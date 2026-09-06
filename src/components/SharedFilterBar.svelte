@@ -15,6 +15,7 @@
   import { filterLayout } from "../stores/filterLayout.js";
   import {
     FILTER_CONTROL_IDS,
+    FILTER_CONTROL_SUPPORT,
     defaultSortDirection,
     isBasicFilterControl,
   } from "../lib/filters.js";
@@ -137,7 +138,9 @@
   // Basic before advanced whatever the stored order says: the two are separate rows
   // of the bar, and only inventory renders both (from two bar instances).
   $: shown = layout.order.filter((id) => enabled.has(id) && !layout.hidden.includes(id));
-  $: customizeOrder = layout.order.filter((id) => enabled.has(id));
+  // Customizing edits the scope-wide layout, so the popover lists every control the
+  // scope supports, not only the ones this bar instance shows.
+  $: customizeOrder = layout.order.filter((id) => FILTER_CONTROL_SUPPORT[scope].includes(id));
   $: visibleControls = [
     ...shown.filter((id) => isBasicFilterControl(id)),
     ...shown.filter((id) => !isBasicFilterControl(id)),
