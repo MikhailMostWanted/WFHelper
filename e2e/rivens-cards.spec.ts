@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator } from "@playwright/test";
 
 import {
   closeElectronTestHarness,
@@ -15,7 +15,7 @@ const MAX_ROLL_INT = 0x3fffffff;
 const RIFLE_RIVEN_ID = "aaaaaaaaaaaaaaaaaaaaaaa1";
 const PISTOL_RIVEN_ID = "aaaaaaaaaaaaaaaaaaaaaaa2";
 
-function riven(itemType: string, oid: string, compat: string) {
+function riven(itemType: string, oid: string, compat: string, buff: number, curse: number) {
   return {
     ItemType: `/Lotus/Upgrades/Mods/Randomized/${itemType}`,
     ItemId: { $oid: oid },
@@ -26,20 +26,40 @@ function riven(itemType: string, oid: string, compat: string) {
       lvl: 8,
       rerolls: 2,
       pol: "AP_ATTACK",
-      buffs: [{ Tag: "WeaponFireDamageMod", Value: Math.round(MAX_ROLL_INT * 0.72) }],
-      curses: [{ Tag: "WeaponFireRateMod", Value: Math.round(MAX_ROLL_INT * 0.3) }],
+      buffs: [{ Tag: "WeaponFireDamageMod", Value: Math.round(MAX_ROLL_INT * buff) }],
+      curses: [{ Tag: "WeaponFireRateMod", Value: Math.round(MAX_ROLL_INT * curse) }],
     }),
   };
 }
 
+// The overall grade is lerp(-10, 10, avg roll), curses counting inverted: the
+// rifle rolls average 0.71 (A-) and the pistol 0.05 (C-), one card per letter.
 function inventory() {
   return {
     Suits: [],
     Upgrades: [
-      riven("LotusRifleRandomModRare", RIFLE_RIVEN_ID, "/Lotus/Weapons/Tenno/Rifle/Rifle"),
-      riven("LotusPistolRandomModRare", PISTOL_RIVEN_ID, "/Lotus/Weapons/Tenno/Pistol/HeavyPistol"),
+      riven(
+        "LotusRifleRandomModRare",
+        RIFLE_RIVEN_ID,
+        "/Lotus/Weapons/Tenno/Rifle/Rifle",
+        0.72,
+        0.3,
+      ),
+      riven(
+        "LotusPistolRandomModRare",
+        PISTOL_RIVEN_ID,
+        "/Lotus/Weapons/Tenno/Pistol/HeavyPistol",
+        0.05,
+        0.95,
+      ),
     ],
   };
+}
+
+function optionValues(select: Locator): Promise<string[]> {
+  return select.evaluate((element) =>
+    Array.from((element as HTMLSelectElement).options, (option) => option.value),
+  );
 }
 
 test.describe("riven card size", () => {
@@ -97,6 +117,33 @@ test.describe("riven card size", () => {
       "compact",
       { timeout: 30_000 },
     );
+    await expect(page.locator("[data-riven-card]")).toHaveCount(2);
+  });
+
+  test("the grade dropdowns list every grade and narrow the cards", async () => {
+    const page = harness!.page;
+
+    const gradeSelect = page.locator("[data-riven-grade-filter] [data-riven-grade-select]");
+    const attrGradeSelect = page.locator("[data-riven-attr-grade-select]");
+    await expect(gradeSelect).toBeVisible({ timeout: 30_000 });
+
+    expect(await optionValues(gradeSelect)).toEqual(["all", "S", "A", "B", "C", "F"]);
+    expect(await optionValues(attrGradeSelect)).toEqual(["all", "Great", "Good", "OK", "Bad"]);
+
+    // The filter matches the letter family, so "C" keeps C+, C and C-.
+    await gradeSelect.selectOption("C");
+    await expect(page.locator("[data-riven-card]")).toHaveCount(1);
+    await expect(
+      page.locator(`[data-riven-card="${PISTOL_RIVEN_ID}"] [data-riven-grade]`),
+    ).toHaveText(/^C[+-]?$/);
+
+    await gradeSelect.selectOption("A");
+    await expect(page.locator("[data-riven-card]")).toHaveCount(1);
+    await expect(
+      page.locator(`[data-riven-card="${RIFLE_RIVEN_ID}"] [data-riven-grade]`),
+    ).toHaveText(/^A[+-]?$/);
+
+    await gradeSelect.selectOption("all");
     await expect(page.locator("[data-riven-card]")).toHaveCount(2);
   });
 });

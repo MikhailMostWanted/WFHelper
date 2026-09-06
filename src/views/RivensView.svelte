@@ -407,19 +407,33 @@
         onChange={(value) => (typeFilter = value)}
       />
 
-      <SegmentedControl
-        value={gradeFilter}
-        options={GRADE_OPTIONS}
-        onChange={(value) => (gradeFilter = value)}
-      />
+      <label class="flex shrink-0 items-center gap-1.5" data-riven-grade-filter>
+        <span class="text-xs text-text-muted">{$tr("rivens.sort.grade")}</span>
+        <select
+          class="shared-filter-select w-24 min-w-24"
+          title={$tr("rivens.sort.grade")}
+          bind:value={gradeFilter}
+          data-riven-grade-select
+        >
+          {#each GRADE_OPTIONS as option (option.value)}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+      </label>
 
-      <div data-riven-attr-grade-filter title={$tr("rivens.sort.attributeGrade")}>
-        <SegmentedControl
-          value={attrGradeFilter}
-          options={ATTR_GRADE_OPTIONS}
-          onChange={(value) => (attrGradeFilter = value)}
-        />
-      </div>
+      <label class="flex shrink-0 items-center gap-1.5">
+        <span class="text-xs text-text-muted">{$tr("rivens.sort.attributeGrade")}</span>
+        <select
+          class="shared-filter-select w-24 min-w-24"
+          title={$tr("rivens.sort.attributeGrade")}
+          bind:value={attrGradeFilter}
+          data-riven-attr-grade-select
+        >
+          {#each ATTR_GRADE_OPTIONS as option (option.value)}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+      </label>
 
       <button
         class="btn-secondary btn-sm inline-flex items-center gap-1.5"
