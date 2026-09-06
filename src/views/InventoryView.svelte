@@ -42,7 +42,7 @@
 </script>
 
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, setContext } from "svelte";
 
   import { tr } from "../lib/i18n.js";
   import EditLayoutBar from "../components/layout/EditLayoutBar.svelte";
@@ -59,7 +59,7 @@
   import InventoryValueStrip from "../components/inventory/InventoryValueStrip.svelte";
   import InventorySelectionBar from "../components/inventory/InventorySelectionBar.svelte";
   import InventoryOrderBookPanel from "../components/inventory/InventoryOrderBookPanel.svelte";
-  import SharedFilterBar from "../components/SharedFilterBar.svelte";
+  import SharedFilterBar, { FILTER_BAR_EXPAND } from "../components/SharedFilterBar.svelte";
   import ResourcesView from "./ResourcesView.svelte";
   import ChipToggleRow from "../components/inventory/ChipToggleRow.svelte";
   import { parseResources } from "../lib/inventory.js";
@@ -266,6 +266,11 @@
   function handleToggleFilterPanel(): void {
     showFilterPanel = !showFilterPanel;
   }
+
+  // Resources drops the advanced row entirely, so there is nothing to reveal there.
+  setContext(FILTER_BAR_EXPAND, () => {
+    if (filter !== "resources") showFilterPanel = true;
+  });
 
   function applyListSort(patch: { sortBy: SharedSortKey; sortDirection: SortDirection }): void {
     updateSharedFilters("inventory", patch);

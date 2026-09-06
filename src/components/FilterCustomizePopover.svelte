@@ -55,10 +55,11 @@
   }
 
   function onWindowPointerDown(event: PointerEvent): void {
-    const target = event.target instanceof Element ? event.target : null;
+    const target = event.target instanceof Node ? event.target : null;
     if (!target) return;
-    // The toggle closes the panel itself, so a click on it must not close and reopen.
-    if (panel?.contains(target) || target.closest("[data-filter-customize-toggle]")) return;
+    // Only the toggle this panel was opened from counts as inside: another bar's
+    // toggle has to close this one before it opens its own.
+    if (panel?.contains(target) || anchor?.contains(target)) return;
     onClose();
   }
 

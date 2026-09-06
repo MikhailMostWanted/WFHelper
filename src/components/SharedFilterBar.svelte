@@ -1,4 +1,16 @@
+<script context="module" lang="ts">
+  /** A view sets this so the bar can ask it to reveal a collapsed filter row. */
+  export const FILTER_BAR_EXPAND = Symbol("filterBarExpand");
+</script>
+
 <script lang="ts">
+  import { getContext, onDestroy } from "svelte";
+
+  import {
+    closeFilterCustomize,
+    filterCustomizeOwners,
+    toggleFilterCustomize,
+  } from "../stores/filterCustomize.js";
   import { resetSharedFilters, sharedFilters, updateSharedFilters } from "../stores/filters.js";
   import { filterLayout } from "../stores/filterLayout.js";
   import {
@@ -35,8 +47,18 @@
 
   const ADVANCED_CONTROLS = FILTER_CONTROL_IDS.filter((id) => !isBasicFilterControl(id));
 
-  let customizeOpen = false;
+  // Identifies this bar in the scope's open-popover slot; the header bar and the
+  // advanced bar must never edit the same layout through two panels.
+  const customizeOwner = Symbol("filterCustomize");
   let customizeAnchor: HTMLElement | null = null;
+  onDestroy(() => closeFilterCustomize(scope, customizeOwner));
+
+  const requestExpand = getContext<(() => void) | undefined>(FILTER_BAR_EXPAND);
+
+  // The popover edits controls the collapsed row hides, so opening it shows that row.
+  function toggleCustomize(): void {
+    if (toggleFilterCustomize(scope, customizeOwner)) requestExpand?.();
+  }
 
   $: PRIME_OPTIONS = [
     ["all", $tr("common.all")],
@@ -89,6 +111,7 @@
     ["no", $tr("filters.no")],
   ] as Array<[Exclude<YesNoFilterMode, "all">, string]>;
 
+  $: customizeOpen = $filterCustomizeOwners[scope] === customizeOwner;
   $: scopeStore = sharedFilters(scope);
   $: state = $scopeStore;
   $: layoutStore = filterLayout(scope);
@@ -431,7 +454,7 @@
         aria-expanded={customizeOpen}
         aria-label={$tr("filters.customizeTitle")}
         title={$tr("filters.customizeTitle")}
-        on:click={() => (customizeOpen = !customizeOpen)}
+        on:click={toggleCustomize}
       >
         <svg
           viewBox="0 0 16 16"
@@ -460,6 +483,6 @@
     hidden={layout.hidden}
     indexOf={(id) => layout.order.indexOf(id)}
     anchor={customizeAnchor}
-    onClose={() => (customizeOpen = false)}
+    onClose={() => closeFilterCustomize(scope, customizeOwner)}
   />
 {/if}
