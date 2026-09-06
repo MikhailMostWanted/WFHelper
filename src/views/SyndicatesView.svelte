@@ -1,7 +1,7 @@
 <script lang="ts">
   import { CREDITS_ICON_URL } from "../lib/assetUrls.js";
   import { formatNumber } from "../lib/format.js";
-  import { tr, type MessageKey } from "../lib/i18n.js";
+  import { locale, tr, type MessageKey } from "../lib/i18n.js";
   import { send } from "../lib/ipc.js";
   import { buildWikiUrl } from "../lib/wikiUrl.js";
   import { buildParsedItemFromDb } from "../lib/parsedItemFromDb.js";
@@ -23,6 +23,7 @@
     syndicateGoals,
   } from "../stores/syndicateGoals.js";
   import ItemImage from "../components/ItemImage.svelte";
+  import ItemTile from "../components/ItemTile.svelte";
   import ThemedButton from "../components/ThemedButton.svelte";
   import ThemedPanel from "../components/ThemedPanel.svelte";
   import WikiButton from "../components/WikiButton.svelte";
@@ -122,9 +123,9 @@
       <p>{$tr("syndicates.noData")}</p>
     </div>
   {:else}
-    <div
-      class="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-1 xl:grid-cols-[minmax(0,1fr)_22rem]"
-    >
+    <!-- No overflow here: an own scrollport would capture the sticky totals
+         panel, which has to stick against #content instead. -->
+    <div class="grid grid-cols-1 gap-3 p-1 xl:grid-cols-[minmax(0,1fr)_22rem]">
       <div class="flex flex-col gap-4">
         {#each GROUPS as group (group.kind)}
           {@const rows = cards.filter((card) => card.meta.kind === group.kind)}
@@ -151,7 +152,7 @@
                           <span class="text-xs text-text-muted" data-syndicate-daily>
                             {card.status.dailyRemaining > 0
                               ? $tr("dailies.standingLeft", {
-                                  amount: formatNumber(card.status.dailyRemaining),
+                                  amount: formatNumber(card.status.dailyRemaining, $locale),
                                 })
                               : $tr("syndicates.dailyCapped")}
                           </span>
@@ -172,7 +173,7 @@
                           {$tr("syndicates.maxRank")}
                         {:else}
                           {$tr("syndicates.toNextRank", {
-                            amount: formatNumber(card.status.standingToNext),
+                            amount: formatNumber(card.status.standingToNext, $locale),
                             level: String(card.status.nextLevel),
                           })}
                         {/if}
@@ -211,7 +212,7 @@
                           </span>
                           <span class="text-text-muted">
                             {$tr("dailies.standing", {
-                              amount: formatNumber(step.standingNeeded),
+                              amount: formatNumber(step.standingNeeded, $locale),
                             })}
                           </span>
                           {#if step.initiation}
@@ -221,63 +222,34 @@
                           {/if}
                         </div>
 
-                        <div class="flex flex-wrap gap-x-3 gap-y-1">
+                        <div class="flex flex-wrap items-start gap-x-2 gap-y-2">
                           {#if step.credits > 0}
-                            {@const creditsOwned = totals.credits.owned}
-                            <span class="flex items-center gap-1 text-xs">
-                              <img
-                                class="h-3.5 w-3.5 object-contain"
-                                src={CREDITS_ICON_URL}
-                                alt={$tr("common.credits")}
-                              />
-                              <span
-                                class={creditsOwned < step.credits
-                                  ? "text-danger"
-                                  : "text-text-secondary"}
-                              >
-                                {formatNumber(step.credits)}
-                              </span>
-                            </span>
+                            <ItemTile
+                              tileKey="credits"
+                              imageUrl={CREDITS_ICON_URL}
+                              label={$tr("common.credits")}
+                              count={formatNumber(step.credits, $locale)}
+                              enough={totals.credits.owned >= step.credits}
+                            />
                           {/if}
                           {#each step.items as item (item.itemType)}
                             {@const have = owned.get(item.itemType) ?? 0}
                             {@const label = db[item.itemType]?.displayName ?? item.name}
-                            <span class="flex items-center gap-1 text-xs">
-                              <span class="h-4 w-4 shrink-0">
-                                <ItemImage
-                                  src={db[item.itemType]?.imageUrl ?? null}
-                                  alt={label}
-                                  auditKey={item.name}
-                                  cls="h-4 w-4"
-                                />
-                              </span>
-                              {#if db[item.itemType]}
-                                <button
-                                  type="button"
-                                  class="link-btn"
-                                  onclick={() => openItem(item.itemType)}
-                                >
-                                  {label}
-                                </button>
-                              {:else}
-                                <button
-                                  type="button"
-                                  class="link-btn"
-                                  onclick={() => openWiki(item.name)}
-                                >
-                                  {label}
-                                </button>
-                              {/if}
-                              <span
-                                class={have < item.count ? "text-danger" : "text-text-secondary"}
-                                data-syndicate-missing={have < item.count ? item.itemType : null}
-                              >
-                                {$tr("syndicates.ownedOfNeeded", {
-                                  owned: formatNumber(have),
-                                  needed: formatNumber(item.count),
-                                })}
-                              </span>
-                            </span>
+                            <ItemTile
+                              tileKey={item.itemType}
+                              imageUrl={db[item.itemType]?.imageUrl ?? null}
+                              {label}
+                              auditKey={item.name}
+                              count={$tr("syndicates.ownedOfNeeded", {
+                                owned: formatNumber(have, $locale),
+                                needed: formatNumber(item.count, $locale),
+                              })}
+                              enough={have >= item.count}
+                              missingKey={have < item.count ? item.itemType : null}
+                              onOpen={db[item.itemType]
+                                ? () => openItem(item.itemType)
+                                : () => openWiki(item.name)}
+                            />
                           {/each}
                         </div>
                       </div>
@@ -290,7 +262,12 @@
         {/each}
       </div>
 
-      <aside class="self-start xl:sticky xl:top-1" data-syndicates-totals>
+      <!-- The 0.5rem is the sticky top (top-1) plus the wrapper's own bottom
+           padding (p-1), so the panel stops exactly at the grid's edge. -->
+      <aside
+        class="self-start xl:sticky xl:top-1 xl:max-h-[calc(100vh_-_var(--titlebar-height)_-_var(--statusbar-height)_-_0.5rem)] xl:overflow-y-auto"
+        data-syndicates-totals
+      >
         <ThemedPanel className="flex flex-col gap-3 p-3">
           <h3 class="m-0 text-sm font-semibold text-text-primary">
             {$tr("syndicates.totalsTitle")}
@@ -314,11 +291,12 @@
                 src={CREDITS_ICON_URL}
                 alt={$tr("common.credits")}
               />
-              <span class="text-text-secondary">{formatNumber(totals.credits.needed)}</span>
+              <span class="text-text-secondary">{formatNumber(totals.credits.needed, $locale)}</span
+              >
               {#if totals.credits.missing > 0}
                 <span class="text-danger">
                   {$tr("syndicates.missingAmount", {
-                    amount: formatNumber(totals.credits.missing),
+                    amount: formatNumber(totals.credits.missing, $locale),
                   })}
                 </span>
               {/if}
@@ -340,8 +318,8 @@
                     <span class="flex-1 truncate text-text-secondary" title={label}>{label}</span>
                     <span class={item.missing > 0 ? "text-danger" : "text-success"}>
                       {$tr("syndicates.ownedOfNeeded", {
-                        owned: formatNumber(item.owned),
-                        needed: formatNumber(item.needed),
+                        owned: formatNumber(item.owned, $locale),
+                        needed: formatNumber(item.needed, $locale),
                       })}
                     </span>
                   </li>
@@ -355,7 +333,7 @@
                   <span class="flex-1 truncate text-text-secondary">
                     {pool.tags.map((tag) => NAME_BY_TAG.get(tag) ?? tag).join(", ")}
                   </span>
-                  <span class="text-text-muted">{formatNumber(pool.needed)}</span>
+                  <span class="text-text-muted">{formatNumber(pool.needed, $locale)}</span>
                   <span class="whitespace-nowrap text-text-muted">
                     {pool.daysEstimate === 0
                       ? $tr("syndicates.daysToday")

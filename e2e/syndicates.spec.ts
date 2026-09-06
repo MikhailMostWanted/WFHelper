@@ -11,6 +11,7 @@ import {
 } from "./electronTestHarness";
 
 const GALLIUM = "/Lotus/Types/Items/MiscItems/Gallium";
+const FORMA = "/Lotus/Types/Items/MiscItems/Forma";
 
 // Each test is self-contained: a failed test restarts the worker, which re-runs
 // beforeAll with a fresh sandbox and empty localStorage.
@@ -53,17 +54,42 @@ test.describe("Syndicate rank-up assistant", () => {
 
   test("picking a target rank lists what is still missing", async () => {
     await expect(card()).toBeVisible({ timeout: 30_000 });
-    await expect(card().locator("[data-syndicate-missing]")).toHaveCount(0);
+    await expect(card().locator("[data-item-tile-missing]")).toHaveCount(0);
 
     await card().locator('[data-syndicate-goal="3"]').click();
 
     await expect(card().locator('[data-syndicate-step="2"]')).toBeVisible();
     await expect(card().locator('[data-syndicate-step="3"]')).toBeVisible();
-    await expect(card().locator("[data-syndicate-missing]").first()).toBeVisible();
+    await expect(card().locator("[data-item-tile-missing]").first()).toBeVisible();
+
+    // Rank 2 costs credits plus one Forma, and each cost draws its own tile.
+    const step2 = card().locator('[data-syndicate-step="2"]');
+    await expect(step2.locator('[data-item-tile="credits"]')).toBeVisible();
+    await expect(step2.locator(`[data-item-tile="${FORMA}"]`)).toBeVisible();
 
     const totals = page.locator("[data-syndicates-totals]");
     await expect(totals.locator("[data-syndicate-total-item]")).toHaveCount(2);
     await expect(totals.locator('[data-syndicate-pool="NORMAL"]')).toBeVisible();
+  });
+
+  test("a cost tile that is a button opens the item detail modal", async () => {
+    await card().locator('[data-syndicate-goal="2"]').click();
+
+    // Credits have nothing to open, so that tile stays a plain div.
+    const step2 = card().locator('[data-syndicate-step="2"]');
+    await expect(step2.locator('div[data-item-tile="credits"]')).toBeVisible();
+
+    const forma = step2.locator(`button[data-item-tile="${FORMA}"]`);
+    await expect(forma).toBeVisible();
+    await forma.click();
+
+    await expect(page.locator('[role="dialog"] .detail-panel').first()).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator('[role="dialog"] .detail-panel')).toHaveCount(0);
+
+    // Goals live in the renderer as well as in storage, so clear the one this test set.
+    await card().locator('[data-syndicate-goal="2"]').click();
+    await expect(card().locator("[data-syndicate-step]")).toHaveCount(0);
   });
 
   test("a goal survives a renderer reload and clears on demand", async () => {
