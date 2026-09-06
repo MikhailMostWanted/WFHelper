@@ -239,9 +239,9 @@
   }}
 />
 
-{#snippet copyGlyph()}
+{#snippet copyGlyph(cls: string)}
   <svg
-    class="h-3 w-3"
+    class={cls}
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -255,13 +255,17 @@
   </svg>
 {/snippet}
 
+{#snippet listingIcon(listing: WfmContract, iconCls: string)}
+  <img
+    src={NAV_ICON_URLS.market}
+    alt={$tr("rivens.listedPrice", { plat: listing.platinum })}
+    class={iconCls}
+  />
+{/snippet}
+
 {#snippet listingBadge(listing: WfmContract, cls: string, iconCls: string)}
   <span class={cls} title={$tr("rivens.listedPrice", { plat: listing.platinum })} data-riven-listed>
-    <img
-      src={NAV_ICON_URLS.market}
-      alt={$tr("rivens.listedPrice", { plat: listing.platinum })}
-      class={iconCls}
-    />
+    {@render listingIcon(listing, iconCls)}
   </span>
 {/snippet}
 
@@ -308,26 +312,51 @@
   >
 {/snippet}
 
-{#snippet cardActions(riven: DecodedRiven, listing: WfmContract | undefined, wrapperCls: string)}
-  <div class={wrapperCls}>
+<!-- Full cards get double-size buttons and carry the listing badge in the same row.
+     The wrapper stays click-through so the gaps between the buttons still open the card. -->
+{#snippet cardActions(
+  riven: DecodedRiven,
+  listing: WfmContract | undefined,
+  wrapperCls: string,
+  full: boolean,
+)}
+  <div class="pointer-events-none {wrapperCls}">
     <button
-      class="inline-flex items-center justify-center rounded border border-border bg-bg-deep/60 p-1 text-text-secondary opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+      type="button"
+      class="pointer-events-auto inline-flex items-center justify-center rounded border border-border bg-bg-deep/85 text-text-secondary shadow-[0_0_6px_rgba(0,0,0,0.9)] transition-colors hover:text-text-primary focus-visible:text-text-primary {full
+        ? 'p-2'
+        : 'p-1'}"
       title={$tr("rivens.copyChatTag")}
       aria-label={$tr("rivens.copyChatTag")}
       onclick={() => copyToClipboard(rivenChatTag(riven))}
       data-riven-copy-tag
     >
-      {@render copyGlyph()}
+      {@render copyGlyph(full ? "h-6 w-6" : "h-3 w-3")}
     </button>
     {#if listing}
       <button
-        class="inline-flex items-center justify-center rounded border border-border bg-bg-deep/60 px-1.5 py-1 font-display text-[0.625rem] font-bold leading-none text-text-secondary opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+        type="button"
+        class="pointer-events-auto inline-flex items-center justify-center rounded border border-border bg-bg-deep/85 font-display font-bold leading-none text-text-secondary shadow-[0_0_6px_rgba(0,0,0,0.9)] transition-colors hover:text-text-primary focus-visible:text-text-primary {full
+          ? 'px-2.5 text-sm'
+          : 'px-1.5 py-1 text-[0.625rem]'}"
         title={$tr("rivens.copyWtsLine")}
         aria-label={$tr("rivens.copyWtsLine")}
         onclick={() => copyToClipboard(rivenWtsLine(riven, listingPlatinum(listing)))}
         data-riven-copy-wts
       >
         WTS
+      </button>
+    {/if}
+    {#if listing && full}
+      <button
+        type="button"
+        class="pointer-events-auto self-center inline-flex items-center justify-center rounded-full border border-accent bg-bg-deep/85 p-1.5 shadow-[0_0_6px_rgba(0,0,0,0.9)]"
+        title={$tr("rivens.listedPrice", { plat: listing.platinum })}
+        aria-label={$tr("rivens.listedPrice", { plat: listing.platinum })}
+        onclick={() => (selectedRiven = riven)}
+        data-riven-listed
+      >
+        {@render listingIcon(listing, "h-4 w-4")}
       </button>
     {/if}
   </div>
@@ -482,6 +511,7 @@
                 riven,
                 listing,
                 "absolute bottom-1.5 right-1.5 z-[2] flex gap-1",
+                false,
               )}
             </div>
           {/each}
@@ -508,14 +538,6 @@
                   class="relative w-full h-full bg-center bg-[length:100%_100%] bg-no-repeat"
                   style:background-image={`url("${RIVEN_TEMPLATE_URL}")`}
                 >
-                  {#if listing}
-                    {@render listingBadge(
-                      listing,
-                      "absolute top-[9%] left-[13%] z-[2] inline-flex items-center justify-center rounded-full border border-accent bg-bg-deep/85 p-1.5 shadow-[0_0_6px_rgba(0,0,0,0.9)]",
-                      "h-4 w-4",
-                    )}
-                  {/if}
-
                   {@render gradeBadges(
                     riven,
                     "absolute top-[10%] right-[15%] z-[2] font-display font-extrabold text-base leading-none [text-shadow:0_0_4px_rgba(0,0,0,1),0_0_8px_rgba(0,0,0,0.9)]",
@@ -581,10 +603,12 @@
                 </div>
               </button>
 
+              <!-- The bottom-right corner is frame ornament, so the actions sit top-left. -->
               {@render cardActions(
                 riven,
                 listing,
-                "absolute right-[7%] top-[90%] z-[3] flex gap-1",
+                "absolute top-[9%] left-[13%] z-[3] flex gap-1.5",
+                true,
               )}
             </div>
           {/each}
