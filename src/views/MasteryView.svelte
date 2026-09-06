@@ -954,7 +954,7 @@
                       {#if pinKey}
                         <button
                           type="button"
-                          class="absolute left-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded border bg-bg-deep/35 transition-[opacity,color,border-color] duration-100 {pinned
+                          class="absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded border bg-bg-deep/35 transition-[opacity,color,border-color] duration-100 {pinned
                             ? 'border-accent-dim text-accent opacity-100'
                             : 'border-border text-text-muted opacity-0 group-hover:opacity-100'}"
                           title={pinned ? $tr("mastery.planner.unpin") : $tr("mastery.planner.pin")}
@@ -1094,7 +1094,7 @@
                       {#if item.wfm}
                         <button
                           type="button"
-                          class="wfm-link absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded border border-border bg-bg-deep/25 text-text-muted opacity-0 transition-[opacity,color,border-color] duration-100 group-hover:opacity-100 hover:text-accent hover:border-accent-dim"
+                          class="wfm-link absolute top-9 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded border border-border bg-bg-deep/25 text-text-muted opacity-0 transition-[opacity,color,border-color] duration-100 group-hover:opacity-100 hover:text-accent hover:border-accent-dim"
                           title={$tr("mastery.viewOnWfmTitle")}
                           aria-label={$tr("mastery.viewOnWfmAria", { name: item.name })}
                           on:click|stopPropagation={() =>
