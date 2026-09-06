@@ -546,27 +546,38 @@ export function categoryNames(entries: ItemCategoryEntry[]): string[] {
   return [...seen].sort((a, b) => a.localeCompare(b));
 }
 
-/** Raw item-database category for a trade row. Trade rows come from EE.log and
- *  exports, so most carry no uniqueName: the market slug and the display name
- *  are the joins that resolve. Indices build on first miss only. */
-function makeDbCategoryResolver(db: ItemDbLookup, wfmLookup: WfmItemsLookup): CategoryResolver {
+/** The join fields a trade row can carry; a `TradeItem` satisfies it. */
+interface ItemRef {
+  internalName?: string;
+  wfmSlug?: string;
+  displayName?: string;
+}
+
+/** Item-database key for a trade row. Most rows come from EE.log or exports and
+ *  carry no uniqueName, so the slug and the display name are the joins that
+ *  resolve. `accept` lets a caller skip a hit and try the next join. */
+export function makeItemRefResolver(
+  db: ItemDbLookup,
+  wfmLookup: WfmItemsLookup,
+  accept: (key: string) => boolean = () => true,
+): (item: ItemRef) => string | null {
   let byGameRef: Map<string, string> | null = null;
   let refBySlug: Map<string, string> | null = null;
 
   // The item database is keyed by the exact uniqueName; WFM's gameRef does not
   // promise DE's casing, so the fallback index folds both sides.
-  const categoryOf = (uniqueName: string | null | undefined): string => {
-    if (!uniqueName) return "";
-    const direct = db[uniqueName]?.category;
-    if (typeof direct === "string" && direct.trim()) return direct.trim();
+  const dbKey = (uniqueName: string | null | undefined): string | null => {
+    if (!uniqueName) return null;
+    if (db[uniqueName]) return accept(uniqueName) ? uniqueName : null;
     if (!byGameRef) {
       byGameRef = new Map();
-      for (const [key, entry] of Object.entries(db)) {
-        const category = typeof entry?.category === "string" ? entry.category.trim() : "";
-        if (category) byGameRef.set(gameRefKey(key), category);
+      for (const key of Object.keys(db)) {
+        const folded = gameRefKey(key);
+        if (folded && !byGameRef.has(folded)) byGameRef.set(folded, key);
       }
     }
-    return byGameRef.get(gameRefKey(uniqueName)) ?? "";
+    const folded = byGameRef.get(gameRefKey(uniqueName));
+    return folded && accept(folded) ? folded : null;
   };
 
   const gameRefForSlug = (slug: string): string => {
@@ -581,26 +592,36 @@ function makeDbCategoryResolver(db: ItemDbLookup, wfmLookup: WfmItemsLookup): Ca
     return refBySlug.get(slug) ?? "";
   };
 
-  return (item: TradeItem): string => {
-    const direct = categoryOf(item?.internalName);
+  return (item: ItemRef): string | null => {
+    const direct = dbKey(item?.internalName);
     if (direct) return direct;
     const slug = normalizeWfmSlug(item?.wfmSlug);
     if (slug) {
-      const viaSlug = categoryOf(gameRefForSlug(slug));
+      const viaSlug = dbKey(gameRefForSlug(slug));
       if (viaSlug) return viaSlug;
     }
     const name = (item?.displayName ?? "").trim().toLowerCase();
-    if (name) {
-      const viaName = categoryOf(wfmLookup[name]?.gameRef);
-      if (viaName) return viaName;
-      // Live rows carry the dialog's rank tag, which no catalog name has.
-      const bare = name.replace(PAREN_TAIL, "").trim();
-      if (bare && bare !== name) {
-        const viaBare = categoryOf(wfmLookup[bare]?.gameRef);
-        if (viaBare) return viaBare;
-      }
-    }
-    return "";
+    if (!name) return null;
+    const viaName = dbKey(wfmLookup[name]?.gameRef);
+    if (viaName) return viaName;
+    // Live rows carry the dialog's rank tag, which no catalog name has.
+    const bare = name.replace(PAREN_TAIL, "").trim();
+    if (!bare || bare === name) return null;
+    return dbKey(wfmLookup[bare]?.gameRef);
+  };
+}
+
+function categoryOf(db: ItemDbLookup, key: string): string {
+  const category = db[key]?.category;
+  return typeof category === "string" ? category.trim() : "";
+}
+
+/** Raw item-database category for a trade row: the first join whose entry has one. */
+function makeDbCategoryResolver(db: ItemDbLookup, wfmLookup: WfmItemsLookup): CategoryResolver {
+  const resolveRef = makeItemRefResolver(db, wfmLookup, (key) => categoryOf(db, key) !== "");
+  return (item: TradeItem): string => {
+    const key = resolveRef(item);
+    return key ? categoryOf(db, key) : "";
   };
 }
 

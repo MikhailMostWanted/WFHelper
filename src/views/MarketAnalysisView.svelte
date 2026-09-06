@@ -103,7 +103,9 @@
   import AnalysisWorthToday from "../components/analysis/AnalysisWorthToday.svelte";
   import AnalysisYearCompare from "../components/analysis/AnalysisYearCompare.svelte";
   import { KIND_KEYS } from "../components/analysis/analysisMessages.js";
-  import { itemDb, wfmItems } from "../stores/data.js";
+  import { componentOwnership, itemDb, wfmItems } from "../stores/data.js";
+  import { activeItem } from "../stores/modals.js";
+  import { buildParsedItemFromDb } from "../lib/parsedItemFromDb.js";
   import { persistedBoolean } from "../lib/persistence.js";
   import { priceCacheRevision } from "../stores/pricing.js";
   import { getCachedMedian } from "../stores/hydration/hydrationCacheHelpers.js";
@@ -143,6 +145,10 @@
     type TradeItemKind,
   } from "../lib/stats/tradeAnalytics.js";
   import { pageLedgerRange } from "../lib/stats/ledgerPaging.js";
+  import {
+    createAnalyticsItemResolver,
+    type AnalyticsItemLink,
+  } from "../lib/stats/analyticsItemLink.js";
 
   const TABLE_PAGE_SIZE = 50;
   // Analytics read the whole range through the paged query; the cap keeps a huge
@@ -526,6 +532,20 @@
     };
   });
 
+  // A riven roll or an unknown name resolves to null and stays an ordinary row.
+  const itemLink = $derived.by<AnalyticsItemLink>(() => {
+    const resolve = createAnalyticsItemResolver($itemDb, $wfmItems);
+    const db = $itemDb;
+    const ownership = $componentOwnership;
+    return {
+      resolve,
+      open: (uniqueName: string): void => {
+        const entry = db[uniqueName];
+        if (entry) activeItem.set(buildParsedItemFromDb(uniqueName, entry, ownership));
+      },
+    };
+  });
+
   const flow = $derived(computeFlow(allEvents));
   const basis = $derived(fifoCostBasis(allEvents));
   const soldRows = $derived(topItems(allEvents, "sold"));
@@ -655,7 +675,7 @@
           </div>
         {:else if sectionId === "analytics.topTraded"}
           <div class="mb-3" data-analysis-section="analytics.topTraded">
-            <AnalysisTopTraded />
+            <AnalysisTopTraded {itemLink} />
           </div>
         {:else if sectionId === "analytics.timeCharts"}
           <div class="mb-3 grid grid-cols-1 gap-3 @5xl:grid-cols-2">
@@ -669,8 +689,13 @@
           </div>
         {:else if sectionId === "analytics.topItems"}
           <div class="mb-3 grid grid-cols-1 gap-3 @5xl:grid-cols-2">
-            <AnalysisTopItems titleKey="analysis.topSold" rows={soldRows} side="sold" />
-            <AnalysisTopItems titleKey="analysis.topBought" rows={boughtRows} side="bought" />
+            <AnalysisTopItems titleKey="analysis.topSold" rows={soldRows} side="sold" {itemLink} />
+            <AnalysisTopItems
+              titleKey="analysis.topBought"
+              rows={boughtRows}
+              side="bought"
+              {itemLink}
+            />
           </div>
         {:else if sectionId === "analytics.byType"}
           <div class="mb-3">
@@ -683,7 +708,7 @@
           </div>
         {:else if sectionId === "analytics.worthToday"}
           <div class="mb-3">
-            <AnalysisWorthToday {worth} />
+            <AnalysisWorthToday {worth} {itemLink} />
           </div>
         {:else if sectionId === "analytics.partners"}
           <div class="mb-3">
@@ -702,6 +727,7 @@
               {typeFilter}
               offset={tableOffset}
               limit={TABLE_PAGE_SIZE}
+              {itemLink}
               {onSearch}
               {onTypeFilter}
               {onOffset}

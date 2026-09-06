@@ -10,6 +10,13 @@
   import { loadTopTraded } from "../../lib/wfm/topTraded.js";
   import { formatPlat } from "../../lib/stats/tradeAnalytics.js";
   import { formatWfmAssetUrl, titleFromSlug } from "../../../config/shared/wfm.js";
+  import type { AnalyticsItemLink } from "../../lib/stats/analyticsItemLink.js";
+
+  interface Props {
+    itemLink: AnalyticsItemLink;
+  }
+
+  let { itemLink }: Props = $props();
 
   type Mode = "volume" | "value";
 
@@ -132,6 +139,7 @@
 
           {#each items as row, index (row.slug)}
             {@const label = row.name || titleFromSlug(row.slug)}
+            {@const link = itemLink.resolve(row.slug, label)}
             <span class="text-right text-[0.65rem] tabular-nums text-text-muted"
               >{offset + index + 1}</span
             >
@@ -144,13 +152,24 @@
                 cls="max-h-6 max-w-6 object-contain"
               />
             </span>
-            <span
-              class="truncate text-sm text-text-primary"
-              title={label}
-              data-analysis-top-traded-item={row.slug}
-            >
-              {label}
-            </span>
+            <!-- The panel is a flat grid of cells, so the name is the row's handle. -->
+            {#if link}
+              <!-- The name truncates on an inner span; a button box does not
+                   hand text-overflow down to its own anonymous content box. -->
+              <button
+                type="button"
+                class="flex min-w-0 cursor-pointer rounded-[var(--radius-md)] border-0 bg-transparent p-0 text-left hover:bg-bg-raised"
+                title={label}
+                aria-label={$tr("common.openDetailsFor", { name: label })}
+                onclick={() => itemLink.open(link)}
+              >
+                <span class="truncate text-sm text-text-primary">{label}</span>
+              </button>
+            {:else}
+              <span class="truncate text-sm text-text-primary" title={label}>
+                {label}
+              </span>
+            {/if}
             <span class="text-right text-xs tabular-nums text-text-secondary">
               {formatPlat(row.median, $locale)}
             </span>

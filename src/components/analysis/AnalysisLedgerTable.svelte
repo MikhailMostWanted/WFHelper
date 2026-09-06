@@ -7,7 +7,8 @@
   // Aliased: a store named `tr` makes svelte-check flag every <tr> row as a lowercase component.
   import { locale, tr as t } from "../../lib/i18n.js";
   import type { MessageKey } from "../../lib/i18n.js";
-  import { formatPlat, tradeItemLabel } from "../../lib/stats/tradeAnalytics.js";
+  import { formatPlat, itemKey, tradeItemLabel } from "../../lib/stats/tradeAnalytics.js";
+  import type { AnalyticsItemLink } from "../../lib/stats/analyticsItemLink.js";
   import type { LedgerPage } from "../../../config/shared/tradeLedgerTypes.js";
   import type { TradeEvent, TradeItem, TradeType } from "../../types/ipc.js";
 
@@ -18,6 +19,7 @@
     typeFilter: TradeType | "all";
     offset: number;
     limit: number;
+    itemLink: AnalyticsItemLink;
     onSearch: (value: string) => void;
     onTypeFilter: (value: TradeType | "all") => void;
     onOffset: (value: number) => void;
@@ -31,6 +33,7 @@
     typeFilter,
     offset,
     limit,
+    itemLink,
     onSearch,
     onTypeFilter,
     onOffset,
@@ -64,17 +67,10 @@
   const canPrev = $derived(offset > 0);
   const canNext = $derived(offset + limit < total);
 
-  function itemsLabel(items: TradeItem[] | undefined): string {
-    if (!Array.isArray(items) || items.length === 0) return "-";
-    return items
-      .map((i) => {
-        const label = tradeItemLabel(i);
-        const name = label.secondary
-          ? `${label.primary} (${label.secondary})`
-          : label.primary || "?";
-        return i.count > 1 ? `${i.count}x ${name}` : name;
-      })
-      .join(", ");
+  function countedItemLabel(item: TradeItem): string {
+    const label = tradeItemLabel(item);
+    const name = label.secondary ? `${label.primary} (${label.secondary})` : label.primary || "?";
+    return item.count > 1 ? `${item.count}x ${name}` : name;
   }
 
   function dayLabel(iso: string, loc: string): string {
@@ -151,6 +147,7 @@
           </thead>
           <tbody>
             {#each rows as event (event.id)}
+              {@const items = event.items ?? []}
               <tr
                 class="border-t border-[color:var(--ui-panel-border)] align-top hover:bg-bg-raised"
                 data-analysis-row={event.id}
@@ -162,7 +159,34 @@
                   {$t(TYPE_KEYS[event.type])}
                 </td>
                 <td class="max-w-[24rem] px-2 py-1.5 text-xs text-text-primary">
-                  <span class="line-clamp-2">{itemsLabel(event.items)}</span>
+                  <span class="line-clamp-2">
+                    {#if items.length === 0}
+                      -
+                    {:else}
+                      {#each items as item, index (index)}
+                        {@const link = itemLink.resolve(
+                          itemKey(item),
+                          tradeItemLabel(item).primary,
+                        )}
+                        <!-- Svelte trims the space after a bare comma, so a margin makes the gap. -->
+                        {#if index > 0}<span class="mr-1">,</span>{/if}
+                        {#if link}
+                          <button
+                            type="button"
+                            class="inline cursor-pointer border-0 bg-transparent p-0 text-left text-inherit hover:underline"
+                            aria-label={$t("common.openDetailsFor", {
+                              name: countedItemLabel(item),
+                            })}
+                            onclick={() => itemLink.open(link)}
+                          >
+                            {countedItemLabel(item)}
+                          </button>
+                        {:else}
+                          <span>{countedItemLabel(item)}</span>
+                        {/if}
+                      {/each}
+                    {/if}
+                  </span>
                 </td>
                 <td class="max-w-[10rem] truncate px-2 py-1.5 text-xs text-text-secondary">
                   {event.partner || "-"}
