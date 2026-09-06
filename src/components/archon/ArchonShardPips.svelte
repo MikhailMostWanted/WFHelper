@@ -12,7 +12,7 @@
     slots: ArchonShardSlot[];
     /** Render unfilled sockets as placeholders instead of dropping them. */
     showEmpty?: boolean;
-    size?: "sm" | "md";
+    size?: "sm" | "md" | "lg";
     title?: string;
   }
 
@@ -56,7 +56,13 @@
 </script>
 
 {#if pips.length > 0}
-  <span class="shard-pips" class:md={size === "md"} {title} data-archon-pips>
+  <span
+    class="shard-pips"
+    class:md={size === "md"}
+    class:lg={size === "lg"}
+    {title}
+    data-archon-pips
+  >
     {#each pips as pip (pip.slot.index)}
       {#if pip.icon}
         {@const icon = pip.icon}
@@ -67,7 +73,6 @@
           loading="lazy"
           draggable="false"
           title={pip.title}
-          style={pip.slot.color ? `--shard:${SHARD_HEX[pip.slot.color]}` : undefined}
           data-archon-pip={pip.slot.color}
           data-archon-tau={pip.slot.tauforged ? "true" : null}
           onerror={() => markBroken(icon)}
@@ -92,7 +97,7 @@
   .shard-pips {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--pip-gap, 3px);
   }
 
   .shard-icon {
@@ -141,18 +146,26 @@
     box-shadow: 0 0 0 1px color-mix(in oklab, var(--bg-deep) 55%, transparent);
   }
 
-  .shard-pips.md .shard-icon {
+  .shard-pips.md .shard-icon,
+  .shard-pips.lg .shard-icon {
     width: 16px;
     height: 16px;
   }
 
-  .shard-pips.md .shard-pip {
+  .shard-pips.md .shard-pip,
+  .shard-pips.lg .shard-pip {
     width: 16px;
     height: 16px;
   }
 
-  .shard-pips.md .shard-pip.tau {
+  .shard-pips.md .shard-pip.tau,
+  .shard-pips.lg .shard-pip.tau {
     width: 15px;
     height: 15px;
+  }
+
+  /* The rotated tau diamond overruns its box, so a full row needs more gap. */
+  .shard-pips.lg {
+    --pip-gap: 5px;
   }
 </style>
