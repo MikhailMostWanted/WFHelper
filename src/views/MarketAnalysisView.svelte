@@ -104,6 +104,7 @@
   import AnalysisYearCompare from "../components/analysis/AnalysisYearCompare.svelte";
   import { KIND_KEYS } from "../components/analysis/analysisMessages.js";
   import { itemDb, wfmItems } from "../stores/data.js";
+  import { persistedBoolean } from "../lib/persistence.js";
   import { priceCacheRevision } from "../stores/pricing.js";
   import { getCachedMedian } from "../stores/hydration/hydrationCacheHelpers.js";
   import { normalizeWfmSlug } from "../../config/shared/wfm.js";
@@ -208,7 +209,9 @@
   let importBusy = $state(false);
   let importErrorKey = $state<MessageKey | null>(null);
 
-  let includePartners = $state(false);
+  // Persisted: it decides whether other players' names go into the export, so a
+  // tab switch must not silently turn it back on.
+  const includePartners = persistedBoolean("wf_analysis_include_partners", true);
   let status = $state<StatusLine | null>(null);
 
   let destroyed = false;
@@ -437,7 +440,7 @@
     try {
       const result = await invoke("ledgerExport", {
         format,
-        includePartners,
+        includePartners: $includePartners,
         ...baseQuery(),
       });
       if (destroyed) return;
@@ -577,7 +580,7 @@
       <label
         class="flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-text-muted"
       >
-        <input type="checkbox" bind:checked={includePartners} data-analysis-include-partners />
+        <input type="checkbox" bind:checked={$includePartners} />
         {$tr("analysis.includePartners")}
       </label>
       <ThemedButton disabled={!ledgerReady} onClick={() => void exportLedger("csv")}>
