@@ -187,8 +187,9 @@
     padding: 0.6rem;
     border: 1px solid var(--ui-control-border);
     border-radius: var(--radius-lg);
-    background: var(--ui-panel-bg);
-    box-shadow: 0 12px 30px color-mix(in oklab, var(--bg-deep) 45%, transparent);
+    /* Opaque ground: the panel token is transparent under the minimal and border styles. */
+    background: var(--surface-tooltip);
+    box-shadow: var(--ui-panel-shadow);
   }
   .filter-customize-head {
     display: flex;

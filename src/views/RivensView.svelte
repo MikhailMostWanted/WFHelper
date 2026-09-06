@@ -712,13 +712,14 @@
   {@const menuRiven = cardMenu.riven}
   {@const menuListing = listingByRiven.get(menuRiven.itemId)}
   <div
-    class="fixed z-[60] min-w-[13rem] rounded-lg border border-border bg-bg-surface py-1 shadow-lg"
+    class="fixed z-[60] min-w-[13rem] rounded-lg border border-border bg-surface-tooltip py-1 shadow-[var(--ui-panel-shadow)]"
     style="left: {cardMenu.x}px; top: {cardMenu.y}px"
     role="menu"
     tabindex="-1"
     data-riven-card-menu
   >
     <button
+      type="button"
       class="block w-full px-3 py-1.5 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
       role="menuitem"
       onclick={() => copyToClipboard(rivenChatTag(menuRiven))}
@@ -727,6 +728,7 @@
     </button>
     {#if menuListing}
       <button
+        type="button"
         class="block w-full px-3 py-1.5 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
         role="menuitem"
         onclick={() => copyToClipboard(rivenWtsLine(menuRiven, listingPlatinum(menuListing)))}

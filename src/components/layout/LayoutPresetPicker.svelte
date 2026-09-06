@@ -20,7 +20,7 @@
 </script>
 
 <div
-  class="absolute right-0 top-full z-30 mt-1 flex w-56 flex-col gap-1 rounded-[var(--radius-lg)] border border-[color:var(--ui-panel-border)] bg-[var(--ui-panel-bg)] p-2 text-xs shadow-[var(--ui-panel-shadow)]"
+  class="absolute right-0 top-full z-30 mt-1 flex w-56 flex-col gap-1 rounded-[var(--radius-lg)] border border-[color:var(--ui-panel-border)] bg-surface-tooltip p-2 text-xs shadow-[var(--ui-panel-shadow)]"
   data-layout-presets
 >
   <label class="flex cursor-pointer items-center gap-1.5 text-text-secondary">
