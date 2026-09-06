@@ -19,7 +19,7 @@
   let { slots, showEmpty = false, size = "sm", title }: Props = $props();
 
   // Shard hues are fixed game colours, so they stay out of the theme presets.
-  // Still used with the icons: they tint the tauforged glow and the fallback dot.
+  // Only the fallback dot needs them; the icons carry their own colour.
   const SHARD_HEX: Record<ArchonShardColor, string> = {
     crimson: "#e2465b",
     amber: "#e8a63a",
@@ -62,7 +62,6 @@
         {@const icon = pip.icon}
         <img
           class="shard-icon"
-          class:tau={pip.slot.tauforged}
           src={icon}
           alt=""
           loading="lazy"
@@ -107,17 +106,6 @@
     filter: drop-shadow(0 0 1px color-mix(in oklab, var(--bg-deep) 85%, transparent));
   }
 
-  /* Tauforged art only differs by a soft halo, which washes out at 9px and makes
-     the crystal read as smaller. A bigger box plus a hard colour ring inverts
-     that back: at pip size tau must read as MORE, not less. */
-  .shard-icon.tau {
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--shard, white) 65%, white);
-    filter: drop-shadow(0 0 1px color-mix(in oklab, var(--bg-deep) 90%, transparent));
-  }
-
   .shard-pip {
     width: 9px;
     height: 9px;
@@ -128,8 +116,7 @@
     box-shadow: 0 0 0 1px color-mix(in oklab, var(--bg-deep) 40%, transparent);
   }
 
-  /* Tauforged is a brighter diamond whose diagonal overruns the plain circle, so
-     shape and size carry it when colour cannot. */
+  /* No icon to fall back on here, so the diamond keeps tauforged readable. */
   .shard-pip.tau {
     width: 9px;
     height: 9px;
@@ -137,7 +124,6 @@
     transform: rotate(45deg);
     background: var(--shard, var(--text-secondary));
     border-color: color-mix(in oklab, var(--shard, white) 45%, white);
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--shard, white) 65%, white);
   }
 
   .shard-pip.empty {
@@ -158,13 +144,6 @@
   .shard-pips.md .shard-icon {
     width: 16px;
     height: 16px;
-  }
-
-  .shard-pips.md .shard-icon.tau {
-    width: 19px;
-    height: 19px;
-    filter: drop-shadow(0 0 1px color-mix(in oklab, var(--bg-deep) 85%, transparent))
-      drop-shadow(0 0 3px color-mix(in oklab, var(--shard, white) 85%, transparent));
   }
 
   .shard-pips.md .shard-pip {

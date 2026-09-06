@@ -336,22 +336,17 @@
                     class="flex items-center gap-2 border-b border-dashed border-border-subtle py-1.5 last:border-b-0"
                   >
                     <ArchonShardPips slots={[slot]} showEmpty size="md" />
-                    <span class="w-24 shrink-0 text-xs">
+                    <span class="w-32 shrink-0 text-xs">
                       {#if slot.color}
-                        {$tr(archonShardColorKey(slot.color))}
+                        {slot.tauforged
+                          ? `${$tr(archonShardColorKey(slot.color))} · ${$tr("archon.tauforged")}`
+                          : $tr(archonShardColorKey(slot.color))}
                       {:else if slot.filled}
                         {$tr("common.unknown")}
                       {:else}
                         <span class="text-text-muted">{$tr("common.none")}</span>
                       {/if}
                     </span>
-                    {#if slot.tauforged}
-                      <span
-                        class="rounded-[var(--radius-sm)] border border-accent/40 px-1 font-display text-[0.6rem] font-bold tracking-wide text-accent uppercase"
-                      >
-                        {$tr("archon.tauforged")}
-                      </span>
-                    {/if}
                     <span class="text-xs text-text-muted">
                       {archonShardUpgradeLabel(slot.upgradeType)}
                     </span>

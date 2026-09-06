@@ -47,16 +47,10 @@
       data-archon-stock={shardKindKey(row.color, row.tauforged)}
     >
       <ArchonShardPips slots={swatch(row)} size="md" />
+      <!-- Stock is keyed by colour AND tauforged, so the label has to carry both
+           or two rows read the same. -->
       <span class="flex flex-wrap items-baseline gap-1 text-xs text-text-secondary">
-        {$tr(archonShardColorKey(row.color))}
-        {#if row.tauforged}
-          <span
-            class="rounded-[var(--radius-sm)] border border-accent/40 px-1 text-[0.6rem]
-                       font-display font-bold tracking-wide text-accent uppercase"
-          >
-            {$tr("archon.tauforged")}
-          </span>
-        {/if}
+        {$tr(archonShardColorKey(row.color))}{row.tauforged ? ` · ${$tr("archon.tauforged")}` : ""}
       </span>
       <span class="font-display text-sm font-bold text-text-primary tabular-nums">
         {row.total.toLocaleString($locale)}
