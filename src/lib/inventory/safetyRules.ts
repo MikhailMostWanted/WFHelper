@@ -1,4 +1,7 @@
-import { componentUniqueNameAliases } from "../../../config/shared/componentNames.js";
+import {
+  componentUniqueNameAliases,
+  ownedComponentCount,
+} from "../../../config/shared/componentNames.js";
 import { getFullSetOverride } from "./fullSetOverrides.js";
 import { setRootOf } from "./fullSets.js";
 import type { InventoryGroup, ItemDbEntry } from "../../types/inventory.js";
@@ -39,6 +42,15 @@ export const SAFETY_REASON_KEYS: readonly SafetyReasonKey[] = [
   "inventory.safety.reason.setKeep",
 ];
 
+/** One build that claims copies of a row, with the path that leads to it. */
+export interface SafetyClaim {
+  /** uniqueNames from the row up to the item that is actually unfinished. Labels
+   *  are resolved at render, so no display string is stored. */
+  chain: readonly string[];
+  /** Copies of the row this one chain takes. */
+  copies: number;
+}
+
 export interface SafetyReservation {
   rule: SafetyRuleId;
   /** Copies this rule alone insists on keeping. Floors compose by max, so this
@@ -48,6 +60,8 @@ export interface SafetyReservation {
   binding: boolean;
   reasonKey: SafetyReasonKey;
   params?: Readonly<Record<string, string | number>>;
+  /** Set by `unmasteredRecipe`: what asks for the copies, one entry per build. */
+  claims?: readonly SafetyClaim[];
 }
 
 export interface SafetyVerdict {
@@ -150,6 +164,12 @@ interface SafetyContextInput {
   /** uniqueName -> units pinned goals need kept. The pin store owns the walk
    *  from a goal to this flat map; the engine only reads it. */
   pinnedRequirements?: ReadonlyMap<string, number>;
+  /** Owned copies per uniqueName, already through `withoutFoundryPending`. Built
+   *  gear counts here, so a weapon in the arsenal covers a recipe that eats it. */
+  ownedCounts?: ReadonlyMap<string, number>;
+  /** Gear the account still holds (`MasteryData.currentlyOwned`). Mastered and
+   *  sold is not owned, so a mastery status can never stand in for this. */
+  ownedUniqueNames?: ReadonlySet<string>;
 }
 
 export interface SafetyContext {
@@ -160,6 +180,8 @@ export interface SafetyContext {
   readonly setKeepRoots: ReadonlySet<string>;
   readonly pinnedDemand: ReadonlyMap<string, number>;
   readonly unmasteredDemand: ReadonlyMap<string, number>;
+  /** Part alias -> the builds behind its unmastered-recipe demand, in units. */
+  readonly recipeClaims: ReadonlyMap<string, readonly { chain: string[]; units: number }[]>;
   readonly setKeepDemand: ReadonlyMap<string, number>;
   /** Rules with no data to work with. They never fire, and the caller should say so. */
   readonly degradedRules: readonly SafetyRuleId[];
@@ -192,6 +214,188 @@ function demandFor(demand: ReadonlyMap<string, number>, aliases: readonly string
   let units = 0;
   for (const alias of aliases) units = Math.max(units, demand.get(alias) ?? 0);
   return units;
+}
+
+interface ParentLink {
+  /** Item database key of the build that consumes the child. */
+  parent: string;
+  /** Units of the child one build of the parent consumes. */
+  perBuild: number;
+}
+
+/** Part alias -> the builds consuming it. Written under every alias, as
+ *  `addPartDemand` does, because a set and the inventory spell a part
+ *  differently. Reads dedupe by link identity, so one pile counts once. */
+function buildParentIndex(itemDb: Record<string, ItemDbEntry>): Map<string, ParentLink[]> {
+  const index = new Map<string, ParentLink[]>();
+  for (const [parent, entry] of Object.entries(itemDb)) {
+    const perChild = new Map<string, number>();
+    for (const part of partsOf(parent, entry)) {
+      const uniqueName = typeof part.uniqueName === "string" ? part.uniqueName : "";
+      if (!uniqueName || uniqueName === parent) continue;
+      // DE lists a doubled ingredient twice, so the counts accumulate.
+      perChild.set(uniqueName, (perChild.get(uniqueName) ?? 0) + (toCount(part.itemCount, 1) || 1));
+    }
+    for (const [child, perBuild] of perChild) {
+      const link: ParentLink = { parent, perBuild };
+      for (const alias of componentUniqueNameAliases(child)) {
+        const links = index.get(alias);
+        if (links) links.push(link);
+        else index.set(alias, [link]);
+      }
+    }
+  }
+  return index;
+}
+
+interface RecipeDemand {
+  demand: Map<string, number>;
+  claims: Map<string, { chain: string[]; units: number }[]>;
+}
+
+/** Copies of every part the account still has to produce, however far above the
+ *  part the unfinished build sits. A part is spare only once nothing over it is
+ *  outstanding: Bronco Prime Receiver stays claimed by an unmastered Akbronco
+ *  Prime even with Bronco Prime itself mastered. */
+function buildRecipeDemand(
+  itemDb: Record<string, ItemDbEntry>,
+  mastered: ReadonlySet<string>,
+  ownedCounts: ReadonlyMap<string, number> | undefined,
+  ownedUniqueNames: ReadonlySet<string> | undefined,
+): RecipeDemand {
+  const index = buildParentIndex(itemDb);
+  const memo = new Map<string, number>();
+  const open = new Set<string>();
+
+  function linksFor(uniqueName: string): ParentLink[] {
+    const links = new Set<ParentLink>();
+    for (const alias of componentUniqueNameAliases(uniqueName)) {
+      for (const link of index.get(alias) ?? []) links.add(link);
+    }
+    return [...links];
+  }
+
+  function ownedOf(uniqueName: string): number {
+    const rows = ownedCounts ? ownedComponentCount(uniqueName, ownedCounts) : 0;
+    return Math.max(rows, ownedUniqueNames?.has(uniqueName) === true ? 1 : 0);
+  }
+
+  function masteryUnitsOf(uniqueName: string): number {
+    return itemDb[uniqueName]?.masterable === true && !mastered.has(uniqueName) ? 1 : 0;
+  }
+
+  /** Copies still to build, and whether a cycle truncated the answer. A result
+   *  that leaned on an open node is never memoized, or the cut would stick. */
+  function outstanding(uniqueName: string): { units: number; cyclic: boolean } {
+    const cached = memo.get(uniqueName);
+    if (cached !== undefined) return { units: cached, cyclic: false };
+    if (open.has(uniqueName)) return { units: 0, cyclic: true };
+
+    open.add(uniqueName);
+    let fromParents = 0;
+    let cyclic = false;
+    for (const link of linksFor(uniqueName)) {
+      const above = outstanding(link.parent);
+      cyclic = cyclic || above.cyclic;
+      fromParents += link.perBuild * above.units;
+    }
+    open.delete(uniqueName);
+
+    // Mastery is earned by ranking one copy, and a copy built for the parent can
+    // be that copy, so the two floors compose by max rather than by sum.
+    const units = Math.max(
+      0,
+      Math.max(masteryUnitsOf(uniqueName), fromParents) - ownedOf(uniqueName),
+    );
+    if (!cyclic) memo.set(uniqueName, units);
+    return { units, cyclic };
+  }
+
+  /** The item that really wants this build: itself when its own mastery is what
+   *  is missing, otherwise the parent asking for the most copies. */
+  function drivingChain(uniqueName: string, seen: Set<string>): string[] {
+    if (seen.has(uniqueName)) return [uniqueName];
+    seen.add(uniqueName);
+    let driver = "";
+    let driverUnits = 0;
+    for (const link of linksFor(uniqueName)) {
+      const units = link.perBuild * outstanding(link.parent).units;
+      if (units > driverUnits) {
+        driverUnits = units;
+        driver = link.parent;
+      }
+    }
+    if (!driver || masteryUnitsOf(uniqueName) >= driverUnits) return [uniqueName];
+    return [uniqueName, ...drivingChain(driver, seen)];
+  }
+
+  const demand = new Map<string, number>();
+  const claims = new Map<string, { chain: string[]; units: number }[]>();
+  for (const [uniqueName, entry] of Object.entries(itemDb)) {
+    const parts = partsOf(uniqueName, entry);
+    if (parts.length === 0) continue;
+    const builds = outstanding(uniqueName).units;
+    if (builds <= 0) continue;
+    addPartDemand(demand, parts, builds);
+
+    const above = drivingChain(uniqueName, new Set());
+    for (const part of parts) {
+      const partUniqueName = typeof part.uniqueName === "string" ? part.uniqueName : "";
+      if (!partUniqueName) continue;
+      const units = (toCount(part.itemCount, 1) || 1) * builds;
+      const claim = { chain: [partUniqueName, ...above], units };
+      for (const alias of componentUniqueNameAliases(partUniqueName)) {
+        const list = claims.get(alias);
+        if (list) list.push(claim);
+        else claims.set(alias, [claim]);
+      }
+    }
+  }
+  return { demand, claims };
+}
+
+interface RecipeDemandCache {
+  itemDb: Record<string, ItemDbEntry>;
+  mastered: ReadonlySet<string>;
+  ownedCounts: ReadonlyMap<string, number> | undefined;
+  ownedUniqueNames: ReadonlySet<string> | undefined;
+  value: RecipeDemand;
+}
+
+// The walk covers the whole item database and none of it depends on locks or
+// spares, so a spare typed into the bulk sell panel reuses the last result.
+let recipeDemandCache: RecipeDemandCache | null = null;
+
+function cachedRecipeDemand(
+  itemDb: Record<string, ItemDbEntry>,
+  mastered: ReadonlySet<string>,
+  ownedCounts: ReadonlyMap<string, number> | undefined,
+  ownedUniqueNames: ReadonlySet<string> | undefined,
+): RecipeDemand {
+  const hit = recipeDemandCache;
+  if (
+    hit &&
+    hit.itemDb === itemDb &&
+    hit.mastered === mastered &&
+    hit.ownedCounts === ownedCounts &&
+    hit.ownedUniqueNames === ownedUniqueNames
+  ) {
+    return hit.value;
+  }
+  const value = buildRecipeDemand(itemDb, mastered, ownedCounts, ownedUniqueNames);
+  recipeDemandCache = { itemDb, mastered, ownedCounts, ownedUniqueNames, value };
+  return value;
+}
+
+function claimsFor(
+  claims: ReadonlyMap<string, readonly { chain: string[]; units: number }[]>,
+  aliases: readonly string[],
+): { chain: string[]; units: number }[] {
+  const found = new Set<{ chain: string[]; units: number }>();
+  for (const alias of aliases) {
+    for (const claim of claims.get(alias) ?? []) found.add(claim);
+  }
+  return [...found];
 }
 
 function resolveDbEntry(
@@ -243,16 +447,11 @@ export function buildSafetyContext(input: SafetyContextInput): SafetyContext {
     degradedRules.push("pinnedGoal");
   }
 
-  const unmasteredDemand = new Map<string, number>();
   const mastered = input.masteredUniqueNames;
-  if (mastered) {
-    for (const [uniqueName, entry] of Object.entries(itemDb)) {
-      if (entry?.masterable !== true || mastered.has(uniqueName)) continue;
-      addPartDemand(unmasteredDemand, partsOf(uniqueName, entry), 1);
-    }
-  } else {
-    degradedRules.push("unmasteredRecipe");
-  }
+  if (!mastered) degradedRules.push("unmasteredRecipe");
+  const recipe = mastered
+    ? cachedRecipeDemand(itemDb, mastered, input.ownedCounts, input.ownedUniqueNames)
+    : { demand: new Map<string, number>(), claims: new Map<string, never[]>() };
 
   const setKeepRoots = new Set(settings.setKeep);
   const setKeepDemand = new Map<string, number>();
@@ -267,7 +466,8 @@ export function buildSafetyContext(input: SafetyContextInput): SafetyContext {
     locks: new Set(settings.locks),
     setKeepRoots,
     pinnedDemand,
-    unmasteredDemand,
+    unmasteredDemand: recipe.demand,
+    recipeClaims: recipe.claims,
     setKeepDemand,
     degradedRules,
   };
@@ -331,11 +531,15 @@ export function safeToList(item: SafetyItem, context: SafetyContext): SafetyVerd
 
   const recipeCopies = reserveUnitsToCopies(demandFor(context.unmasteredDemand, aliases), entry);
   if (recipeCopies > 0) {
-    floors.push(
-      floor("unmasteredRecipe", recipeCopies, "inventory.safety.reason.unmasteredRecipe", {
+    const claims = claimsFor(context.recipeClaims, aliases)
+      .map((claim) => ({ chain: claim.chain, copies: reserveUnitsToCopies(claim.units, entry) }))
+      .sort((a, b) => b.copies - a.copies || a.chain.length - b.chain.length);
+    floors.push({
+      ...floor("unmasteredRecipe", recipeCopies, "inventory.safety.reason.unmasteredRecipe", {
         count: recipeCopies,
       }),
-    );
+      ...(claims.length > 0 ? { claims } : {}),
+    });
   }
 
   const keptSetRow =

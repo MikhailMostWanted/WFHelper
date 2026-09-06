@@ -4,9 +4,10 @@
   import WorkbenchQueueRow from "./WorkbenchQueueRow.svelte";
   import WorkbenchReview from "./WorkbenchReview.svelte";
   import ModalShell from "../ModalShell.svelte";
-  import { itemDb, parsedItems, wfmItems } from "../../stores/data.js";
+  import { parsedItems, wfmItems } from "../../stores/data.js";
   import {
     inventorySafety,
+    inventorySafetyContext,
     resetInventorySafety,
     setItemSpare,
     setSpareDefault,
@@ -14,8 +15,6 @@
     toggleSetKeep,
   } from "../../stores/inventorySafety.js";
   import { inventorySelection } from "../../stores/inventorySelection.js";
-  import { masteryData } from "../../stores/mastery.js";
-  import { masteryPins } from "../../stores/masteryPins.js";
   import { relicDb } from "../../stores/relics.js";
   import { safeToList, SAFETY_REASON_KEYS } from "../../lib/inventory/safetyRules.js";
   import { setRootOf } from "../../lib/inventory/fullSets.js";
@@ -36,7 +35,6 @@
     bindingReasonKeys,
     buildPlanFromRows,
     buildSelectedQueueRows,
-    buildSelectionSafetyContext,
     captureSafetySnapshot,
     mergeQueueRows,
     planTotals,
@@ -122,14 +120,7 @@
   const LABEL_CLASS =
     "flex flex-col gap-1 font-display text-xs uppercase tracking-[0.04em] text-text-muted";
 
-  const safetyCtx = $derived(
-    buildSelectionSafetyContext({
-      itemDb: $itemDb,
-      settings: $inventorySafety,
-      mastery: $masteryData,
-      pins: $masteryPins,
-    }),
-  );
+  const safetyCtx = $derived($inventorySafetyContext);
 
   let rows = $state<QueueRow[]>([]);
   let filter = $state("");

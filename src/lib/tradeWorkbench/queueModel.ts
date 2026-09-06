@@ -93,6 +93,34 @@ interface SelectionSafetyInput {
   mastery: MasteryData | null;
   /** Mastery goal uniqueNames the user pinned in the planner. */
   pins: readonly string[];
+  /** uniqueName -> owned copies, foundry claims already subtracted. */
+  ownership?: ReadonlyMap<string, number>;
+}
+
+interface MasteryIndex {
+  mastery: MasteryData | null;
+  mastered: ReadonlySet<string>;
+  owned: ReadonlySet<string>;
+}
+
+// Kept by payload identity so the safety engine's own memo still hits when only
+// a lock or a spare changed.
+let masteryIndexCache: MasteryIndex | null = null;
+
+function masteryIndex(mastery: MasteryData | null): MasteryIndex {
+  if (masteryIndexCache?.mastery === mastery) return masteryIndexCache;
+  const mastered = new Set<string>();
+  const owned = new Set<string>();
+  for (const item of mastery?.items ?? []) {
+    const uniqueName = item.uniqueName || item.internalName;
+    if (!uniqueName) continue;
+    // Ownership is its own field: mastered gear the player sold is gone, and
+    // reading the status instead would hold its parts back forever.
+    if (item.currentlyOwned === true) owned.add(uniqueName);
+    if (item.status === "mastered") mastered.add(uniqueName);
+  }
+  masteryIndexCache = { mastery, mastered, owned };
+  return masteryIndexCache;
 }
 
 /** The one safety context both the inventory grid's eligibility pass and the
@@ -100,12 +128,7 @@ interface SelectionSafetyInput {
  *  pinnedGoal and unmasteredRecipe rules out of `degradedRules`, where they
  *  would silently never fire. */
 export function buildSelectionSafetyContext(input: SelectionSafetyInput): SafetyContext {
-  const masteredUniqueNames = new Set<string>();
-  for (const item of input.mastery?.items ?? []) {
-    if (item.status !== "mastered") continue;
-    const uniqueName = item.uniqueName || item.internalName;
-    if (uniqueName) masteredUniqueNames.add(uniqueName);
-  }
+  const { mastered: masteredUniqueNames, owned: ownedUniqueNames } = masteryIndex(input.mastery);
 
   const pinnedRequirements = new Map<string, number>();
   for (const pin of input.pins) {
@@ -121,8 +144,12 @@ export function buildSelectionSafetyContext(input: SelectionSafetyInput): Safety
   return buildSafetyContext({
     itemDb: input.itemDb,
     settings: input.settings,
-    masteredUniqueNames,
+    // No mastery data means every masterable item reads as unmastered, which
+    // would reserve the whole account; the rule degrades instead.
+    ...(input.mastery ? { masteredUniqueNames } : {}),
     pinnedRequirements,
+    ...(input.ownership ? { ownedCounts: input.ownership } : {}),
+    ownedUniqueNames,
   });
 }
 

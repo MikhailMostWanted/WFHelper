@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { attachPartMasteryFlags, buildPartMasteryResolver } from "../../../src/lib/parentMastery";
+import type { SafetyVerdict } from "../../../src/lib/inventory/safetyRules";
 import type { ItemDbEntry, MasteryData } from "../../../src/types/inventory";
 
 const itemDb = {
@@ -87,46 +88,46 @@ describe("buildPartMasteryResolver", () => {
   });
 });
 
-describe("spares", () => {
-  it("counts everything above the recipe as spare while the owner is missing", () => {
-    const row = { name: "Ankyros Prime Gauntlet", internalName: "/W/AnkyrosPrimeGauntlet" };
-    expect(resolve({ ...row, amount: 2 }).spare).toBe(false);
-    expect(resolve({ ...row, amount: 3 }).spare).toBe(true);
-  });
-
-  it("treats every copy as spare once the owner is built or mastered", () => {
-    expect(
-      resolve({ name: "Soma Prime Stock", internalName: "/W/SomaPrimeStock", amount: 1 }).spare,
-    ).toBe(true);
-    expect(
-      resolve({ name: "Braton Prime Barrel", internalName: "/W/BratonPrimeBarrel", amount: 1 })
-        .spare,
-    ).toBe(true);
-  });
-
-  it("leaves spare unset without an amount or a resolvable part", () => {
-    expect(
-      resolve({ name: "Ankyros Prime Gauntlet", internalName: "/W/AnkyrosPrimeGauntlet" }).spare,
-    ).toBeUndefined();
-    expect(resolve({ name: "Braton Prime Set", amount: 3 }).spare).toBeUndefined();
-  });
-});
-
 describe("attachPartMasteryFlags", () => {
+  interface Row {
+    name: string;
+    internalName?: string;
+    parentMastered?: boolean;
+    spare?: boolean;
+  }
+
+  const rows: Row[] = [
+    { name: "Braton Prime Barrel", internalName: "/W/BratonPrimeBarrel" },
+    { name: "Ankyros Prime Gauntlet", internalName: "/W/AnkyrosPrimeGauntlet" },
+    { name: "Forma" },
+  ];
+
   it("stamps resolvable rows and leaves the rest untouched", () => {
-    const rows: Array<{
-      name: string;
-      internalName?: string;
-      amount?: number;
-      parentMastered?: boolean;
-      spare?: boolean;
-    }> = [
-      { name: "Braton Prime Barrel", internalName: "/W/BratonPrimeBarrel", amount: 4 },
-      { name: "Forma" },
-    ];
-    const [barrel, forma] = attachPartMasteryFlags(rows, resolve);
+    const [barrel, , forma] = attachPartMasteryFlags(rows, resolve);
     expect(barrel.parentMastered).toBe(true);
+    expect(barrel.spare).toBeUndefined();
+    expect(forma).toBe(rows[2]);
+  });
+
+  it("reads spare off the safety verdict, so the filter follows the badge", () => {
+    const verdicts = new Map<string, SafetyVerdict>([
+      ["/W/BratonPrimeBarrel", { total: 4, reserved: 0, safe: 4, reservations: [] }],
+      ["/W/AnkyrosPrimeGauntlet", { total: 2, reserved: 2, safe: 0, reservations: [] }],
+    ]);
+    const [barrel, gauntlet, forma] = attachPartMasteryFlags(rows, resolve, verdicts);
     expect(barrel.spare).toBe(true);
-    expect(forma).toBe(rows[1]);
+    expect(gauntlet.spare).toBe(false);
+    expect(gauntlet.parentMastered).toBe(false);
+    // No verdict and no masterable owner leaves both filters skipping the row.
+    expect(forma).toBe(rows[2]);
+  });
+
+  it("leaves spare unset on rows that are not build components", () => {
+    const withForma: Row[] = [{ name: "Forma", internalName: "/W/Forma" }];
+    const verdicts = new Map<string, SafetyVerdict>([
+      ["/W/Forma", { total: 9, reserved: 1, safe: 8, reservations: [] }],
+    ]);
+    const [forma] = attachPartMasteryFlags(withForma, resolve, verdicts);
+    expect(forma.spare).toBeUndefined();
   });
 });

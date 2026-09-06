@@ -1,17 +1,18 @@
 import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
+import type { SafetyVerdict } from "./inventory/safetyRules.js";
 import type { ItemDbEntry, MasteryData } from "../types/inventory.js";
 
 interface RowLike {
   name: string;
   internalName?: string;
-  amount?: number | null;
   parentMastered?: boolean;
   spare?: boolean;
 }
 
 interface PartMasteryFlags {
   parentMastered?: boolean;
-  spare?: boolean;
+  /** The row is a build component, the only kind the Spares filter is about. */
+  component?: true;
 }
 
 type PartMasteryResolver = (row: RowLike) => PartMasteryFlags;
@@ -29,9 +30,8 @@ function dbEntryFor(
   return null;
 }
 
-/** Per-row mastered/spare flags. A part only counts against its recipe while
- * the owner is still missing; built or mastered gear needs nothing more.
- * Unset flags mean nothing masterable needs the row, and filters skip it. */
+/** Per-row parent-mastery flag. Unset means nothing masterable owns the row,
+ * and the strict tri-state filter then skips it. */
 export function buildPartMasteryResolver(
   itemDb: Record<string, ItemDbEntry>,
   mastery: MasteryData | null,
@@ -69,17 +69,9 @@ export function buildPartMasteryResolver(
       dbEntryFor(itemDb, nameIndex.get(row.name.toLowerCase()));
     if (resolved?.entry.isBuildComponent && resolved.entry.componentOf) {
       const parent = itemDb[resolved.entry.componentOf];
-      const status = statusOf(resolved.entry.componentOf, parent?.name);
-      if (!status) return {};
-      const aliases = componentUniqueNameAliases(resolved.uniqueName);
-      const required =
-        (parent?.components || []).find(
-          (comp) => comp.uniqueName && aliases.includes(comp.uniqueName),
-        )?.itemCount || 1;
-      const stillNeeded = status === "missing" ? required : 0;
       return {
-        parentMastered: status === "mastered",
-        ...(typeof row.amount === "number" ? { spare: row.amount > stillNeeded } : {}),
+        ...masteredFlag(statusOf(resolved.entry.componentOf, parent?.name)),
+        component: true,
       };
     }
     return masteredFlag(statusOf(resolved?.uniqueName ?? row.internalName, row.name));
@@ -87,15 +79,18 @@ export function buildPartMasteryResolver(
 }
 
 /** Takes a prebuilt resolver: it indexes the whole item database, so callers
- * keep one per itemDb/mastery pair instead of rebuilding it per row list. */
+ * keep one per itemDb/mastery pair instead of rebuilding it per row list.
+ * `spare` comes from the safety verdicts so the filter, the card badge and the
+ * bulk sell queue can never disagree about what is free to sell. */
 export function attachPartMasteryFlags<T extends RowLike>(
   rows: T[],
   resolve: PartMasteryResolver,
+  verdicts?: ReadonlyMap<string, SafetyVerdict>,
 ): T[] {
   return rows.map((row) => {
-    const flags = resolve(row);
-    return flags.parentMastered === undefined && flags.spare === undefined
-      ? row
-      : { ...row, ...flags };
+    const { component, ...flags } = resolve(row);
+    const verdict = component && row.internalName ? verdicts?.get(row.internalName) : undefined;
+    if (flags.parentMastered === undefined && verdict === undefined) return row;
+    return { ...row, ...flags, ...(verdict ? { spare: verdict.safe > 0 } : {}) };
   });
 }

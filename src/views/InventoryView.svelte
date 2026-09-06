@@ -105,7 +105,7 @@
   import { inventoryViewMode } from "../stores/inventoryViewMode.js";
   import { inventoryValueAllTradables, inventoryValueMinPlatinum } from "../stores/preferences.js";
   import { activeItem, activeRelic } from "../stores/modals.js";
-  import { inventorySafety } from "../stores/inventorySafety.js";
+  import { inventorySafetyContext, inventorySafetyVerdicts } from "../stores/inventorySafety.js";
   import {
     bulkSellOpen,
     clearSelection,
@@ -119,11 +119,7 @@
     toggleSelected,
     toggleSelectionMode,
   } from "../stores/inventorySelection.js";
-  import { masteryPins } from "../stores/masteryPins.js";
-  import {
-    buildSelectionSafetyContext,
-    eligibleSelectionKeys,
-  } from "../lib/tradeWorkbench/queueModel.js";
+  import { eligibleSelectionKeys } from "../lib/tradeWorkbench/queueModel.js";
   import { workbenchState } from "../lib/tradeWorkbench/workbenchState.js";
   import { isRankedGroup } from "../../config/shared/numeric.js";
   import type { SharedSortKey, SharedFiltersState, SortDirection } from "../types/filters.js";
@@ -562,7 +558,11 @@
     ? tabItems.find((entry) => entry.internalName === selectedInternalName) || null
     : null;
   $: partMastery = buildPartMasteryResolver($itemDb, $masteryData);
-  $: masteredTabItems = attachPartMasteryFlags(searchableTabItems, partMastery);
+  $: masteredTabItems = attachPartMasteryFlags(
+    searchableTabItems,
+    partMastery,
+    $inventorySafetyVerdicts,
+  );
   $: sortedTabItems = applySharedFiltersAndSort(masteredTabItems, $inventoryFilters);
   $: filtered =
     filter === "full_sets" && hiddenSetCategories.length > 0
@@ -621,16 +621,8 @@
   $: resetGridLimit(filter, $inventoryFilters);
   $: gridItems = gridLimit < visibleItems.length ? visibleItems.slice(0, gridLimit) : visibleItems;
   // Eligibility walks every parsed item, so it only runs while picking.
-  $: selectionSafetyContext = $inventorySelectionMode
-    ? buildSelectionSafetyContext({
-        itemDb: $itemDb,
-        settings: $inventorySafety,
-        mastery: $masteryData,
-        pins: $masteryPins,
-      })
-    : null;
-  $: eligibleSelectionSet = selectionSafetyContext
-    ? eligibleSelectionKeys($parsedItems, selectionSafetyContext, $wfmItems)
+  $: eligibleSelectionSet = $inventorySelectionMode
+    ? eligibleSelectionKeys($parsedItems, $inventorySafetyContext, $wfmItems)
     : NO_SELECTION_KEYS;
   $: selectableVisibleKeys = $inventorySelectionMode
     ? visibleItems.map((item) => item.internalName).filter((key) => eligibleSelectionSet.has(key))

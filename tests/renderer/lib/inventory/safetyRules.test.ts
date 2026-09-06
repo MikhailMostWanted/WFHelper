@@ -297,6 +297,234 @@ describe("unmastered recipe components", () => {
   });
 });
 
+describe("recipes above the part", () => {
+  const AKBRONCO = "/Lotus/Weapons/Tenno/Akimbo/PrimeAkimboShotGun";
+  const BRONCO = "/Lotus/Weapons/Tenno/Pistol/BroncoPrime";
+  const RECEIVER = "/Lotus/Types/Recipes/Weapons/WeaponParts/BroncoPrimeReceiver";
+  const LINK = "/Lotus/Types/Recipes/Weapons/WeaponParts/AkbroncoPrimeLink";
+
+  // DE lists the doubled ingredient as two entries, exactly as WFCD exports it.
+  const CHAIN_DB: Record<string, ItemDbEntry> = {
+    [AKBRONCO]: {
+      name: "Akbronco Prime",
+      masterable: true,
+      components: [
+        { name: "Link", uniqueName: LINK, itemCount: 1 },
+        { name: "Bronco Prime", uniqueName: BRONCO, itemCount: 1 },
+        { name: "Bronco Prime", uniqueName: BRONCO, itemCount: 1 },
+      ],
+    },
+    [BRONCO]: {
+      name: "Bronco Prime",
+      masterable: true,
+      components: [{ name: "Receiver", uniqueName: RECEIVER, itemCount: 1 }],
+    },
+    [RECEIVER]: { name: "Bronco Prime Receiver", isBuildComponent: true, componentOf: BRONCO },
+  };
+
+  function chainContext(overrides: Partial<Parameters<typeof buildSafetyContext>[0]> = {}) {
+    return buildSafetyContext({
+      itemDb: CHAIN_DB,
+      masteredUniqueNames: new Set([BRONCO]),
+      pinnedRequirements: new Map<string, number>(),
+      ...overrides,
+    });
+  }
+
+  const receiverRow = row({ internalName: RECEIVER, uniqueName: RECEIVER, amount: 3 });
+
+  it("keeps a part claimed two levels up, past a mastered middle weapon", () => {
+    const verdict = safeToList(receiverRow, chainContext());
+    expect(verdict).toMatchObject({ total: 3, reserved: 2, safe: 1 });
+  });
+
+  it("names the whole chain that asks for the copies", () => {
+    const claim = safeToList(receiverRow, chainContext()).reservations.find(
+      (entry) => entry.rule === "unmasteredRecipe",
+    )?.claims?.[0];
+    expect(claim).toEqual({ chain: [RECEIVER, BRONCO, AKBRONCO], copies: 2 });
+  });
+
+  it("composes the middle weapon's own mastery with the demand above it by max", () => {
+    // Unmastered Bronco Prime wants one copy and Akbronco Prime wants two. Summed
+    // that would be three receivers; the copy ranked for mastery is one of the two.
+    const verdict = safeToList(receiverRow, chainContext({ masteredUniqueNames: new Set() }));
+    expect(verdict.reserved).toBe(2);
+  });
+
+  it("lets a built copy in the arsenal settle one unit of the demand", () => {
+    const ownedCounts = aggregateComponentOwnership({ Pistols: [{ ItemType: BRONCO }] });
+    expect(safeToList(receiverRow, chainContext({ ownedCounts })).reserved).toBe(1);
+  });
+
+  it("does not treat a mastered but sold weapon as owned", () => {
+    const sold = chainContext({ ownedUniqueNames: new Set<string>() });
+    expect(safeToList(receiverRow, sold).reserved).toBe(2);
+    const held = chainContext({ ownedUniqueNames: new Set([BRONCO]) });
+    expect(safeToList(receiverRow, held).reserved).toBe(1);
+  });
+
+  it("releases the part once nothing above it is outstanding", () => {
+    const ctx = chainContext({ masteredUniqueNames: new Set([BRONCO, AKBRONCO]) });
+    expect(safeToList(receiverRow, ctx)).toMatchObject({ reserved: 0, safe: 3 });
+  });
+
+  it("multiplies a doubled ingredient through the levels below it", () => {
+    const doubled: Record<string, ItemDbEntry> = {
+      ...CHAIN_DB,
+      [BRONCO]: {
+        ...CHAIN_DB[BRONCO],
+        components: [{ name: "Receiver", uniqueName: RECEIVER, itemCount: 2 }],
+      },
+    };
+    const ctx = buildSafetyContext({
+      itemDb: doubled,
+      masteredUniqueNames: new Set([BRONCO]),
+      pinnedRequirements: new Map(),
+    });
+    expect(safeToList(row({ internalName: RECEIVER, amount: 9 }), ctx).reserved).toBe(4);
+  });
+});
+
+describe("recipe demand identity", () => {
+  const TOP = "/W/Top";
+  const OTHER = "/W/Other";
+  const MID = "/Lotus/Types/Recipes/Weapons/WeaponParts/MidComponent";
+  const LEAF = "/Lotus/Types/Recipes/Weapons/WeaponParts/LeafComponent";
+
+  it("counts one parent once however many spellings of the part it reaches", () => {
+    // The index is written under every alias of MID, so an undeduped read would
+    // see the same Top -> Mid link twice and double everything below it.
+    const db: Record<string, ItemDbEntry> = {
+      [TOP]: { name: "Top", masterable: true, components: [{ name: "Mid", uniqueName: MID }] },
+      [MID]: { name: "Mid", components: [{ name: "Leaf", uniqueName: LEAF }] },
+    };
+    const ctx = buildSafetyContext({
+      itemDb: db,
+      masteredUniqueNames: new Set(),
+      pinnedRequirements: new Map(),
+    });
+    expect(safeToList(row({ internalName: LEAF, amount: 4 }), ctx).reserved).toBe(1);
+  });
+
+  it("sums the demand of two different parents for one part", () => {
+    const db: Record<string, ItemDbEntry> = {
+      [TOP]: { name: "Top", masterable: true, components: [{ name: "Leaf", uniqueName: LEAF }] },
+      [OTHER]: {
+        name: "Other",
+        masterable: true,
+        components: [{ name: "Leaf", uniqueName: LEAF }],
+      },
+    };
+    const ctx = buildSafetyContext({
+      itemDb: db,
+      masteredUniqueNames: new Set(),
+      pinnedRequirements: new Map(),
+    });
+    const verdict = safeToList(row({ internalName: LEAF, amount: 5 }), ctx);
+    expect(verdict.reserved).toBe(2);
+    expect(
+      verdict.reservations.find((entry) => entry.rule === "unmasteredRecipe")?.claims,
+    ).toHaveLength(2);
+  });
+
+  it("settles on a demand instead of hanging when two recipes contain each other", () => {
+    const db: Record<string, ItemDbEntry> = {
+      [TOP]: { name: "Top", masterable: true, components: [{ name: "Other", uniqueName: OTHER }] },
+      [OTHER]: {
+        name: "Other",
+        masterable: true,
+        components: [
+          { name: "Top", uniqueName: TOP },
+          { name: "Leaf", uniqueName: LEAF },
+        ],
+      },
+    };
+    const ctx = buildSafetyContext({
+      itemDb: db,
+      masteredUniqueNames: new Set(),
+      pinnedRequirements: new Map(),
+    });
+    expect(safeToList(row({ internalName: TOP, amount: 2 }), ctx).reserved).toBe(1);
+    expect(safeToList(row({ internalName: OTHER, amount: 2 }), ctx).reserved).toBe(1);
+    // The truncated branch must not be memoized, or the part under the cycle
+    // would read back as unclaimed.
+    expect(safeToList(row({ internalName: LEAF, amount: 2 }), ctx).reserved).toBe(1);
+  });
+
+  it("keeps one copy of a reusable blueprint however large the demand", () => {
+    const db: Record<string, ItemDbEntry> = {
+      [TOP]: {
+        name: "Top",
+        masterable: true,
+        components: [{ name: "Leaf", uniqueName: LEAF, itemCount: 4 }],
+      },
+      [LEAF]: { name: "Leaf Blueprint", reusableBlueprint: true },
+    };
+    const ctx = buildSafetyContext({
+      itemDb: db,
+      masteredUniqueNames: new Set(),
+      pinnedRequirements: new Map(),
+    });
+    expect(safeToList(row({ internalName: LEAF, amount: 3 }), ctx)).toMatchObject({
+      reserved: 1,
+      safe: 2,
+    });
+  });
+
+  it("divides a multi-yield recipe's demand by what one craft returns", () => {
+    const db: Record<string, ItemDbEntry> = {
+      [TOP]: {
+        name: "Top",
+        masterable: true,
+        components: [{ name: "Leaf", uniqueName: LEAF, itemCount: 6 }],
+      },
+      [LEAF]: {
+        name: "Leaf Blueprint",
+        recipe: { buildPrice: 0, buildTime: 0, num: 3, ingredients: [] },
+      },
+    };
+    const ctx = buildSafetyContext({
+      itemDb: db,
+      masteredUniqueNames: new Set(),
+      pinnedRequirements: new Map(),
+    });
+    expect(safeToList(row({ internalName: LEAF, amount: 5 }), ctx)).toMatchObject({
+      reserved: 2,
+      safe: 3,
+    });
+  });
+
+  it("reuses the recipe walk when only the settings changed", () => {
+    const db: Record<string, ItemDbEntry> = {
+      [TOP]: { name: "Top", masterable: true, components: [{ name: "Leaf", uniqueName: LEAF }] },
+    };
+    const mastered = new Set<string>();
+    const first = buildSafetyContext({ itemDb: db, masteredUniqueNames: mastered });
+    const second = buildSafetyContext({
+      itemDb: db,
+      masteredUniqueNames: mastered,
+      settings: settings({ spareDefault: 2 }),
+    });
+    expect(second.unmasteredDemand).toBe(first.unmasteredDemand);
+    expect(second.recipeClaims).toBe(first.recipeClaims);
+  });
+
+  it("walks a full-set override root the item database cannot rebuild", () => {
+    const root = "/Lotus/Types/Items/Ships/InsectShip";
+    const part = "/Lotus/Types/Recipes/LandingCraftRecipes/Mantys/MantysPowerCoreBlueprint";
+    const ctx = buildSafetyContext({
+      itemDb: { [root]: { name: "Mantis", masterable: true } },
+      masteredUniqueNames: new Set(),
+      pinnedRequirements: new Map(),
+    });
+    expect(safeToList(row({ internalName: part, amount: 2 }), ctx)).toMatchObject({
+      reserved: 1,
+      safe: 1,
+    });
+  });
+});
+
 describe("complete-set keep flag", () => {
   const settingsWithKeep = settings({ setKeep: [FRAME] });
 

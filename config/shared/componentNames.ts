@@ -18,7 +18,7 @@ export function componentUniqueNameAliases(uniqueName: string): string[] {
 /** Owned count for a set component; max across aliases - one pile, two spellings. */
 export function ownedComponentCount(
   uniqueName: string | null | undefined,
-  ownedCounts: Map<string, number>,
+  ownedCounts: ReadonlyMap<string, number>,
 ): number {
   if (!uniqueName) return 0;
   let owned = 0;

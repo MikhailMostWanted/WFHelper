@@ -7,6 +7,7 @@
   import MarketMetricStrip from "../MarketMetricStrip.svelte";
   import { NAV_ICON_URLS } from "../../lib/assetUrls.js";
   import { archonShardsBySuit } from "../../stores/archonShards.js";
+  import { inventorySafetyVerdicts } from "../../stores/inventorySafety.js";
   import { tr } from "../../lib/i18n.js";
   import type { InventoryViewItem } from "../../lib/inventoryMarket.js";
   import { isRankedGroup } from "../../../config/shared/numeric.js";
@@ -30,6 +31,17 @@
   let visibilityReported = false;
 
   $: shardCopies = $archonShardsBySuit.get(item.uniqueName || item.internalName || "") ?? [];
+
+  // Only a reserving verdict earns the badge; everything else is fully sellable
+  // and the owned count already says so.
+  $: verdict = $inventorySafetyVerdicts.get(item.internalName) ?? null;
+  $: reservedVerdict = item.tradable && verdict && verdict.reserved > 0 ? verdict : null;
+  $: safeToSellTitle = reservedVerdict
+    ? [
+        $tr("inventory.safety.safeCount", { count: reservedVerdict.safe }),
+        ...reservedVerdict.reservations.map((entry) => $tr(entry.reasonKey, entry.params)),
+      ].join("\n")
+    : "";
 
   $: mastered = item.rank >= item.maxRank && item.maxRank > 1;
   $: canShowRank = item.maxRank > 1 && isRankedGroup(item.inventoryGroup);
@@ -170,7 +182,11 @@
     {:else}
       <span
         class="absolute right-2 bottom-1.5 font-display text-base font-bold text-success drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
-        >x{item.amount}</span
+        >x{item.amount}{#if reservedVerdict}<span
+            class="ml-1 text-sm text-warning"
+            data-safe-to-sell={reservedVerdict.safe}
+            title={safeToSellTitle}>({reservedVerdict.safe})</span
+          >{/if}</span
       >
     {/if}
   </div>

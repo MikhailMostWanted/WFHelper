@@ -1,10 +1,17 @@
-import { get, writable, type Readable } from "svelte/store";
+import { derived, get, writable, type Readable } from "svelte/store";
 import {
+  safeToList,
+  type InventorySafetySettings,
+  type SafetyContext,
+  type SafetyVerdict,
   DEFAULT_SAFETY_SETTINGS,
   normalizeSafetySettings,
-  type InventorySafetySettings,
 } from "../lib/inventory/safetyRules.js";
 import { readStoredJson, writeStorage } from "../lib/persistence.js";
+import { buildSelectionSafetyContext, selectionKeyFor } from "../lib/tradeWorkbench/queueModel.js";
+import { componentOwnership, itemDb, parsedItems } from "./data.js";
+import { masteryData } from "./mastery.js";
+import { masteryPins } from "./masteryPins.js";
 
 const STORAGE_KEY = "inventory.safety";
 
@@ -69,3 +76,28 @@ export function toggleSetKeep(rootUniqueName: string): void {
 export function resetInventorySafety(): void {
   commit(DEFAULT_SAFETY_SETTINGS);
 }
+
+/** The one context every consumer reads: the parent index behind the recipe
+ *  rule is built here, once per inventory/mastery/settings generation. */
+export const inventorySafetyContext: Readable<SafetyContext> = derived(
+  [itemDb, store, masteryData, masteryPins, componentOwnership],
+  ([$itemDb, $settings, $mastery, $pins, $ownership]) =>
+    buildSelectionSafetyContext({
+      itemDb: $itemDb,
+      settings: $settings,
+      mastery: $mastery,
+      pins: $pins,
+      ownership: $ownership,
+    }),
+);
+
+/** Inventory row key -> verdict, so a grid of a thousand cards looks its answer
+ *  up instead of re-running the engine per card. Keyed like the selection set. */
+export const inventorySafetyVerdicts: Readable<ReadonlyMap<string, SafetyVerdict>> = derived(
+  [parsedItems, inventorySafetyContext],
+  ([$items, $context]) => {
+    const verdicts = new Map<string, SafetyVerdict>();
+    for (const item of $items) verdicts.set(selectionKeyFor(item), safeToList(item, $context));
+    return verdicts;
+  },
+);

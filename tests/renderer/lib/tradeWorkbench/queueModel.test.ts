@@ -689,6 +689,44 @@ describe("selection safety context inputs", () => {
     expect(verdict).toMatchObject({ total: 3, reserved: 2, safe: 1 });
   });
 
+  it("degrades the recipe rule rather than reserving everything without mastery data", () => {
+    const context = buildSelectionSafetyContext({
+      itemDb: DB,
+      settings: SETTINGS,
+      mastery: null,
+      pins: [],
+    });
+    expect(context.degradedRules).toContain("unmasteredRecipe");
+    expect(safeToList({ internalName: CHASSIS, amount: 3 }, context).reserved).toBe(0);
+  });
+
+  it("reads ownership off currentlyOwned, never off the mastery status", () => {
+    const AKFRAME = "/Lotus/Powersuits/Volt/VoltPrimeTwin";
+    const db: Record<string, ItemDbEntry> = {
+      ...DB,
+      [AKFRAME]: {
+        name: "Volt Prime Twin",
+        masterable: true,
+        components: [{ name: "Volt Prime", uniqueName: FRAME, itemCount: 1 }],
+      },
+    };
+    const contextFor = (currentlyOwned: boolean) =>
+      buildSelectionSafetyContext({
+        itemDb: db,
+        settings: SETTINGS,
+        mastery: {
+          items: [
+            makeItem("Volt Prime", { internalName: FRAME, status: "mastered", currentlyOwned }),
+          ],
+          stats: {} as never,
+        },
+        pins: [],
+      });
+    // Mastered and sold still leaves the parts of the copy that has to be rebuilt.
+    expect(safeToList({ internalName: CHASSIS, amount: 4 }, contextFor(false)).reserved).toBe(2);
+    expect(safeToList({ internalName: CHASSIS, amount: 4 }, contextFor(true)).reserved).toBe(0);
+  });
+
   it("drops the unmastered-recipe reservation once the goal is mastered", () => {
     const unmastered = buildSelectionSafetyContext({
       itemDb: DB,

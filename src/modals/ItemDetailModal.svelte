@@ -22,8 +22,11 @@
   } from "../lib/inventory/archonShards.js";
   import { archonShardsBySuit } from "../stores/archonShards.js";
   import { parsePetGenetics } from "../lib/inventory/petGenetics.js";
+  import { inventorySafetyVerdicts } from "../stores/inventorySafety.js";
+  import { fallbackNameFromUniqueName } from "../../config/shared/displayName.js";
   import { locale, tr, type MessageKey } from "../lib/i18n.js";
-  import type { ComponentInfo, ParsedItem } from "../types/inventory.js";
+  import type { SafetyClaim } from "../lib/inventory/safetyRules.js";
+  import type { ComponentInfo, ItemDbEntry, ParsedItem } from "../types/inventory.js";
 
   let priceKey: MessageKey | null = null;
   let priceParams: Record<string, string | number> | undefined;
@@ -67,6 +70,17 @@
     treeRootKey && showCraftingTree
       ? buildCraftingTree(treeRootKey, $itemDb || {}, $componentOwnership)
       : null;
+
+  // Same map the inventory card reads, so the modal can never claim a different
+  // number from the badge that opened it.
+  $: safetyVerdict = item ? ($inventorySafetyVerdicts.get(item.internalName) ?? null) : null;
+  $: reservations = safetyVerdict && safetyVerdict.reserved > 0 ? safetyVerdict.reservations : [];
+
+  function chainLabel(claim: SafetyClaim, db: Record<string, ItemDbEntry>): string {
+    return claim.chain
+      .map((uniqueName) => itemLabel(db[uniqueName]) || fallbackNameFromUniqueName(uniqueName))
+      .join(" > ");
+  }
 
   // Reset selected component when the active item changes.
   $: if (item && itemKey !== lastItemKey) {
@@ -280,6 +294,30 @@
                 </button>
               {/each}
             </div>
+          </div>
+        {/if}
+
+        {#if reservations.length > 0}
+          <div class="detail-section" data-reserved-section>
+            <h3>{$tr("inventory.safety.reservedTitle")}</h3>
+            <ul class="m-0 list-none p-0 text-sm text-text-secondary">
+              {#each reservations as reservation}
+                <li class="border-b border-dashed border-border-subtle py-1.5 last:border-b-0">
+                  <span class="flex items-center justify-between gap-2">
+                    <span>{$tr(reservation.reasonKey, reservation.params)}</span>
+                    <span class="comp-count text-warning">{reservation.quantity}</span>
+                  </span>
+                  {#each reservation.claims || [] as claim}
+                    <span class="block text-xs text-text-muted">
+                      {$tr("inventory.safety.claim", {
+                        chain: chainLabel(claim, $itemDb || {}),
+                        count: claim.copies,
+                      })}
+                    </span>
+                  {/each}
+                </li>
+              {/each}
+            </ul>
           </div>
         {/if}
 

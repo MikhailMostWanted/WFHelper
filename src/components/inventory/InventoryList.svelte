@@ -14,6 +14,7 @@
     ownedSortKeyFor,
   } from "./inventoryListColumns.js";
   import { wfmItems } from "../../stores/data.js";
+  import { inventorySafetyVerdicts } from "../../stores/inventorySafety.js";
   import type { InventoryViewItem } from "../../lib/inventoryMarket.js";
   import type { SharedSortKey, SortDirection } from "../../types/filters.js";
   import { isRankedGroup } from "../../../config/shared/numeric.js";
@@ -262,6 +263,14 @@
           {@const shardCopies =
             $archonShardsBySuit.get(item.uniqueName || item.internalName || "") ?? []}
           {@const selected = selectedKeys?.has(item.internalName) ?? false}
+          {@const verdict = $inventorySafetyVerdicts.get(item.internalName)}
+          {@const reserved = item.tradable && verdict && verdict.reserved > 0 ? verdict : null}
+          {@const safeTitle = reserved
+            ? [
+                $t("inventory.safety.safeCount", { count: reserved.safe }),
+                ...reserved.reservations.map((entry) => $t(entry.reasonKey, entry.params)),
+              ].join("\n")
+            : ""}
           <tr
             class="cursor-pointer transition-colors duration-100 hover:bg-bg-raised {selected
               ? 'bg-accent/15'
@@ -334,7 +343,11 @@
             <td
               class="border-b border-border/50 px-2 py-1 text-right font-semibold text-success tabular-nums"
             >
-              {ownedLabel(item, $locale)}
+              {ownedLabel(item, $locale)}{#if reserved}<span
+                  class="ml-1 text-xs text-warning"
+                  data-safe-to-sell={reserved.safe}
+                  title={safeTitle}>({reserved.safe})</span
+                >{/if}
             </td>
             <td class="border-b border-border/50 px-2 py-1 text-xs whitespace-nowrap">
               {#if showsRank(item)}
