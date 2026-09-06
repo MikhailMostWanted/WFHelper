@@ -27,7 +27,7 @@
   import ItemImage from "../components/ItemImage.svelte";
   import { inventoryData, itemDb } from "../stores/data.js";
   import { sharedFilters } from "../stores/filters.js";
-  import { rivenCardSize, type RivenCardSize } from "../stores/rivenCardSize.js";
+  import { rivenCardSize } from "../stores/rivenCardSize.js";
   import { marketContracts } from "../stores/market.js";
   import { addToast } from "../stores/toasts.js";
   import { readStorage, writeStorage } from "../lib/persistence.js";
@@ -94,10 +94,6 @@
     ["rerolls", $tr("common.rerolls")],
     ["grade", $tr("rivens.sort.grade")],
     ["attr_grade", $tr("rivens.sort.attributeGrade")],
-  ]);
-  const CARD_SIZE_OPTIONS: { value: RivenCardSize; label: string }[] = $derived([
-    { value: "full", label: $tr("rivens.cardSize.full") },
-    { value: "compact", label: $tr("rivens.cardSize.compact") },
   ]);
   const rivenFilters = sharedFilters("rivens");
   function filterableRiven(riven: DecodedRiven): {
@@ -393,14 +389,6 @@
           value={attrGradeFilter}
           options={ATTR_GRADE_OPTIONS}
           onChange={(value) => (attrGradeFilter = value)}
-        />
-      </div>
-
-      <div data-riven-card-size-control>
-        <SegmentedControl
-          value={$rivenCardSize}
-          options={CARD_SIZE_OPTIONS}
-          onChange={(value) => rivenCardSize.set(value)}
         />
       </div>
 

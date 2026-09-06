@@ -5,6 +5,8 @@
   import { themeSettings } from "../../stores/theme.js";
   import { marketDensity } from "../../stores/uiDensity.js";
   import type { UiDensity } from "../../stores/uiDensity.js";
+  import { rivenCardSize } from "../../stores/rivenCardSize.js";
+  import type { RivenCardSize } from "../../stores/rivenCardSize.js";
   import ThemedControlCard from "../ThemedControlCard.svelte";
   import SegmentedControl from "../SegmentedControl.svelte";
   import GlassBlurControl from "./GlassBlurControl.svelte";
@@ -26,6 +28,11 @@
     { value: "plain", labelKey: "appearance.relicCardsPlain" },
   ];
 
+  const rivenCardOptions: Array<{ value: RivenCardSize; labelKey: MessageKey }> = [
+    { value: "full", labelKey: "appearance.surfaceFull" },
+    { value: "compact", labelKey: "appearance.rivenCardsCompact" },
+  ];
+
   const densityOptions: Array<{ value: UiDensity; labelKey: MessageKey }> = [
     { value: "compact", labelKey: "appearance.densityCards" },
     { value: "row", labelKey: "appearance.densityRows" },
@@ -35,6 +42,7 @@
   $: cornerSegOptions = cornerOptions.map((o) => ({ value: o.value, label: $tr(o.labelKey) }));
   $: surfaceSegOptions = surfaceOptions.map((o) => ({ value: o.value, label: $tr(o.labelKey) }));
   $: relicSegOptions = relicCardOptions.map((o) => ({ value: o.value, label: $tr(o.labelKey) }));
+  $: rivenSegOptions = rivenCardOptions.map((o) => ({ value: o.value, label: $tr(o.labelKey) }));
   $: densitySegOptions = densityOptions.map((o) => ({ value: o.value, label: $tr(o.labelKey) }));
 </script>
 
@@ -84,6 +92,21 @@
           options={relicSegOptions}
           onChange={(v) => themeSettings.setEffects({ relicCardStyle: v })}
         />
+      </div>
+    </ThemedControlCard>
+
+    <ThemedControlCard>
+      <div class="flex items-center justify-between gap-3">
+        <span class="text-text-secondary text-xs font-medium"
+          >{$tr("appearance.rivenCardSize")}</span
+        >
+        <div data-riven-card-size-control>
+          <SegmentedControl
+            value={$rivenCardSize}
+            options={rivenSegOptions}
+            onChange={(v) => rivenCardSize.set(v)}
+          />
+        </div>
       </div>
     </ThemedControlCard>
 

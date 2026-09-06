@@ -71,8 +71,11 @@ test.describe("riven card size", () => {
     await expect(rifleCard).toBeVisible();
     await expect(rifleCard.locator("[data-riven-grade]")).toHaveText(/^[SABCF][+-]?$/);
 
-    // SegmentedControl renders the options in store order: full, then compact.
+    // SegmentedControl renders the options in store order: full, compact.
+    await openView(page, "settings");
+    await page.locator('[data-tour-tab="appearance"]').click();
     await page.locator("[data-riven-card-size-control] button").nth(1).click();
+    await openView(page, "rivens");
 
     await expect(grid).toHaveAttribute("data-riven-card-size", "compact");
     await expect(page.locator("[data-riven-card]")).toHaveCount(fullCards);
