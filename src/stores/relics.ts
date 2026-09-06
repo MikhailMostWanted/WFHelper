@@ -10,7 +10,7 @@ function restoreRelicTab(): string {
   return raw && RELIC_TABS.has(raw) ? raw : "all";
 }
 
-export type RelicSortMode = "tier" | "name" | "ev" | "ducat" | "ducatonator";
+export type RelicSortMode = "tier" | "name" | "ev" | "ducat" | "ducatonator" | "owned";
 export type RelicQualityMode = "owned" | "intact" | "exceptional" | "flawless" | "radiant";
 export type RelicVaultedMode = "all" | "vaulted" | "unvaulted";
 export type RelicOwnershipMode = "owned" | "all";

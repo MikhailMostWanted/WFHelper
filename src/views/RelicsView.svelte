@@ -61,6 +61,7 @@
     ["ev", "common.platinum"],
     ["ducat", "common.ducats"],
     ["ducatonator", "relics.sort.ducatsPerPlat"],
+    ["owned", "common.owned"],
   ];
   $: SORT_OPTIONS = SORT_OPTION_KEYS.map(
     ([key, i18nKey]) => [key, $tr(i18nKey)] as [RelicSortMode, string],
@@ -147,6 +148,11 @@
 
     if (sortMode === "name") return direction * a.name.localeCompare(b.name);
     if (sortMode === "tier") return direction * compareRelicTierThenName(a, b);
+    if (sortMode === "owned") {
+      return compareNullableRelicMetric(a, b, direction, (group) =>
+        ownedCountForMode(group, qualityMode),
+      );
+    }
 
     const metricKey =
       sortMode === "ducatonator" ? "ratio" : sortMode === "ducat" ? "ducat" : "plat";
@@ -455,6 +461,12 @@
     }
 
     return qualityEvData(group, mode);
+  }
+
+  // The refinement selector picks the pile; "owned" means every refinement together.
+  function ownedCountForMode(group: RelicGroup, mode: RelicQualityMode): number {
+    if (mode !== "owned") return ownedCount(group, mode);
+    return RELIC_QUALITY_COLUMNS.reduce((sum, quality) => sum + ownedCount(group, quality), 0);
   }
 
   function ownedCount(group: RelicGroup, quality: RelicQuality): number {
