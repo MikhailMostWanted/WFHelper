@@ -7,6 +7,7 @@
     flowBarX,
     FLOW_BAR,
     FLOW_HEIGHT,
+    FLOW_SLOT,
   } from "../../lib/stats/chartData.js";
   import { formatPlat, parseDateKey, type MonthFlow } from "../../lib/stats/tradeAnalytics.js";
 
@@ -86,21 +87,30 @@
         />
         {#each chart.bars as bar, index (bar.month)}
           {@const row = rows[index]}
+          {@const title = $tr("analysis.flowDetail", {
+            label: monthLabel(bar.month, $locale),
+            in: formatPlat(row.platIn, $locale),
+            out: formatPlat(row.platOut, $locale),
+            net: formatPlat(row.net, $locale),
+          })}
           <rect
             x={bar.x}
             y={bar.y}
             width={FLOW_BAR}
             height={bar.h}
             class={bar.positive ? "fill-success opacity-75" : "fill-danger opacity-75"}
+          />
+          <!-- A near-zero month draws a one-unit sliver nobody can hover, so the
+               whole column carries the tooltip on top of the bar. -->
+          <rect
+            x={index * FLOW_SLOT}
+            y="0"
+            width={FLOW_SLOT}
+            height={FLOW_HEIGHT}
+            fill="none"
+            pointer-events="all"
           >
-            <title>
-              {$tr("analysis.flowDetail", {
-                label: monthLabel(bar.month, $locale),
-                in: formatPlat(row.platIn, $locale),
-                out: formatPlat(row.platOut, $locale),
-                net: formatPlat(row.net, $locale),
-              })}
-            </title>
+            <title>{title}</title>
           </rect>
         {/each}
       </svg>
