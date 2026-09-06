@@ -5,6 +5,7 @@ import {
   launchElectronTestHarness,
   openView,
   type ElectronTestHarness,
+  setLayoutViewport,
 } from "./electronTestHarness";
 
 const LAYOUT_KEY = "wf_layout_v1";
@@ -183,7 +184,7 @@ test.describe("Per-view layout editing", () => {
   test("dragging a World section into the other column moves it, and one Undo puts it back", async () => {
     // Viewport emulation, not setBounds: at the 1280 default the world grid
     // measures under LAYOUT_NARROW_MAX_PX and renders a single column.
-    await page.setViewportSize({ width: 1800, height: 950 });
+    await setLayoutViewport(page, 1800, 950);
     await page.waitForFunction(() => window.innerWidth >= 1700);
     await openView(page, "world");
 

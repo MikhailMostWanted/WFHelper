@@ -92,6 +92,21 @@ export async function launchElectronTestHarness(
   }
 }
 
+/** Viewport in CSS pixels. setViewportSize sets the device viewport and the app
+ * divides it by the zoom from config/runtime/uiScale.ts (1.15 on a 1440p panel,
+ * 0.9 on a small CI display), so a raw 1800 lands at 1565 or 2000 CSS px. */
+export async function setLayoutViewport(page: Page, width: number, height: number): Promise<void> {
+  await page.setViewportSize({ width, height });
+  const applied = await page.evaluate(() => window.innerWidth);
+  if (!applied) return;
+  const zoom = width / applied;
+  if (Math.abs(zoom - 1) < 0.01) return;
+  await page.setViewportSize({
+    width: Math.round(width * zoom),
+    height: Math.round(height * zoom),
+  });
+}
+
 /** Sidebar labels are translated, so navigate by data-view. */
 export async function openView(page: Page, view: string): Promise<void> {
   await page.locator(`#sidebar [data-view="${view}"]`).click();
