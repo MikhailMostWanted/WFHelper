@@ -27,6 +27,19 @@ export interface SyndicateStatus {
   dailyRemaining: number | null;
 }
 
+interface CreditsRow {
+  needed: number;
+  owned: number;
+  missing: number;
+}
+
+/** Credits are one inventory balance, so every cost row reads them off the raw payload. */
+export function creditsRow(needed: number, inv: RawInventoryData | null): CreditsRow {
+  const owned = Math.max(0, toFiniteNumber(inv?.RegularCredits) ?? 0);
+  const total = Math.max(0, needed);
+  return { needed: total, owned, missing: Math.max(0, total - owned) };
+}
+
 export interface RankUpStep {
   level: number;
   title: string;
@@ -64,7 +77,7 @@ interface StandingNeed {
 }
 
 interface AggregateNeeds {
-  credits: { needed: number; owned: number; missing: number };
+  credits: CreditsRow;
   items: NeededItem[];
   standing: StandingNeed[];
 }
@@ -257,13 +270,8 @@ export function aggregateNeeds(
     pool.daysEstimate = afterToday === 0 ? 0 : Math.ceil(afterToday / pool.dailyCap);
   }
 
-  const creditsOwned = toFiniteNumber(inv?.RegularCredits) ?? 0;
   return {
-    credits: {
-      needed: creditsNeeded,
-      owned: creditsOwned,
-      missing: Math.max(0, creditsNeeded - creditsOwned),
-    },
+    credits: creditsRow(creditsNeeded, inv),
     items: [...items.values()].sort(
       (a, b) => b.missing - a.missing || a.name.localeCompare(b.name),
     ),

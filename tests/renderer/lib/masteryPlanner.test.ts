@@ -12,6 +12,7 @@ import {
   type PlannedItem,
   type PlannerPin,
 } from "../../../src/lib/masteryPlanner.js";
+import { creditsRow } from "../../../src/lib/syndicates/rankup.js";
 import type { ItemDbEntry } from "../../../src/types/inventory.js";
 import type { WfmItemsLookup } from "../../../src/types/ipc.js";
 
@@ -616,5 +617,58 @@ describe("mastery planner missing filter", () => {
 
     expect(missingOnly(rows).map((row) => row.uniqueName)).toEqual(["a", "c"]);
     expect(missingOnly([{ uniqueName: "b", missing: 0 }])).toEqual([]);
+  });
+});
+
+describe("mastery planner credits row", () => {
+  it("measures the summed build cost against the account balance", () => {
+    const db: Record<string, ItemDbEntry> = {
+      "/Lotus/Weapons/Alpha": entry("Alpha", {
+        buildPrice: 15_000,
+        buildTime: 0,
+        num: 1,
+        ingredients: [{ uniqueName: FERRITE, count: 10 }],
+      }),
+      "/Lotus/Weapons/Beta": entry("Beta", {
+        buildPrice: 5000,
+        buildTime: 0,
+        num: 1,
+        ingredients: [{ uniqueName: FERRITE, count: 10 }],
+      }),
+      [FERRITE]: entry("Ferrite"),
+    };
+    const built = buildMasteryPlan(
+      [pin("/Lotus/Weapons/Alpha", "Alpha"), pin("/Lotus/Weapons/Beta", "Beta")],
+      db,
+      new Map(),
+    );
+
+    expect(creditsRow(built.totalCredits, { RegularCredits: 12_000 })).toEqual({
+      needed: 20_000,
+      owned: 12_000,
+      missing: 8000,
+    });
+  });
+
+  it("treats a missing or unreadable balance as zero owned", () => {
+    expect(creditsRow(70_000, null)).toEqual({
+      needed: 70_000,
+      owned: 0,
+      missing: 70_000,
+    });
+    expect(creditsRow(70_000, {})).toEqual({
+      needed: 70_000,
+      owned: 0,
+      missing: 70_000,
+    });
+    expect(creditsRow(70_000, { RegularCredits: "nope" }).owned).toBe(0);
+  });
+
+  it("unwraps a boxed balance and covers a paid-for plan", () => {
+    expect(creditsRow(70_000, { RegularCredits: { $numberLong: "90000" } })).toEqual({
+      needed: 70_000,
+      owned: 90_000,
+      missing: 0,
+    });
   });
 });

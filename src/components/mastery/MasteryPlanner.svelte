@@ -1,8 +1,10 @@
 <script lang="ts">
-  import MaterialRing from "./MaterialRing.svelte";
   import ItemImage from "../ItemImage.svelte";
+  import ItemTile from "../ItemTile.svelte";
   import SegmentedControl from "../SegmentedControl.svelte";
   import ThemedPanel from "../ThemedPanel.svelte";
+  import { CREDITS_ICON_URL } from "../../lib/assetUrls.js";
+  import { formatNumber } from "../../lib/format.js";
   import { itemLabel } from "../../lib/itemLabel.js";
   import { locale, tr } from "../../lib/i18n.js";
   import { buildItemNameIndex } from "../../lib/componentResolution.js";
@@ -14,7 +16,8 @@
     type PlannedItem,
     type PlannerSort,
   } from "../../lib/masteryPlanner.js";
-  import { itemDb } from "../../stores/data.js";
+  import { creditsRow } from "../../lib/syndicates/rankup.js";
+  import { inventoryData, itemDb } from "../../stores/data.js";
   import type { ComponentInfo } from "../../types/inventory.js";
 
   interface Props {
@@ -28,6 +31,15 @@
 
   let { plan, sort, onSort, onUnpin, onOpenItem, onOpenComponent }: Props = $props();
 
+  interface MaterialRow {
+    key: string;
+    label: string;
+    iconUrl?: string;
+    owned: number;
+    needed: number;
+    missing: number;
+  }
+
   // Past this many chips a card reads as a bill of materials, so the rest wait
   // behind one expander.
   const MATERIAL_CHIP_LIMIT = 4;
@@ -38,15 +50,40 @@
   const groups = $derived(groupPlannedItems(plan.items, sort, itemLabel));
   const shortTotals = $derived(missingOnly(plan.totals));
   const visibleTotals = $derived(showCovered ? plan.totals : shortTotals);
-  // Short rows lead, biggest gap first; covered rows fall to the back in name
-  // order, so revealing them never reshuffles what was already on screen.
-  const sortedTotals = $derived(
-    [...visibleTotals].sort((a, b) => {
+  const credits = $derived(creditsRow(plan.totalCredits, $inventoryData));
+  const creditsVisible = $derived(credits.needed > 0 && (showCovered || credits.missing > 0));
+  // Covered rows go last in name order, so revealing them never reshuffles the rest.
+  const sortedRows: MaterialRow[] = $derived(
+    [
+      ...visibleTotals.map((row) => ({
+        key: row.uniqueName,
+        label: itemLabel(row),
+        owned: row.owned,
+        needed: row.needed,
+        missing: row.missing,
+      })),
+      ...(creditsVisible
+        ? [
+            {
+              key: "credits",
+              label: $tr("common.credits"),
+              iconUrl: CREDITS_ICON_URL,
+              owned: credits.owned,
+              needed: credits.needed,
+              missing: credits.missing,
+            },
+          ]
+        : []),
+    ].sort((a, b) => {
       if (a.missing > 0 !== b.missing > 0) return a.missing > 0 ? -1 : 1;
       if (a.missing > 0) return missingShare(b) - missingShare(a);
-      return itemLabel(a).localeCompare(itemLabel(b));
+      return a.label.localeCompare(b.label);
     }),
   );
+  const hiddenRows = $derived(
+    plan.totals.length - shortTotals.length + (credits.needed > 0 && credits.missing <= 0 ? 1 : 0),
+  );
+  const allRowCount = $derived(plan.totals.length + (credits.needed > 0 ? 1 : 0));
   const plannedXp = $derived(plan.items.reduce((sum, item) => sum + item.masteryXpRemaining, 0));
   const sortOptions = $derived([
     { value: "mastery_xp" as const, label: $tr("mastery.sort.masteryXp") },
@@ -56,6 +93,13 @@
 
   function missingShare(row: { missing: number; needed: number }): number {
     return row.needed > 0 ? row.missing / row.needed : 0;
+  }
+
+  // Floor so a hair under full still reads 99%; only a covered row claims 100%.
+  function coveredPercent(row: { owned: number; needed: number; missing: number }): number {
+    if (row.missing <= 0) return 100;
+    const fraction = row.needed > 0 ? Math.max(0, Math.min(1, row.owned / row.needed)) : 1;
+    return Math.floor(fraction * 100);
   }
 
   function toggleMaterials(uniqueName: string): void {
@@ -78,6 +122,36 @@
     onOpenComponent(target.comp, target.parentName);
   }
 </script>
+
+{#snippet materialBar(row: MaterialRow)}
+  {@const percent = coveredPercent(row)}
+  {@const shortfall =
+    row.missing > 0 ? `\n${$tr("common.missing")} ${row.missing.toLocaleString($locale)}` : ""}
+  {@const detail = `${row.label}\n${row.owned.toLocaleString($locale)} / ${row.needed.toLocaleString($locale)}${shortfall}`}
+  <div
+    class="material-bar relative flex min-w-0 items-center gap-2 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 py-1.5"
+    role="img"
+    aria-label={detail}
+    title={detail}
+  >
+    <span class="material-bar__fill" class:covered={row.missing <= 0} style="width: {percent}%"
+    ></span>
+    {#if row.iconUrl}
+      <img src={row.iconUrl} alt="" class="relative h-4 w-4 shrink-0 object-contain" />
+    {/if}
+    <span class="relative min-w-0 flex-1 truncate text-xs text-text-primary">{row.label}</span>
+    <!-- Compact counts so nothing clips; the title carries the exact numbers. Fixed
+         widths line the numbers up bar to bar. -->
+    <span
+      class="material-bar__value relative min-w-[6.25rem] shrink-0 text-right text-xs tabular-nums text-text-primary"
+      >{formatNumber(row.owned, $locale)} / {formatNumber(row.needed, $locale)}</span
+    >
+    <span
+      class="material-bar__value relative min-w-[2.75rem] shrink-0 text-right font-display text-xs tabular-nums text-text-primary"
+      >{percent}%</span
+    >
+  </div>
+{/snippet}
 
 {#snippet plannedCard(item: PlannedItem)}
   {@const missingParts = missingOnly(item.components)}
@@ -185,19 +259,20 @@
             class="font-display text-[0.68rem] font-semibold uppercase tracking-[0.06em] text-text-muted"
             >{$tr("mastery.planner.parts")}</span
           >
-          <div class="flex flex-wrap gap-1.5">
+          <div class="flex min-w-0 flex-wrap gap-1.5">
             {#each missingParts as comp (comp.uniqueName)}
-              <button
-                type="button"
-                class="planner-chip short"
-                aria-label={$tr("mastery.openComponentDetailsAria", {
+              <ItemTile
+                tileKey={comp.uniqueName}
+                tone="danger"
+                imageUrl={comp.imageUrl}
+                auditKey={comp.name}
+                label={itemLabel(comp)}
+                count="{formatNumber(comp.owned, $locale)}/{formatNumber(comp.needed, $locale)}"
+                ariaLabel={$tr("mastery.openComponentDetailsAria", {
                   name: itemLabel(comp) || $tr("mastery.componentFallback"),
                 })}
-                onclick={() => openRow(comp)}
-              >
-                <span class="min-w-0 truncate">{itemLabel(comp)}</span>
-                <span class="tabular-nums opacity-80">{comp.owned}/{comp.needed}</span>
-              </button>
+                onOpen={() => openRow(comp)}
+              />
             {/each}
           </div>
         </div>
@@ -220,7 +295,7 @@
                 onclick={() => openRow(row)}
               >
                 <span class="min-w-0 truncate">{itemLabel(row)}</span>
-                <span class="tabular-nums opacity-80"
+                <span class="font-semibold tabular-nums text-text-primary"
                   >{row.owned.toLocaleString($locale)}/{row.needed.toLocaleString($locale)}</span
                 >
               </button>
@@ -329,7 +404,7 @@
         >
         <div class="flex flex-wrap items-center gap-2 text-xs text-text-muted">
           <span>{$tr("mastery.planner.pinnedCount", { count: plan.items.length })}</span>
-          {#if plan.totals.length > shortTotals.length}
+          {#if hiddenRows > 0}
             <button
               type="button"
               class="rounded-[var(--radius-sm)] border border-[var(--border)] px-1.5 py-0.5 text-text-secondary hover:border-accent-dim hover:text-accent"
@@ -337,39 +412,20 @@
             >
               {showCovered
                 ? $tr("common.showFewer")
-                : $tr("mastery.planner.showAllMaterials", { count: plan.totals.length })}
+                : $tr("mastery.planner.showAllMaterials", { count: allRowCount })}
             </button>
           {/if}
         </div>
       </div>
 
-      {#if visibleTotals.length === 0}
+      {#if sortedRows.length === 0}
         <p class="text-xs text-text-muted">{$tr("mastery.planner.noMaterialsNeeded")}</p>
       {:else}
-        <div class="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
-          {#each sortedTotals as row (row.uniqueName)}
-            {@const label = itemLabel(row)}
-            {@const counts = `${row.owned.toLocaleString($locale)} / ${row.needed.toLocaleString($locale)}`}
-            <div
-              class="flex items-center gap-2.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2.5 py-2"
-              data-planner-material={row.uniqueName}
-            >
-              <MaterialRing owned={row.owned} needed={row.needed} missing={row.missing} {label} />
-              <span class="grid min-w-0 gap-0.5">
-                <span class="truncate text-xs text-text-secondary" title={label}>{label}</span>
-                <span
-                  class="truncate text-[0.7rem] tabular-nums {row.missing > 0
-                    ? 'text-warning'
-                    : 'text-text-muted'}"
-                  title={counts}>{counts}</span
-                >
-                {#if row.missing > 0}
-                  <span class="truncate text-[0.7rem] tabular-nums text-text-muted"
-                    >{$tr("common.missing")} {row.missing.toLocaleString($locale)}</span
-                  >
-                {/if}
-              </span>
-            </div>
+        <!-- min() so a container narrower than one bar shrinks the track instead
+             of overflowing. -->
+        <div class="grid gap-2 grid-cols-[repeat(auto-fill,minmax(min(100%,270px),1fr))]">
+          {#each sortedRows as row (row.key)}
+            {@render materialBar(row)}
           {/each}
         </div>
       {/if}
@@ -406,6 +462,23 @@
 {/if}
 
 <style>
+  /* Tinted rather than solid: the name sits on top of this fill and has to stay
+     legible where the bar ends and where it covers the whole row. */
+  .material-bar__fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: color-mix(in oklab, var(--warning) 26%, transparent);
+  }
+  .material-bar__fill.covered {
+    background: color-mix(in oklab, var(--success) 26%, transparent);
+  }
+  /* Darkens fill and empty track alike, so one pill style works at any percent. */
+  .material-bar__value {
+    border-radius: var(--radius-sm);
+    padding: 0 0.25rem;
+    background: color-mix(in oklab, var(--bg-deep) 55%, transparent);
+  }
+
   .planner-chip {
     display: inline-flex;
     align-items: center;
@@ -414,7 +487,7 @@
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
     padding: 0.1rem 0.4rem;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     cursor: pointer;
   }
   .planner-chip.short {

@@ -62,11 +62,11 @@ function compactUnit(value: number): string {
   return value.toFixed(1).replace(/\.0$/, "");
 }
 
-export function formatNumber(num: number): string {
+export function formatNumber(num: number, locale?: string): string {
   // 999,950+ would render as "1000.0K" - bump to the next unit instead.
   if (num >= 999_950) return `${compactUnit(num / 1e6)}M`;
   if (num >= 1e3) return `${compactUnit(num / 1e3)}K`;
-  return num.toLocaleString();
+  return num.toLocaleString(locale);
 }
 
 export function formatTimeRemaining(endDate: Date, nowMs: number = Date.now()): string {
