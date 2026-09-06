@@ -1557,6 +1557,7 @@
   "update.noReleaseNotes": "此版本没有发布更新说明。详情请查看发布页面。",
   "update.released": "发布于 {date}",
   "update.restartAndInstall": "重启并安装",
+  "update.supportPatreon": "在 Patreon 上支持",
   "update.updateFallback": "更新",
   "update.whatsNew": "更新内容",
   "update.whatsNewIn": "{version} 的更新内容",

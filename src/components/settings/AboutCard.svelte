@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PATREON_URL } from "../../config/links.js";
   import { tr } from "../../lib/i18n.js";
   import { send } from "../../lib/ipc.js";
   import SettingsSection from "./SettingsSection.svelte";
@@ -82,9 +83,7 @@
           onclick={() => openLink("https://github.com/sponsors/MrZockerator")}
           >&hearts; {$tr("settings.creditSponsors")}</button
         >
-        <button class="settings-link" onclick={() => openLink("https://www.patreon.com/WFHelper")}
-          >Patreon</button
-        >
+        <button class="settings-link" onclick={() => openLink(PATREON_URL)}>Patreon</button>
       </span>
     </div>
   </div>

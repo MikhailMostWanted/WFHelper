@@ -1,5 +1,6 @@
 <script lang="ts">
   import ModalShell from "./ModalShell.svelte";
+  import { PATREON_URL } from "../config/links.js";
   import { locale, tr } from "../lib/i18n.js";
   import { parseReleaseNotes } from "../lib/releaseNotes.js";
   import type { AppUpdateState } from "../types/ipc.js";
@@ -99,26 +100,36 @@
     </div>
 
     <div class="update-modal-footer">
-      {#if state.status === "available"}
-        <button type="button" class="btn-success btn-sm" disabled={pending} on:click={onDownload}>
-          {$tr("update.download", { version: version || $tr("update.updateFallback") })}
-        </button>
-      {:else if state.status === "downloaded"}
-        <button type="button" class="btn-success btn-sm" disabled={pending} on:click={onInstall}>
-          {$tr("update.restartAndInstall")}
-        </button>
-      {/if}
-      <button type="button" class="btn-secondary btn-sm" on:click={onClose}
-        >{$tr("common.close")}</button
+      <button
+        type="button"
+        class="btn-patreon btn-sm"
+        on:click={() => openLink(PATREON_URL)}
+        data-update-patreon
       >
+        {$tr("update.supportPatreon")}
+      </button>
+      <div class="update-modal-actions">
+        {#if state.status === "available"}
+          <button type="button" class="btn-success btn-sm" disabled={pending} on:click={onDownload}>
+            {$tr("update.download", { version: version || $tr("update.updateFallback") })}
+          </button>
+        {:else if state.status === "downloaded"}
+          <button type="button" class="btn-success btn-sm" disabled={pending} on:click={onInstall}>
+            {$tr("update.restartAndInstall")}
+          </button>
+        {/if}
+        <button type="button" class="btn-secondary btn-sm" on:click={onClose}
+          >{$tr("common.close")}</button
+        >
+      </div>
     </div>
   </div>
 </ModalShell>
 
 <style>
   .update-modal-panel {
-    max-width: 30rem;
-    width: min(30rem, 92vw);
+    max-width: 48rem;
+    width: min(48rem, 92vw);
   }
   .update-modal-date {
     margin-top: 0.15rem;
@@ -126,31 +137,32 @@
     color: var(--text-muted);
   }
   .update-modal-body {
-    max-height: 55vh;
+    max-height: 65vh;
     overflow-y: auto;
   }
   .update-notes {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    font-size: 0.85rem;
-    line-height: 1.5;
+    gap: 0.6rem;
+    font-size: 0.95rem;
+    line-height: 1.55;
     color: var(--text-secondary);
   }
   .update-notes-heading {
     font-weight: 600;
+    font-size: 1rem;
     color: var(--text-primary);
-    margin-top: 0.25rem;
+    margin-top: 0.35rem;
   }
   .update-notes-heading.is-h1 {
-    font-size: 1rem;
+    font-size: 1.15rem;
   }
   .update-notes-list {
     list-style: disc;
     padding-left: 1.15rem;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: 0.3rem;
   }
   .update-notes :global(a) {
     color: var(--accent);
@@ -158,7 +170,7 @@
     cursor: pointer;
   }
   .update-notes-empty {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     color: var(--text-muted);
   }
   .update-progress {
@@ -185,8 +197,34 @@
   }
   .update-modal-footer {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     gap: 0.5rem;
     margin-top: 1rem;
+  }
+  .update-modal-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+  /* Its own class rather than btn-danger: red, but nothing here is destructive. */
+  .btn-patreon {
+    display: inline-flex;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--danger);
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--danger);
+    background: color-mix(in oklab, var(--danger) 18%, transparent);
+    transition:
+      background-color 0.15s,
+      border-color 0.15s,
+      color 0.15s;
+  }
+  .btn-patreon:hover {
+    background: color-mix(in oklab, var(--danger) 28%, transparent);
   }
 </style>

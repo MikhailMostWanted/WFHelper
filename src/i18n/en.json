@@ -1570,6 +1570,7 @@
   "update.noReleaseNotes": "No release notes were published for this version. See the releases page for details.",
   "update.released": "Released {date}",
   "update.restartAndInstall": "Restart & install",
+  "update.supportPatreon": "Support on Patreon",
   "update.updateFallback": "update",
   "update.whatsNew": "What's new",
   "update.whatsNewIn": "What's new in {version}",

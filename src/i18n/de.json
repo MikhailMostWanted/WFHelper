@@ -1553,6 +1553,7 @@
   "update.noReleaseNotes": "Für diese Version wurden keine Release-Notes veröffentlicht. Details auf der Releases-Seite.",
   "update.released": "Veröffentlicht {date}",
   "update.restartAndInstall": "Neustarten & installieren",
+  "update.supportPatreon": "Auf Patreon unterstützen",
   "update.updateFallback": "Update",
   "update.whatsNew": "Was ist neu",
   "update.whatsNewIn": "Was ist neu in {version}",
