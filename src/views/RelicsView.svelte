@@ -37,8 +37,7 @@
   import { foundryBuildProducts } from "../lib/inventory/foundryResources.js";
   import { buildMasteryLookup } from "../lib/masteryLookup.js";
   import { isRewardNeeded, type RewardNeedContext } from "../lib/relic/rewardNeed.js";
-  import { componentParentOf } from "../lib/inventory/partConsumers.js";
-  import { aggregateComponentOwnership } from "../../config/shared/componentOwnership.js";
+  import { inventorySafetyContext } from "../stores/inventorySafety.js";
   import { stripQuantityPrefix } from "../../config/shared/quantityPrefix.js";
   import type { ParsedItem } from "../types/inventory.js";
   import type { RelicGroup, RelicQuality, RelicReward } from "../types/relics.js";
@@ -370,15 +369,11 @@
     );
   }
 
-  // Ownership comes from the raw inventory, not the componentOwnership store:
-  // that one drops blueprints the foundry already consumed, and a part sitting
-  // in a pending build is not a part the player still needs.
   // The three reward lookups are named here so the filter follows their rebuilds.
   $: needContext = {
-    owned: aggregateComponentOwnership($inventoryData),
+    safety: $inventorySafetyContext,
     building: foundryBuildProducts($foundryData),
     mastery: buildMasteryLookup($masteryData).byUniqueName,
-    parentOf: (uniqueName: string) => componentParentOf(uniqueName, $itemDb),
     uniqueNameOf: (reward: RelicReward) => rewardUniqueName(reward, rewardGameRefBySlug),
     ownedByName: (reward: RelicReward) =>
       isOwnedRewardIn(reward, rewardGameRefBySlug, ownedRewardInternalNames, ownedRewardNames),
@@ -691,7 +686,6 @@
           class="filter-tab min-h-8 shrink-0 whitespace-nowrap"
           class:active={$relicViewState.containsNeededReward}
           title={$tr("relics.neededRewardTitle")}
-          data-relic-needed-toggle
           on:click={() =>
             setRelicFilter({ containsNeededReward: !$relicViewState.containsNeededReward })}
         >

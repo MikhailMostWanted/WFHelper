@@ -1,15 +1,18 @@
-import { componentUniqueNameAliases } from "../../../config/shared/componentNames.js";
+import {
+  componentUniqueNameAliases,
+  ownedComponentCount,
+} from "../../../config/shared/componentNames.js";
+import { consumersOf, partConsumerIndex } from "../inventory/partConsumers.js";
+import { recipeCopiesFor, type SafetyContext } from "../inventory/safetyRules.js";
 import type { MasteryStatus } from "../../types/inventory.js";
 import type { RelicReward } from "../../types/relics.js";
 
 export interface RewardNeedContext {
-  /** Owned copies per uniqueName from the raw inventory; foundry-consumed blueprints still count. */
-  owned: ReadonlyMap<string, number>;
+  /** The safe-to-sell engine's context; its demand walk says what a part still owes. */
+  safety: SafetyContext;
   /** Product uniqueNames sitting in the foundry, building or claimable. */
   building: ReadonlySet<string>;
   mastery: ReadonlyMap<string, MasteryStatus>;
-  /** The item a component belongs to (itemDb componentOf), or null for a whole item. */
-  parentOf: (uniqueName: string) => string | null;
   /** reward.uniqueName, else the WFM gameRef behind reward.urlName. */
   uniqueNameOf: (reward: RelicReward) => string | null;
   /** The parsed-inventory name/gameRef ownership check. */
@@ -17,24 +20,27 @@ export interface RewardNeedContext {
 }
 
 function heldOrMastered(uniqueName: string, ctx: RewardNeedContext): boolean {
-  if ((ctx.owned.get(uniqueName) ?? 0) > 0) return true;
-  if (ctx.building.has(uniqueName)) return true;
-  return ctx.mastery.get(uniqueName) === "mastered";
+  if (ownedComponentCount(uniqueName, ctx.safety.ownedCounts) > 0) return true;
+  return componentUniqueNameAliases(uniqueName).some(
+    (alias) => ctx.building.has(alias) || ctx.mastery.get(alias) === "mastered",
+  );
 }
 
-/** A reward is still needed when neither it nor the item it builds is held,
- *  in the foundry, or mastered. Mastered gear the player sold stays unneeded. */
+/** A part is needed while the builds above it, at any depth, claim more copies
+ *  than the account holds; anything else is needed until held or mastered.
+ *  Mastered gear the player sold stays unneeded. */
 export function isRewardNeeded(reward: RelicReward, ctx: RewardNeedContext): boolean {
   if (ctx.ownedByName(reward)) return false;
 
   const uniqueName = ctx.uniqueNameOf(reward);
   if (!uniqueName) return true;
 
-  for (const alias of componentUniqueNameAliases(uniqueName)) {
-    if (heldOrMastered(alias, ctx)) return false;
-    const parent = ctx.parentOf(alias);
-    if (parent && heldOrMastered(parent, ctx)) return false;
+  // Without mastery data the walk cannot run and the reward's own copies decide.
+  if (!ctx.safety.degradedRules.includes("unmasteredRecipe")) {
+    const claimed = recipeCopiesFor(ctx.safety, uniqueName);
+    if (claimed > 0) return claimed > ownedComponentCount(uniqueName, ctx.safety.ownedCounts);
+    if (consumersOf(partConsumerIndex(ctx.safety.itemDb), uniqueName).length > 0) return false;
   }
 
-  return true;
+  return !heldOrMastered(uniqueName, ctx);
 }
