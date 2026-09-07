@@ -183,3 +183,20 @@ describe("relicGroupMatchesSearch quality words", () => {
     expect(relicGroupMatchesSearch(makeGroup(), "radiant nikana")).toBe(false);
   });
 });
+
+describe("relicGroupHasMatchingReward", () => {
+  it("tests every reward when the rows share one uniqueName", () => {
+    const group = makeGroup();
+    for (const reward of group.qualities.intact?.rewards ?? []) {
+      reward.uniqueName = "/Lotus/Relics/NeoZ9Intact";
+    }
+    const seen: string[] = [];
+    expect(
+      relicGroupHasMatchingReward(group, (reward) => {
+        seen.push(reward.name);
+        return reward.name === "Saryn Prime Neuroptics";
+      }),
+    ).toBe(true);
+    expect(seen).toEqual(["Braton Prime Barrel", "Saryn Prime Neuroptics"]);
+  });
+});

@@ -854,7 +854,7 @@ interface NameSlugIndex {
 }
 
 // Rebuilt lazily because buildDatabase() drops it. The scan this replaces
-// slugified all 20k names per call, and the relic reward list makes ~600 calls.
+// slugified all 20k names per call, and the relic reward rows make ~19k calls.
 let nameSlugIndex: NameSlugIndex | null = null;
 
 function hasPartMetadata(item: ItemEntry): boolean {

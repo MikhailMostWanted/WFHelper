@@ -132,7 +132,8 @@ export function relicGroupHasMatchingReward(
   const seen = new Set<string>();
   for (const qualityData of Object.values(group.qualities || {})) {
     for (const reward of qualityData?.rewards || []) {
-      const key = reward.uniqueName || reward.urlName || reward.name;
+      // Slug first: one uniqueName can repeat across a group's rewards.
+      const key = reward.urlName || reward.uniqueName || reward.name;
       if (seen.has(key)) continue;
       seen.add(key);
       if (predicate(reward)) return true;

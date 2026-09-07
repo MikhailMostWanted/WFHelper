@@ -89,6 +89,20 @@ function buildMirroredWfcdImageUrl(imageName: string | null | undefined): string
   return trimmed ? toIconMirrorUrl(WFCD_CDN + trimmed) : null;
 }
 
+const RELIC_PROJECTION_PATH = "/Lotus/Types/Game/Projections/";
+
+/** Nearly every @wfcd reward row carries the containing relic's uniqueName instead of
+ *  the item's, so the item database resolves the reward by name or WFM slug. */
+function rewardItemUniqueName(
+  item: { uniqueName?: unknown; name?: unknown } | undefined,
+  rawSlug: string | null,
+): string | null {
+  const own = typeof item?.uniqueName === "string" ? item.uniqueName : "";
+  if (own && !own.startsWith(RELIC_PROJECTION_PATH)) return own;
+  const name = typeof item?.name === "string" ? item.name : null;
+  return lookupItemByNameOrSlug(name, rawSlug)?.uniqueName ?? null;
+}
+
 function buildRelicDatabase(): RelicDatabase {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped @wfcd/items constructor
   let Items: any;
@@ -144,10 +158,11 @@ function buildRelicDatabase(): RelicDatabase {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped @wfcd/items reward
       rewards: (relic.rewards || []).map((r: any) => {
         const rawSlug = r.item?.warframeMarket?.urlName || r.item?.warframeMarket?.url_name || null;
+        const uniqueName = rewardItemUniqueName(r.item, rawSlug);
         return {
           name: r.item?.name || "Unknown",
-          ...localizedNameFields(r.item?.uniqueName, r.item?.name || "Unknown"),
-          uniqueName: r.item?.uniqueName || null,
+          ...localizedNameFields(uniqueName, r.item?.name || "Unknown"),
+          uniqueName,
           imageUrl: buildMirroredWfcdImageUrl(r.item?.imageName),
           rarity: relicRewardRarity(quality, r.chance || 0, r.rarity || "Common"),
           chance: r.chance || 0,
