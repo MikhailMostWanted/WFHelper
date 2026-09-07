@@ -1,3 +1,5 @@
+import { BUILT_GEAR_COLLECTIONS } from "./gearCollections";
+
 interface InventoryItemWithType {
   ItemType?: unknown;
   ItemCount?: unknown;
@@ -7,27 +9,6 @@ const DEFAULT_OWNED_COUNT = 1;
 
 /** Stacked slices carry a count; built gear is one row per copy. */
 const STACKED_COLLECTIONS = ["MiscItems", "Recipes"] as const;
-
-/** Built gear lives in its own collection, and a built weapon or frame can be a
- *  recipe ingredient - Aklex Prime consumes two built Lex Primes. Reading only
- *  the stacked slices reports gear the player is holding as missing. */
-const BUILT_GEAR_COLLECTIONS = [
-  "Suits",
-  "LongGuns",
-  "Pistols",
-  "Melee",
-  "SpecialItems",
-  "SentinelWeapons",
-  "Sentinels",
-  "SpaceGuns",
-  "SpaceMelee",
-  "SpaceSuits",
-  "MechSuits",
-  "Hoverboards",
-  "OperatorAmps",
-  "KubrowPets",
-  "MoaPets",
-] as const;
 
 function entryItemType(entry: unknown): string {
   if (!entry || typeof entry !== "object") return "";
@@ -57,6 +38,7 @@ export function aggregateComponentOwnership(inventory: unknown): Map<string, num
     }
   }
 
+  // Built gear lives in its own collection and can be a recipe ingredient.
   for (const key of BUILT_GEAR_COLLECTIONS) {
     const slice = slices[key];
     if (!Array.isArray(slice)) continue;

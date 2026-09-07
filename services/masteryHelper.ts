@@ -6,6 +6,7 @@ import type { ComponentEntry } from "./types/gameData";
 import { MAX_ITEM_RANK } from "../config/game/constants";
 import { aggregateComponentOwnership } from "../config/shared/componentOwnership";
 import { sanitizeDisplayName } from "../config/shared/displayName";
+import { EQUIPMENT_COLLECTIONS, MODULAR_COLLECTIONS } from "../config/shared/gearCollections";
 import { withoutFoundryPending } from "../config/shared/foundryPending";
 import { masteryRankToXp, masteryXpToRank } from "../config/shared/masteryXp";
 import { toFiniteNumber } from "../config/shared/numeric";
@@ -137,22 +138,9 @@ const VINQUIBUS_MELEE_UNIQUE_NAME = "/Lotus/Weapons/Tenno/Bayonet/TnBayonetMelee
 const GILDED_FEATURE_MASK = 8;
 
 // Inventory JSON key -> maxRank
-const INV_CATEGORIES: Record<string, number> = {
-  Suits: MAX_ITEM_RANK,
-  LongGuns: MAX_ITEM_RANK,
-  Pistols: MAX_ITEM_RANK,
-  Melee: MAX_ITEM_RANK,
-  Sentinels: MAX_ITEM_RANK,
-  SentinelWeapons: MAX_ITEM_RANK,
-  SpaceSuits: MAX_ITEM_RANK,
-  SpaceGuns: MAX_ITEM_RANK,
-  SpaceMelee: MAX_ITEM_RANK,
-  OperatorAmps: MAX_ITEM_RANK,
-  MechSuits: MAX_ITEM_RANK,
-  KubrowPets: MAX_ITEM_RANK,
-  MoaPets: MAX_ITEM_RANK,
-  Hoverboards: MAX_ITEM_RANK,
-};
+const INV_CATEGORIES: Record<string, number> = Object.fromEntries(
+  [...EQUIPMENT_COLLECTIONS, ...MODULAR_COLLECTIONS].map((key) => [key, MAX_ITEM_RANK]),
+);
 
 // XPInfo lacks containers; explicit identities keep pet weapons at weapon rate.
 function isSuitRateXpInfoItem(

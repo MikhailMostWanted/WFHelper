@@ -4,12 +4,12 @@ import {
   fallbackNameFromUniqueName,
   sanitizeDisplayName,
 } from "../../../config/shared/displayName.js";
-import type {
-  InventoryGroup,
-  ItemDbEntry,
-  RawInventoryData,
-  RawInventoryEntry,
-} from "../../types/inventory.js";
+import {
+  EQUIPMENT_COLLECTIONS,
+  MODULAR_COLLECTIONS,
+} from "../../../config/shared/gearCollections.js";
+import type { EquipmentCollection } from "../../../config/shared/gearCollections.js";
+import type { InventoryGroup, ItemDbEntry, RawInventoryEntry } from "../../types/inventory.js";
 
 export interface ResolvedItem extends ItemDbEntry {
   name: string;
@@ -17,40 +17,37 @@ export interface ResolvedItem extends ItemDbEntry {
 }
 
 interface CategoryDef {
-  key: keyof RawInventoryData;
+  key: EquipmentCollection;
   cat: string;
   label: string;
 }
 
-export const CATEGORIES: CategoryDef[] = [
-  { key: "Suits", cat: "warframes", label: "Warframe" },
-  { key: "LongGuns", cat: "primary", label: "Primary" },
-  { key: "Pistols", cat: "secondary", label: "Secondary" },
-  { key: "Melee", cat: "melee", label: "Melee" },
-  { key: "Sentinels", cat: "companions", label: "Companion" },
-  { key: "SentinelWeapons", cat: "companions", label: "Companion" },
-  { key: "SpaceSuits", cat: "archwing", label: "Archwing" },
-  { key: "SpaceGuns", cat: "archwing", label: "Archwing" },
-  { key: "SpaceMelee", cat: "archwing", label: "Archwing" },
-  { key: "OperatorAmps", cat: "amps", label: "Amp" },
-  { key: "MechSuits", cat: "necramech", label: "Necramech" },
-];
-
-const PRODUCT_TO_FILTER: Record<string, string> = {
-  Suits: "warframes",
-  LongGuns: "primary",
-  Pistols: "secondary",
-  Melee: "melee",
-  Sentinels: "companions",
-  SentinelWeapons: "companions",
-  SpaceSuits: "archwing",
-  SpaceGuns: "archwing",
-  SpaceMelee: "archwing",
-  OperatorAmps: "amps",
-  MechSuits: "necramech",
+/** Filter chip and label per equipment collection; the shared list owns the keys. */
+const CATEGORY_BY_COLLECTION: Record<EquipmentCollection, Omit<CategoryDef, "key">> = {
+  Suits: { cat: "warframes", label: "Warframe" },
+  LongGuns: { cat: "primary", label: "Primary" },
+  Pistols: { cat: "secondary", label: "Secondary" },
+  Melee: { cat: "melee", label: "Melee" },
+  Sentinels: { cat: "companions", label: "Companion" },
+  SentinelWeapons: { cat: "companions", label: "Companion" },
+  SpaceSuits: { cat: "archwing", label: "Archwing" },
+  SpaceGuns: { cat: "archwing", label: "Archwing" },
+  SpaceMelee: { cat: "archwing", label: "Archwing" },
+  OperatorAmps: { cat: "amps", label: "Amp" },
+  MechSuits: { cat: "necramech", label: "Necramech" },
 };
 
-const EQUIPMENT_COLLECTION_KEYS = new Set(CATEGORIES.map((entry) => String(entry.key)));
+export const CATEGORIES: CategoryDef[] = EQUIPMENT_COLLECTIONS.map((key) => ({
+  key,
+  ...CATEGORY_BY_COLLECTION[key],
+}));
+
+// DE names the collection and the productCategory alike, so one row serves both.
+const FILTER_BY_PRODUCT = new Map<string, string>(
+  CATEGORIES.map((entry) => [entry.key, entry.cat]),
+);
+
+const EQUIPMENT_COLLECTION_KEYS = new Set<string>(EQUIPMENT_COLLECTIONS);
 
 interface SupplementalCollectionDef {
   key: string;
@@ -398,7 +395,7 @@ export function inferCategory(
   if (/\/OperatorAmplifiers?\//i.test(internalName)) return "amps";
   const mapped =
     typeof dbEntry.productCategory === "string"
-      ? PRODUCT_TO_FILTER[dbEntry.productCategory]
+      ? FILTER_BY_PRODUCT.get(dbEntry.productCategory)
       : undefined;
   if (!mapped) return defaultCat;
   if (
@@ -451,9 +448,8 @@ const HOUND_KIND: ModularKind = {
 /** Hatched Kubrows, Kavats and Deimos pets all live here. */
 export const PET_COLLECTION_KEY = "KubrowPets";
 
-/** Modular collections DE keeps outside CATEGORIES, so parseInventory walks
- *  them separately and takes only the builds they hold. */
-export const MODULAR_COLLECTION_KEYS = ["Hoverboards", "MoaPets", PET_COLLECTION_KEY];
+/** parseInventory walks these separately and takes only the builds they hold. */
+export const MODULAR_COLLECTION_KEYS: readonly string[] = MODULAR_COLLECTIONS;
 
 // Everything in these two is a build; elsewhere ModularParts is what tells a
 // build apart from a normal weapon or a plain kubrow.

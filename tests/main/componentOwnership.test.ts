@@ -7,9 +7,6 @@ const LEX_RECEIVER = "/Lotus/Types/Recipes/Weapons/WeaponParts/LexPrimeReceiver"
 const RHINO = "/Lotus/Powersuits/Rhino/Rhino";
 
 describe("aggregateComponentOwnership counts built gear", () => {
-  // Aklex Prime consumes two built Lex Primes, and a built weapon lives in its
-  // own collection, never in MiscItems - so ignoring those reads as "missing"
-  // on gear the player is holding.
   it("counts a built weapon an akimbo recipe consumes", () => {
     const owned = aggregateComponentOwnership({
       MiscItems: [{ ItemType: LEX_RECEIVER, ItemCount: 2 }],

@@ -1,3 +1,4 @@
+import { EQUIPMENT_COLLECTIONS } from "../../config/shared/gearCollections.js";
 import type { ItemDbEntry, RawInventoryData } from "../types/inventory.js";
 import type { VaultTrader, VaultTraderInventoryItem, WorldState } from "../types/world.js";
 import { PLANET_ICON_URLS } from "./assetUrls.js";
@@ -98,20 +99,7 @@ interface DbByNameEntry extends ItemDbEntry {
 }
 
 function getInventoryRows(inventoryData: RawInventoryData): Array<{ ItemType?: string }> {
-  const keys: Array<keyof RawInventoryData> = [
-    "Suits",
-    "LongGuns",
-    "Pistols",
-    "Melee",
-    "Sentinels",
-    "SentinelWeapons",
-    "SpaceSuits",
-    "SpaceGuns",
-    "SpaceMelee",
-    "OperatorAmps",
-    "MechSuits",
-  ];
-  return keys.flatMap((key) =>
+  return EQUIPMENT_COLLECTIONS.flatMap((key) =>
     Array.isArray(inventoryData[key]) ? (inventoryData[key] as Array<{ ItemType?: string }>) : [],
   );
 }
@@ -120,17 +108,7 @@ function getInventoryRows(inventoryData: RawInventoryData): Array<{ ItemType?: s
 export function buildBaroOwnedSet(inventoryData: RawInventoryData | null): Set<string> {
   if (!inventoryData) return new Set();
   const BARO_INV_KEYS: Array<keyof RawInventoryData> = [
-    "Suits",
-    "LongGuns",
-    "Pistols",
-    "Melee",
-    "Sentinels",
-    "SentinelWeapons",
-    "SpaceSuits",
-    "SpaceGuns",
-    "SpaceMelee",
-    "OperatorAmps",
-    "MechSuits",
+    ...EQUIPMENT_COLLECTIONS,
     "RawUpgrades",
     "Upgrades",
     "LevelKeys",
