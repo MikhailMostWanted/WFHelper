@@ -24,7 +24,7 @@ interface RelicViewState {
   squadSize: number;
   vaultedMode: RelicVaultedMode;
   ownershipMode: RelicOwnershipMode;
-  containsUnownedReward: boolean;
+  containsNeededReward: boolean;
 }
 
 const DEFAULT_RELIC_VIEW_STATE: RelicViewState = {
@@ -36,7 +36,7 @@ const DEFAULT_RELIC_VIEW_STATE: RelicViewState = {
   squadSize: 1,
   vaultedMode: "all",
   ownershipMode: "owned",
-  containsUnownedReward: false,
+  containsNeededReward: false,
 };
 
 export const relicDb = writable<RelicDatabase | null>(null);

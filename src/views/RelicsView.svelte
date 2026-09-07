@@ -8,7 +8,8 @@
     relicViewState,
     setRelicFilter,
   } from "../stores/relics.js";
-  import { inventoryData, itemDb, parsedItems, wfmItems } from "../stores/data.js";
+  import { foundryData, inventoryData, itemDb, parsedItems, wfmItems } from "../stores/data.js";
+  import { masteryData } from "../stores/mastery.js";
   import { activeRelic } from "../stores/modals.js";
   import { priceCacheRevision } from "../stores/pricing.js";
   import { themeSettings } from "../stores/theme.js";
@@ -33,6 +34,10 @@
   import SearchBox from "../components/SearchBox.svelte";
   import SortControl from "../components/SortControl.svelte";
   import { defaultSortDirection } from "../lib/filters.js";
+  import { buildMasteryLookup } from "../lib/masteryLookup.js";
+  import { isRewardNeeded, type RewardNeedContext } from "../lib/relic/rewardNeed.js";
+  import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
+  import { aggregateComponentOwnership } from "../../config/shared/componentOwnership.js";
   import { stripQuantityPrefix } from "../../config/shared/quantityPrefix.js";
   import type { ParsedItem } from "../types/inventory.js";
   import type { RelicGroup, RelicQuality, RelicReward } from "../types/relics.js";
@@ -315,9 +320,7 @@
     viewState: typeof $relicViewState,
     _evRevision: number,
     _priceRevision: number,
-    _ownedInternalNames: typeof ownedRewardInternalNames,
-    _ownedNames: typeof ownedRewardNames,
-    _rewardRefs: typeof rewardGameRefBySlug,
+    needContext: RewardNeedContext,
     qualityLabels: Record<RelicQuality, string>,
   ): RelicGroup[] {
     if (!db) return [];
@@ -349,9 +352,9 @@
       );
     }
 
-    if (viewState.containsUnownedReward) {
+    if (viewState.containsNeededReward) {
       relicGroups = relicGroups.filter((group) =>
-        relicGroupHasMatchingReward(group, (reward) => !isOwnedReward(reward)),
+        relicGroupHasMatchingReward(group, (reward) => isRewardNeeded(reward, needContext)),
       );
     }
 
@@ -366,6 +369,20 @@
     );
   }
 
+  // Ownership comes from the raw inventory, not the componentOwnership store:
+  // that one drops blueprints the foundry already consumed, and a part sitting
+  // in a pending build is not a part the player still needs.
+  // The three reward lookups are named here so the filter follows their rebuilds.
+  $: needContext = {
+    owned: aggregateComponentOwnership($inventoryData),
+    building: foundryProductUniqueNames($foundryData),
+    mastery: buildMasteryLookup($masteryData).byUniqueName,
+    parentOf: (uniqueName: string) => componentParentUniqueName(uniqueName, $itemDb),
+    uniqueNameOf: (reward: RelicReward) => rewardUniqueName(reward, rewardGameRefBySlug),
+    ownedByName: (reward: RelicReward) =>
+      isOwnedRewardIn(reward, rewardGameRefBySlug, ownedRewardInternalNames, ownedRewardNames),
+  } satisfies RewardNeedContext;
+
   // $relicEvRevision / $priceCacheRevision are listed as args (and ignored by
   // the function) only so Svelte re-runs this when EV/price caches invalidate.
   $: groups = computeFilteredRelicGroups(
@@ -375,9 +392,7 @@
     $relicViewState,
     $relicEvRevision,
     $priceCacheRevision,
-    ownedRewardInternalNames,
-    ownedRewardNames,
-    rewardGameRefBySlug,
+    needContext,
     QUALITY_LABELS,
   );
 
@@ -490,23 +505,59 @@
     return [];
   }
 
-  function isOwnedReward(reward: RelicReward): boolean {
-    const slug =
-      typeof reward.urlName === "string" && reward.urlName.trim().length > 0
-        ? reward.urlName.trim().toLowerCase()
-        : "";
-    const gameRef = slug ? rewardGameRefBySlug[slug] : "";
-    if (gameRef && ownedRewardInternalNames[gameRef]) {
+  function rewardSlug(reward: RelicReward): string {
+    return typeof reward.urlName === "string" && reward.urlName.trim().length > 0
+      ? reward.urlName.trim().toLowerCase()
+      : "";
+  }
+
+  function rewardUniqueName(
+    reward: RelicReward,
+    gameRefBySlug: Record<string, string>,
+  ): string | null {
+    if (typeof reward.uniqueName === "string" && reward.uniqueName.trim().length > 0) {
+      return reward.uniqueName.trim();
+    }
+    const slug = rewardSlug(reward);
+    return (slug ? gameRefBySlug[slug] : "") || null;
+  }
+
+  function componentParentUniqueName(uniqueName: string, db: typeof $itemDb): string | null {
+    return (
+      componentUniqueNameAliases(uniqueName)
+        .map((alias) => db[alias]?.componentOf)
+        .find((value): value is string => Boolean(value)) ?? null
+    );
+  }
+
+  function foundryProductUniqueNames(foundry: typeof $foundryData): ReadonlySet<string> {
+    return new Set(
+      foundry.building
+        .map((entry) => entry.productUniqueName ?? entry.uniqueName)
+        .filter((value): value is string => Boolean(value)),
+    );
+  }
+
+  function isOwnedRewardIn(
+    reward: RelicReward,
+    gameRefBySlug: Record<string, string>,
+    internalNames: Record<string, true>,
+    names: Record<string, true>,
+  ): boolean {
+    const slug = rewardSlug(reward);
+    const gameRef = slug ? gameRefBySlug[slug] : "";
+    if (gameRef && internalNames[gameRef]) {
       return true;
     }
-    return Boolean(ownedRewardNames[normalizeOwnedRewardName(reward.name)]);
+    return Boolean(names[normalizeOwnedRewardName(reward.name)]);
+  }
+
+  function isOwnedReward(reward: RelicReward): boolean {
+    return isOwnedRewardIn(reward, rewardGameRefBySlug, ownedRewardInternalNames, ownedRewardNames);
   }
 
   function rewardIconSrc(reward: RelicReward): string | null {
-    const slug =
-      typeof reward.urlName === "string" && reward.urlName.trim().length > 0
-        ? reward.urlName.trim().toLowerCase()
-        : "";
+    const slug = rewardSlug(reward);
 
     if (slug) {
       const gameRef = rewardGameRefBySlug[slug];
@@ -653,12 +704,13 @@
         <button
           type="button"
           class="filter-tab min-h-8 shrink-0 whitespace-nowrap"
-          class:active={$relicViewState.containsUnownedReward}
-          title={$tr("relics.unownedRewardTitle")}
+          class:active={$relicViewState.containsNeededReward}
+          title={$tr("relics.neededRewardTitle")}
+          data-relic-needed-toggle
           on:click={() =>
-            setRelicFilter({ containsUnownedReward: !$relicViewState.containsUnownedReward })}
+            setRelicFilter({ containsNeededReward: !$relicViewState.containsNeededReward })}
         >
-          {$tr("relics.unownedRewardLabel")}
+          {$tr("relics.neededRewardLabel")}
         </button>
 
         <label class="shared-filter-sort" title={$tr("relics.qualityTitle")}>
