@@ -32,6 +32,7 @@
   import { compareSharedFilterSort, matchesSharedFilters } from "../lib/filters.js";
   import { collectRecipeMaterialNames } from "../lib/craftingTree.js";
   import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
+  import { buildMasteryLookup, normalizeLookupKey } from "../lib/masteryLookup.js";
   import { buildParsedItemFromDb } from "../lib/parsedItemFromDb.js";
   import { CREDITS_ICON_URL } from "../lib/assetUrls.js";
   import { clockStore } from "../lib/timers.js";
@@ -189,31 +190,6 @@
     return byUniqueName;
   }
 
-  function buildMasteryLookup(data: typeof $masteryData): {
-    byUniqueName: SvelteMap<string, MasteryStatus>;
-    byName: SvelteMap<string, MasteryStatus>;
-  } {
-    const byUniqueName = new SvelteMap<string, MasteryStatus>();
-    const byName = new SvelteMap<string, MasteryStatus>();
-
-    for (const item of data?.items ?? []) {
-      const status = item.status;
-      if (!status) continue;
-
-      const uniqueName = item.uniqueName || item.internalName;
-      if (uniqueName && !byUniqueName.has(uniqueName)) {
-        byUniqueName.set(uniqueName, status);
-      }
-
-      const nameKey = normalizeLookupKey(item.name);
-      if (nameKey && !byName.has(nameKey)) {
-        byName.set(nameKey, status);
-      }
-    }
-
-    return { byUniqueName, byName };
-  }
-
   $: productOwnedLookup = buildProductOwnedLookup($parsedItems);
   $: masteryLookup = buildMasteryLookup($masteryData);
 
@@ -225,10 +201,6 @@
       return "in-progress";
     }
     return isFoundryRecipeReady(entry, ownedMap, chainSets) ? "ready-to-build" : "not-ready";
-  }
-
-  function normalizeLookupKey(value: string | null | undefined): string {
-    return (value || "").trim().toLowerCase();
   }
 
   function ownedCountFor(entry: FoundryEntry): number {

@@ -37,6 +37,7 @@
   } from "../stores/data.js";
   import { buildSubsumedFamilySet, isFrameSubsumed, isSubsumableFrame } from "../lib/helminth.js";
   import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
+  import { normalizeLookupKey } from "../lib/masteryLookup.js";
   import { masteryProjectionSubtext } from "../lib/masteryProjection.js";
   import { buildMasteryRoadmap, estimateMasteryPurchaseCost } from "../lib/masteryRoadmap.js";
   import {
@@ -615,10 +616,6 @@
       if (nameKey && !byName.has(nameKey)) byName.set(nameKey, item.status);
     }
     return { byUniqueName, byName };
-  }
-
-  function normalizeLookupKey(value: string | null | undefined): string {
-    return (value || "").trim().toLowerCase();
   }
 
   $: setStatusLookup = buildSetStatusLookup(displayMasteryData);
