@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { get } from "svelte/store";
 
-import type { InventorySafetySettings } from "../../../src/lib/inventory/safetyRules.js";
+import type {
+  InventorySafetySettings,
+  SafetyReservation,
+  SafetyRuleId,
+} from "../../../src/lib/inventory/safetyRules.js";
 
 const STORAGE_KEY = "inventory.safety";
 const MOD = "/Lotus/Upgrades/Mods/Serration";
@@ -139,6 +143,49 @@ describe("writes", () => {
     resetInventorySafety();
     expect(get(inventorySafety)).toEqual({ spareDefault: 0, spares: {}, locks: [], setKeep: [] });
     expect(persisted()).toEqual({ spareDefault: 0, spares: {}, locks: [], setKeep: [] });
+  });
+
+  it("reads a verdict by the row's inventory key and has none for a row outside the map", async () => {
+    const { verdictFor } = await loadStore();
+    const verdict = { total: 2, reserved: 0, safe: 2, reservations: [] };
+    const modRow = {
+      internalName: MOD,
+      inventoryKey: `${MOD}#r10m10`,
+      amount: 2,
+    } as unknown as Parameters<typeof verdictFor>[0];
+    const verdicts = new Map([[`${MOD}#r10m10`, verdict]]);
+    expect(verdictFor(modRow, verdicts)).toBe(verdict);
+    const dbBuilt = { internalName: FRAME } as unknown as Parameters<typeof verdictFor>[0];
+    expect(verdictFor(dbBuilt, verdicts)).toBeNull();
+  });
+
+  it("badges tradable rows, and equipment only when a rule beyond its rank binds it", async () => {
+    const { showsSafetyBadge } = await loadStore();
+    const reservation = (rule: SafetyRuleId): SafetyReservation => ({
+      rule,
+      quantity: 1,
+      reasonKey: "inventory.safety.reason.locked",
+      binding: true,
+    });
+    const reserved = { total: 2, reserved: 1, safe: 1, reservations: [reservation("lastCopy")] };
+    const builtOnly = {
+      ...reserved,
+      reservations: [reservation("built"), reservation("lastCopy"), reservation("equipped")],
+    };
+    const lockedBuilt = { ...reserved, reservations: [reservation("built"), reservation("lock")] };
+    expect(showsSafetyBadge({ tradable: true, inventoryGroup: "all_parts" }, reserved)).toBe(true);
+    expect(showsSafetyBadge({ tradable: true, inventoryGroup: "equipment" }, reserved)).toBe(true);
+    expect(showsSafetyBadge({ tradable: true, inventoryGroup: "equipment" }, builtOnly)).toBe(
+      false,
+    );
+    expect(showsSafetyBadge({ tradable: true, inventoryGroup: "equipment" }, lockedBuilt)).toBe(
+      true,
+    );
+    expect(showsSafetyBadge({ tradable: false, inventoryGroup: "mods" }, reserved)).toBe(false);
+    expect(
+      showsSafetyBadge({ tradable: true, inventoryGroup: "mods" }, { ...reserved, reserved: 0 }),
+    ).toBe(false);
+    expect(showsSafetyBadge({ tradable: true, inventoryGroup: "mods" }, null)).toBe(false);
   });
 
   it("feeds buildSafetyContext without adaptation", async () => {

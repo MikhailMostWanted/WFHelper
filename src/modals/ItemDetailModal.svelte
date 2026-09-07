@@ -3,7 +3,7 @@
   import { activeItem } from "../stores/modals.js";
   import { itemDb, wfmItems, componentOwnership, inventoryData } from "../stores/data.js";
   import { createPriceLoader } from "../lib/priceState.js";
-  import { resolveItemPriceLookup } from "../lib/componentResolution.js";
+  import { enrichComponents, resolveItemPriceLookup } from "../lib/componentResolution.js";
   import { buildCraftingTree } from "../lib/craftingTree.js";
   import { buildParsedItemFromDb } from "../lib/parsedItemFromDb.js";
   import ItemImage from "../components/ItemImage.svelte";
@@ -22,7 +22,12 @@
   } from "../lib/inventory/archonShards.js";
   import { archonShardsBySuit } from "../stores/archonShards.js";
   import { parsePetGenetics } from "../lib/inventory/petGenetics.js";
-  import { inventorySafetyVerdicts } from "../stores/inventorySafety.js";
+  import {
+    inventorySafetyVerdicts,
+    showsSafetyBadge,
+    verdictFor,
+  } from "../stores/inventorySafety.js";
+  import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
   import { fallbackNameFromUniqueName } from "../../config/shared/displayName.js";
   import { locale, tr, type MessageKey } from "../lib/i18n.js";
   import type { SafetyClaim } from "../lib/inventory/safetyRules.js";
@@ -71,14 +76,27 @@
       ? buildCraftingTree(treeRootKey, $itemDb || {}, $componentOwnership)
       : null;
 
-  // Same map the inventory card reads, so the modal can never claim a different
-  // number from the badge that opened it.
-  $: safetyVerdict = item ? ($inventorySafetyVerdicts.get(item.internalName) ?? null) : null;
-  $: reservations = safetyVerdict && safetyVerdict.reserved > 0 ? safetyVerdict.reservations : [];
+  // A row opened from the inventory grid carries the raw database rows, so the
+  // doubled-ingredient merge and the owned counts are applied here.
+  $: components = item ? enrichComponents(item.components || [], $componentOwnership) : [];
 
+  $: safetyVerdict = item ? verdictFor(item, $inventorySafetyVerdicts) : null;
+  $: reservations =
+    item && safetyVerdict && showsSafetyBadge(item, safetyVerdict)
+      ? safetyVerdict.reservations
+      : [];
+
+  // A chain step is spelled as the recipe lists it, the database as the other
+  // half of the pair, so both spellings have to be tried.
   function chainLabel(claim: SafetyClaim, db: Record<string, ItemDbEntry>): string {
     return claim.chain
-      .map((uniqueName) => itemLabel(db[uniqueName]) || fallbackNameFromUniqueName(uniqueName))
+      .map((uniqueName) => {
+        for (const alias of componentUniqueNameAliases(uniqueName)) {
+          const label = itemLabel(db[alias]);
+          if (label) return label;
+        }
+        return fallbackNameFromUniqueName(uniqueName);
+      })
       .join(" > ");
   }
 
@@ -172,7 +190,7 @@
     sideState={selectedComp ? "component" : "none"}
     panelClass={showCraftingTree ? "w-[90vw] max-w-[1100px]" : ""}
   >
-    <div class="detail-panel-top-actions">
+    <div class="detail-panel-top-actions" data-item-detail>
       {#if navigationStack.length > 0}
         <button
           type="button"
@@ -267,11 +285,11 @@
       </div>
 
       <div class="detail-body">
-        {#if (item.components || []).length > 0}
+        {#if components.length > 0}
           <div class="detail-section">
             <h3>{$tr("detail.components")}</h3>
             <div class="detail-components">
-              {#each item.components as comp}
+              {#each components as comp}
                 {@const ownedCount = comp.ownedCount ?? 0}
                 {@const needed = comp.itemCount || 1}
                 {@const countClass =
@@ -302,13 +320,19 @@
             <h3>{$tr("inventory.safety.reservedTitle")}</h3>
             <ul class="m-0 list-none p-0 text-sm text-text-secondary">
               {#each reservations as reservation}
-                <li class="border-b border-dashed border-border-subtle py-1.5 last:border-b-0">
+                <li
+                  class="border-b border-dashed border-border-subtle py-1.5 last:border-b-0"
+                  data-safety-rule={reservation.rule}
+                >
                   <span class="flex items-center justify-between gap-2">
                     <span>{$tr(reservation.reasonKey, reservation.params)}</span>
                     <span class="comp-count text-warning">{reservation.quantity}</span>
                   </span>
                   {#each reservation.claims || [] as claim}
-                    <span class="block text-xs text-text-muted">
+                    <span
+                      class="block text-xs text-text-muted"
+                      data-safety-claim={claim.chain.join(" > ")}
+                    >
                       {$tr("inventory.safety.claim", {
                         chain: chainLabel(claim, $itemDb || {}),
                         count: claim.copies,

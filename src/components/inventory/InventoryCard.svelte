@@ -7,7 +7,11 @@
   import MarketMetricStrip from "../MarketMetricStrip.svelte";
   import { NAV_ICON_URLS } from "../../lib/assetUrls.js";
   import { archonShardsBySuit } from "../../stores/archonShards.js";
-  import { inventorySafetyVerdicts } from "../../stores/inventorySafety.js";
+  import {
+    inventorySafetyVerdicts,
+    showsSafetyBadge,
+    verdictFor,
+  } from "../../stores/inventorySafety.js";
   import { tr } from "../../lib/i18n.js";
   import type { InventoryViewItem } from "../../lib/inventoryMarket.js";
   import { isRankedGroup } from "../../../config/shared/numeric.js";
@@ -32,10 +36,9 @@
 
   $: shardCopies = $archonShardsBySuit.get(item.uniqueName || item.internalName || "") ?? [];
 
-  // Only a reserving verdict earns the badge; everything else is fully sellable
-  // and the owned count already says so.
-  $: verdict = $inventorySafetyVerdicts.get(item.internalName) ?? null;
-  $: reservedVerdict = item.tradable && verdict && verdict.reserved > 0 ? verdict : null;
+  // Only a reserving verdict earns the badge; the owned count covers the rest.
+  $: verdict = verdictFor(item, $inventorySafetyVerdicts);
+  $: reservedVerdict = showsSafetyBadge(item, verdict) ? verdict : null;
   $: safeToSellTitle = reservedVerdict
     ? [
         $tr("inventory.safety.safeCount", { count: reservedVerdict.safe }),

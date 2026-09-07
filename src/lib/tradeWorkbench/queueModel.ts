@@ -1,5 +1,6 @@
 import {
   buildSafetyContext,
+  reservableParts,
   safeToList,
   safetyKeyFor,
   type InventorySafetySettings,
@@ -95,6 +96,8 @@ interface SelectionSafetyInput {
   pins: readonly string[];
   /** uniqueName -> owned copies, foundry claims already subtracted. */
   ownership?: ReadonlyMap<string, number>;
+  /** Products the foundry is building; each covers one copy of the demand. */
+  buildingUniqueNames?: ReadonlySet<string>;
 }
 
 interface MasteryIndex {
@@ -130,10 +133,11 @@ function masteryIndex(mastery: MasteryData | null): MasteryIndex {
 export function buildSelectionSafetyContext(input: SelectionSafetyInput): SafetyContext {
   const { mastered: masteredUniqueNames, owned: ownedUniqueNames } = masteryIndex(input.mastery);
 
+  // Same part list as the recipe rule, so a pinned goal never reserves a resource.
   const pinnedRequirements = new Map<string, number>();
   for (const pin of input.pins) {
-    for (const part of input.itemDb[pin]?.components ?? []) {
-      const uniqueName = typeof part.uniqueName === "string" ? part.uniqueName : "";
+    for (const part of reservableParts(input.itemDb, pin)) {
+      const uniqueName = part.uniqueName ?? "";
       if (!uniqueName) continue;
       const count = typeof part.itemCount === "number" ? Math.floor(part.itemCount) : 1;
       const need = count > 0 ? count : 1;
@@ -150,6 +154,7 @@ export function buildSelectionSafetyContext(input: SelectionSafetyInput): Safety
     pinnedRequirements,
     ...(input.ownership ? { ownedCounts: input.ownership } : {}),
     ownedUniqueNames,
+    ...(input.buildingUniqueNames ? { buildingUniqueNames: input.buildingUniqueNames } : {}),
   });
 }
 

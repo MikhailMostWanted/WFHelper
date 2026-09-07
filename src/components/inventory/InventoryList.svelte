@@ -14,7 +14,11 @@
     ownedSortKeyFor,
   } from "./inventoryListColumns.js";
   import { wfmItems } from "../../stores/data.js";
-  import { inventorySafetyVerdicts } from "../../stores/inventorySafety.js";
+  import {
+    inventorySafetyVerdicts,
+    showsSafetyBadge,
+    verdictFor,
+  } from "../../stores/inventorySafety.js";
   import type { InventoryViewItem } from "../../lib/inventoryMarket.js";
   import type { SharedSortKey, SortDirection } from "../../types/filters.js";
   import { isRankedGroup } from "../../../config/shared/numeric.js";
@@ -263,8 +267,8 @@
           {@const shardCopies =
             $archonShardsBySuit.get(item.uniqueName || item.internalName || "") ?? []}
           {@const selected = selectedKeys?.has(item.internalName) ?? false}
-          {@const verdict = $inventorySafetyVerdicts.get(item.internalName)}
-          {@const reserved = item.tradable && verdict && verdict.reserved > 0 ? verdict : null}
+          {@const verdict = verdictFor(item, $inventorySafetyVerdicts)}
+          {@const reserved = showsSafetyBadge(item, verdict) ? verdict : null}
           {@const safeTitle = reserved
             ? [
                 $t("inventory.safety.safeCount", { count: reserved.safe }),

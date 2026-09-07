@@ -7,9 +7,7 @@ import {
   type ElectronTestHarness,
 } from "./electronTestHarness";
 
-// Bronco Prime Receiver builds Bronco Prime, and Akbronco Prime eats two built
-// Bronco Primes. With neither weapon owned, three receivers leave exactly one
-// spare - a rule that only looked one level up would call two of them spare.
+// Akbronco Prime eats two built Bronco Primes, so three receivers leave one spare.
 const RECEIVER = "/Lotus/Types/Recipes/Weapons/WeaponParts/BroncoPrimeReceiver";
 const OWNED = 3;
 
@@ -51,9 +49,15 @@ test.describe("Inventory safe-to-sell", () => {
     await page.locator(`[data-inventory-card="${RECEIVER}"] .expand-link`).click();
     const section = page.locator("[data-reserved-section]");
     await expect(section).toBeVisible({ timeout: 15_000 });
-    await expect(section).toContainText(/Akbronco Prime/i);
+    await expect(section.locator('[data-safety-rule="unmasteredRecipe"]')).toHaveCount(1);
 
-    await page.locator(".detail-close").click();
+    // The claim chain is uniqueNames: receiver, its weapon, the akimbo pair.
+    const claim = section.locator("[data-safety-claim]").first();
+    // The database may spell the part with a Blueprint suffix, hence the prefix.
+    await expect(claim).toHaveAttribute("data-safety-claim", new RegExp(`^${RECEIVER}`));
+    expect(((await claim.getAttribute("data-safety-claim")) ?? "").split(" > ")).toHaveLength(3);
+
+    await page.locator("[data-item-detail] .detail-close").click();
     await expect(page.locator("[data-reserved-section]")).toHaveCount(0);
   });
 });

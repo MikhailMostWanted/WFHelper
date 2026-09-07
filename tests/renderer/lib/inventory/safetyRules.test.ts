@@ -346,8 +346,7 @@ describe("recipes above the part", () => {
   });
 
   it("composes the middle weapon's own mastery with the demand above it by max", () => {
-    // Unmastered Bronco Prime wants one copy and Akbronco Prime wants two. Summed
-    // that would be three receivers; the copy ranked for mastery is one of the two.
+    // Summing would give three receivers; the copy ranked for mastery is one of the two.
     const verdict = safeToList(receiverRow, chainContext({ masteredUniqueNames: new Set() }));
     expect(verdict.reserved).toBe(2);
   });
@@ -508,6 +507,97 @@ describe("recipe demand identity", () => {
     });
     expect(second.unmasteredDemand).toBe(first.unmasteredDemand);
     expect(second.recipeClaims).toBe(first.recipeClaims);
+
+    const remastered = buildSafetyContext({ itemDb: db, masteredUniqueNames: new Set([TOP]) });
+    expect(remastered.unmasteredDemand).not.toBe(first.unmasteredDemand);
+  });
+
+  it("counts a copy the foundry is building as one already owned", () => {
+    const db: Record<string, ItemDbEntry> = {
+      [TOP]: { name: "Top", masterable: true, components: [{ name: "Leaf", uniqueName: LEAF }] },
+    };
+    const building = buildSafetyContext({
+      itemDb: db,
+      masteredUniqueNames: new Set(),
+      buildingUniqueNames: new Set([TOP]),
+    });
+    expect(safeToList(row({ internalName: LEAF, amount: 2 }), building).reserved).toBe(0);
+  });
+
+  it("converts a multi-yield parent's outstanding units into crafts", () => {
+    const GRAND = "/W/Grand";
+    const db: Record<string, ItemDbEntry> = {
+      [GRAND]: {
+        name: "Grand",
+        masterable: true,
+        components: [{ name: "Top", uniqueName: TOP, itemCount: 3 }],
+      },
+      [TOP]: {
+        name: "Top",
+        recipe: { buildPrice: 0, buildTime: 0, num: 2, ingredients: [] },
+        components: [{ name: "Leaf", uniqueName: LEAF }],
+      },
+    };
+    const ctx = buildSafetyContext({ itemDb: db, masteredUniqueNames: new Set() });
+    // Three Tops outstanding, two per craft: two crafts, so two leaves.
+    expect(safeToList(row({ internalName: LEAF, amount: 5 }), ctx).reserved).toBe(2);
+  });
+
+  it("leaves crafting resources out of the demand", () => {
+    const CELL = "/Lotus/Types/Items/MiscItems/OrokinCell";
+    const db: Record<string, ItemDbEntry> = {
+      [TOP]: {
+        name: "Top",
+        masterable: true,
+        components: [
+          { name: "Leaf", uniqueName: LEAF },
+          { name: "Orokin Cell", uniqueName: CELL, itemCount: 10 },
+        ],
+      },
+    };
+    const ctx = buildSafetyContext({ itemDb: db, masteredUniqueNames: new Set() });
+    expect(safeToList(row({ internalName: CELL, amount: 30 }), ctx).reserved).toBe(0);
+    expect(safeToList(row({ internalName: LEAF, amount: 3 }), ctx).reserved).toBe(1);
+  });
+
+  it("merges a doubled part into one claim that matches the reserved count", () => {
+    const db: Record<string, ItemDbEntry> = {
+      [TOP]: {
+        name: "Top",
+        masterable: true,
+        components: [
+          { name: "Leaf", uniqueName: LEAF },
+          { name: "Leaf", uniqueName: LEAF },
+        ],
+      },
+    };
+    const ctx = buildSafetyContext({ itemDb: db, masteredUniqueNames: new Set() });
+    const verdict = safeToList(row({ internalName: LEAF, amount: 5 }), ctx);
+    expect(verdict.reserved).toBe(2);
+    const claims = verdict.reservations.find((entry) => entry.rule === "unmasteredRecipe")?.claims;
+    expect(claims).toEqual([{ chain: [LEAF, TOP], copies: 2 }]);
+  });
+
+  it("never lets the claims add up past the reserved count", () => {
+    const db: Record<string, ItemDbEntry> = {
+      [TOP]: { name: "Top", masterable: true, components: [{ name: "Leaf", uniqueName: LEAF }] },
+      [OTHER]: {
+        name: "Other",
+        masterable: true,
+        components: [{ name: "Leaf", uniqueName: LEAF }],
+      },
+      [LEAF]: {
+        name: "Leaf Blueprint",
+        recipe: { buildPrice: 0, buildTime: 0, num: 2, ingredients: [] },
+      },
+    };
+    const ctx = buildSafetyContext({ itemDb: db, masteredUniqueNames: new Set() });
+    const verdict = safeToList(row({ internalName: LEAF, amount: 4 }), ctx);
+    // Two units of demand, two per craft: one copy covers both claims.
+    expect(verdict.reserved).toBe(1);
+    const claims = verdict.reservations.find((entry) => entry.rule === "unmasteredRecipe")?.claims;
+    expect(claims).toHaveLength(1);
+    expect(claims?.[0].copies).toBe(1);
   });
 
   it("walks a full-set override root the item database cannot rebuild", () => {

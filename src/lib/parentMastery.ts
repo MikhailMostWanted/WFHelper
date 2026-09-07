@@ -1,6 +1,6 @@
 import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
 import { componentParentOf } from "./inventory/partConsumers.js";
-import type { SafetyVerdict } from "./inventory/safetyRules.js";
+import type { SafetyVerdictLookup } from "./inventory/safetyRules.js";
 import { buildMasteryLookup, inheritedMasteryStatus, normalizeLookupKey } from "./masteryLookup.js";
 import type { ItemDbEntry, MasteryData, MasteryStatus } from "../types/inventory.js";
 
@@ -75,7 +75,7 @@ export function buildPartMasteryResolver(
 export function attachPartMasteryFlags<T extends RowLike>(
   rows: T[],
   resolve: PartMasteryResolver,
-  verdicts?: ReadonlyMap<string, SafetyVerdict>,
+  verdicts?: SafetyVerdictLookup,
 ): T[] {
   return rows.map((row) => {
     const { component, ...flags } = resolve(row);
