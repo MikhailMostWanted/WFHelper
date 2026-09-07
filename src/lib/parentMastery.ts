@@ -1,6 +1,8 @@
 import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
+import { componentParentOf } from "./inventory/partConsumers.js";
 import type { SafetyVerdict } from "./inventory/safetyRules.js";
-import type { ItemDbEntry, MasteryData } from "../types/inventory.js";
+import { buildMasteryLookup, inheritedMasteryStatus, normalizeLookupKey } from "./masteryLookup.js";
+import type { ItemDbEntry, MasteryData, MasteryStatus } from "../types/inventory.js";
 
 interface RowLike {
   name: string;
@@ -36,52 +38,40 @@ export function buildPartMasteryResolver(
   itemDb: Record<string, ItemDbEntry>,
   mastery: MasteryData | null,
 ): PartMasteryResolver {
-  const items = mastery?.items ?? [];
-  if (items.length === 0) return () => ({});
-
-  const statusByUnique = new Map<string, string>();
-  const statusByName = new Map<string, string>();
-  for (const item of items) {
-    if (!item.status) continue;
-    if (item.uniqueName) statusByUnique.set(item.uniqueName, item.status);
-    statusByName.set(item.name.toLowerCase(), item.status);
-  }
+  if ((mastery?.items ?? []).length === 0) return () => ({});
+  const lookup = buildMasteryLookup(mastery);
 
   const nameIndex = new Map<string, string>();
   for (const [uniqueName, entry] of Object.entries(itemDb)) {
-    const key = entry.name?.toLowerCase();
+    const key = normalizeLookupKey(entry.name);
     if (key && !nameIndex.has(key)) nameIndex.set(key, uniqueName);
   }
 
-  const statusOf = (uniqueName?: string, name?: string): string | undefined =>
-    (uniqueName ? statusByUnique.get(uniqueName) : undefined) ??
-    (name ? statusByName.get(name.toLowerCase()) : undefined);
-
-  const masteredFlag = (status: string | undefined): PartMasteryFlags =>
+  const masteredFlag = (status: MasteryStatus | undefined): PartMasteryFlags =>
     status ? { parentMastered: status === "mastered" } : {};
 
   return (row) => {
     const setBase = /\sSet$/i.test(row.name) ? row.name.replace(/\s+Set$/i, "") : null;
-    if (setBase) return masteredFlag(statusOf(undefined, setBase));
+    if (setBase) return masteredFlag(lookup.byName.get(normalizeLookupKey(setBase)));
 
     const resolved =
       dbEntryFor(itemDb, row.internalName) ??
-      dbEntryFor(itemDb, nameIndex.get(row.name.toLowerCase()));
-    if (resolved?.entry.isBuildComponent && resolved.entry.componentOf) {
-      const parent = itemDb[resolved.entry.componentOf];
+      dbEntryFor(itemDb, nameIndex.get(normalizeLookupKey(row.name)));
+    const parent = resolved ? componentParentOf(resolved.uniqueName, itemDb) : null;
+    if (parent) {
       return {
-        ...masteredFlag(statusOf(resolved.entry.componentOf, parent?.name)),
+        ...masteredFlag(inheritedMasteryStatus(lookup, itemDb, parent, itemDb[parent]?.name)),
         component: true,
       };
     }
-    return masteredFlag(statusOf(resolved?.uniqueName ?? row.internalName, row.name));
+    return masteredFlag(
+      inheritedMasteryStatus(lookup, itemDb, resolved?.uniqueName ?? row.internalName, row.name),
+    );
   };
 }
 
-/** Takes a prebuilt resolver: it indexes the whole item database, so callers
- * keep one per itemDb/mastery pair instead of rebuilding it per row list.
- * `spare` comes from the safety verdicts so the filter, the card badge and the
- * bulk sell queue can never disagree about what is free to sell. */
+/** Takes a prebuilt resolver: it indexes the whole item database, so keep one
+ * per itemDb/mastery pair. */
 export function attachPartMasteryFlags<T extends RowLike>(
   rows: T[],
   resolve: PartMasteryResolver,

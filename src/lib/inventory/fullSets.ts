@@ -9,6 +9,7 @@ import {
   isRelicLikeItem,
 } from "./itemClassification.js";
 import { FULL_SET_OVERRIDES, getFullSetOverride } from "./fullSetOverrides.js";
+import { isCraftingResource } from "./partConsumers.js";
 
 // Set rows are synthesized, so they key off the root uniqueName plus a marker
 // that cannot collide with a real DE path.
@@ -27,7 +28,7 @@ function isGenericSetComponent(
   isPrimeRoot: boolean,
 ): boolean {
   const uniqueName = component.uniqueName || "";
-  if (!uniqueName || /\/(MiscItems|Research)\//i.test(uniqueName)) return false;
+  if (!uniqueName || isCraftingResource(uniqueName)) return false;
 
   const entry = itemDb[uniqueName];
   if (entry?.isBuildComponent === false || entry?.masterable === true) return false;

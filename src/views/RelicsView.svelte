@@ -34,9 +34,10 @@
   import SearchBox from "../components/SearchBox.svelte";
   import SortControl from "../components/SortControl.svelte";
   import { defaultSortDirection } from "../lib/filters.js";
+  import { foundryBuildProducts } from "../lib/inventory/foundryResources.js";
   import { buildMasteryLookup } from "../lib/masteryLookup.js";
   import { isRewardNeeded, type RewardNeedContext } from "../lib/relic/rewardNeed.js";
-  import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
+  import { componentParentOf } from "../lib/inventory/partConsumers.js";
   import { aggregateComponentOwnership } from "../../config/shared/componentOwnership.js";
   import { stripQuantityPrefix } from "../../config/shared/quantityPrefix.js";
   import type { ParsedItem } from "../types/inventory.js";
@@ -375,9 +376,9 @@
   // The three reward lookups are named here so the filter follows their rebuilds.
   $: needContext = {
     owned: aggregateComponentOwnership($inventoryData),
-    building: foundryProductUniqueNames($foundryData),
+    building: foundryBuildProducts($foundryData),
     mastery: buildMasteryLookup($masteryData).byUniqueName,
-    parentOf: (uniqueName: string) => componentParentUniqueName(uniqueName, $itemDb),
+    parentOf: (uniqueName: string) => componentParentOf(uniqueName, $itemDb),
     uniqueNameOf: (reward: RelicReward) => rewardUniqueName(reward, rewardGameRefBySlug),
     ownedByName: (reward: RelicReward) =>
       isOwnedRewardIn(reward, rewardGameRefBySlug, ownedRewardInternalNames, ownedRewardNames),
@@ -520,22 +521,6 @@
     }
     const slug = rewardSlug(reward);
     return (slug ? gameRefBySlug[slug] : "") || null;
-  }
-
-  function componentParentUniqueName(uniqueName: string, db: typeof $itemDb): string | null {
-    return (
-      componentUniqueNameAliases(uniqueName)
-        .map((alias) => db[alias]?.componentOf)
-        .find((value): value is string => Boolean(value)) ?? null
-    );
-  }
-
-  function foundryProductUniqueNames(foundry: typeof $foundryData): ReadonlySet<string> {
-    return new Set(
-      foundry.building
-        .map((entry) => entry.productUniqueName ?? entry.uniqueName)
-        .filter((value): value is string => Boolean(value)),
-    );
   }
 
   function isOwnedRewardIn(

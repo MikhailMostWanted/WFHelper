@@ -37,7 +37,7 @@
   } from "../stores/data.js";
   import { buildSubsumedFamilySet, isFrameSubsumed, isSubsumableFrame } from "../lib/helminth.js";
   import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
-  import { normalizeLookupKey } from "../lib/masteryLookup.js";
+  import { buildMasteryLookup, normalizeLookupKey } from "../lib/masteryLookup.js";
   import { masteryProjectionSubtext } from "../lib/masteryProjection.js";
   import { buildMasteryRoadmap, estimateMasteryPurchaseCost } from "../lib/masteryRoadmap.js";
   import {
@@ -85,12 +85,7 @@
   import { parseArchonShards, summarizeArchonShards } from "../lib/inventory/archonShards.js";
   import { fallbackNameFromUniqueName } from "../../config/shared/displayName.js";
   import { send } from "../lib/ipc.js";
-  import type {
-    ComponentInfo,
-    MasteryCategoryStats,
-    MasteryStatus,
-    ProgressPair,
-  } from "../types/inventory.js";
+  import type { ComponentInfo, MasteryCategoryStats, ProgressPair } from "../types/inventory.js";
   import type { FoundryState } from "../types/filters.js";
 
   const CAT_ORDER = [
@@ -600,25 +595,9 @@
     catFilter = "all";
   }
 
-  /** A set row has no mastery status of its own (rank 0 of 1), so every set read
-   *  as "not mastered". Resolve it from the set root instead. */
-  function buildSetStatusLookup(data: typeof $masteryData): {
-    byUniqueName: SvelteMap<string, MasteryStatus>;
-    byName: SvelteMap<string, MasteryStatus>;
-  } {
-    const byUniqueName = new SvelteMap<string, MasteryStatus>();
-    const byName = new SvelteMap<string, MasteryStatus>();
-    for (const item of data?.items ?? []) {
-      if (!item.status) continue;
-      const uniqueName = item.uniqueName || item.internalName;
-      if (uniqueName && !byUniqueName.has(uniqueName)) byUniqueName.set(uniqueName, item.status);
-      const nameKey = normalizeLookupKey(item.name);
-      if (nameKey && !byName.has(nameKey)) byName.set(nameKey, item.status);
-    }
-    return { byUniqueName, byName };
-  }
-
-  $: setStatusLookup = buildSetStatusLookup(displayMasteryData);
+  // A set row has no mastery status of its own (rank 0 of 1), so every set read
+  // as "not mastered". Resolve it from the set root instead.
+  $: setStatusLookup = buildMasteryLookup(displayMasteryData);
 
   // Started but unfinished. Shares the filter bar with the category tabs, so
   // mastered/prime/vaulted and the sort dropdown all apply here too.

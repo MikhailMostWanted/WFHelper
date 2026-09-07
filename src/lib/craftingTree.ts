@@ -3,6 +3,8 @@ import {
   ownedComponentCount,
 } from "../../config/shared/componentNames.js";
 import { fallbackNameFromUniqueName } from "../../config/shared/displayName.js";
+import { mergeDuplicateIngredients } from "../../config/shared/recipeRows.js";
+import { consumersOf, partConsumerIndex } from "./inventory/partConsumers.js";
 import type { ItemDbEntry, RecipeData } from "../types/inventory.js";
 
 export interface CraftingTreeNode {
@@ -228,16 +230,11 @@ function buildNode(
 }
 
 function aggregateIngredients(ingredients: RecipeData["ingredients"]): RecipeData["ingredients"] {
-  const byUniqueName = new Map<string, RecipeData["ingredients"][number]>();
-  for (const ingredient of ingredients) {
-    const existing = byUniqueName.get(ingredient.uniqueName);
-    if (existing) {
-      existing.count += ingredient.count;
-    } else {
-      byUniqueName.set(ingredient.uniqueName, { ...ingredient });
-    }
-  }
-  return [...byUniqueName.values()];
+  return mergeDuplicateIngredients(
+    ingredients,
+    (ingredient) => ingredient.count,
+    (ingredient, count) => ({ ...ingredient, count }),
+  );
 }
 
 interface ExpandableRecipe {
@@ -390,17 +387,15 @@ function findUsedFor(
   const seen = new Set<string>();
   const matches: CraftingTreeNode["usedFor"] = [];
 
-  for (const [productUniqueName, entry] of Object.entries(itemDb)) {
-    const ingredients = entry.recipe?.ingredients ?? [];
-    if (!ingredients.some((ingredient) => ingredient.uniqueName === uniqueName)) continue;
-    if (seen.has(productUniqueName)) continue;
-
-    seen.add(productUniqueName);
+  for (const { parent } of consumersOf(partConsumerIndex(itemDb), uniqueName)) {
+    if (seen.has(parent)) continue;
+    seen.add(parent);
+    const entry = itemDb[parent];
     matches.push({
-      uniqueName: productUniqueName,
-      name: entry.name || fallbackNameFromUniqueName(productUniqueName),
-      ...(entry.displayName ? { displayName: entry.displayName } : {}),
-      imageUrl: entry.imageUrl || null,
+      uniqueName: parent,
+      name: entry?.name || fallbackNameFromUniqueName(parent),
+      ...(entry?.displayName ? { displayName: entry.displayName } : {}),
+      imageUrl: entry?.imageUrl || null,
     });
   }
 

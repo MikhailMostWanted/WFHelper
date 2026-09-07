@@ -364,3 +364,14 @@ export function isFoundryRecipeReady(
   if (allOwned) return true;
   return recipe.uniqueName != null && chainBuildable.has(recipe.uniqueName);
 }
+
+/** uniqueNames sitting in the foundry, building or claimable: the product when the
+ *  recipe resolved, else the blueprint itself so an alias lookup still finds it. */
+export function foundryBuildProducts(foundry: FoundryData): Set<string> {
+  const products = new Set<string>();
+  for (const build of foundry.building) {
+    const uniqueName = build.productUniqueName ?? build.uniqueName;
+    if (uniqueName) products.add(uniqueName);
+  }
+  return products;
+}

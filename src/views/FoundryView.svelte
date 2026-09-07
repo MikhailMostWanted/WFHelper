@@ -31,8 +31,7 @@
   import { formatBuildTime, formatTimeRemaining, formatNumber } from "../lib/format.js";
   import { compareSharedFilterSort, matchesSharedFilters } from "../lib/filters.js";
   import { collectRecipeMaterialNames } from "../lib/craftingTree.js";
-  import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
-  import { buildMasteryLookup, normalizeLookupKey } from "../lib/masteryLookup.js";
+  import { buildMasteryLookup, inheritedMasteryStatus } from "../lib/masteryLookup.js";
   import { buildParsedItemFromDb } from "../lib/parsedItemFromDb.js";
   import { CREDITS_ICON_URL } from "../lib/assetUrls.js";
   import { clockStore } from "../lib/timers.js";
@@ -210,23 +209,10 @@
 
   function masteryStateFor(entry: FoundryEntry): MasteryStatus | "unknown" {
     if (!$masteryData) return "unknown";
-
-    if (entry.productUniqueName) {
-      const direct = masteryLookup.byUniqueName.get(entry.productUniqueName);
-      if (direct) return direct;
-      // A component has no mastery of its own; it carries the state of the item it builds.
-      const parent = componentUniqueNameAliases(entry.productUniqueName)
-        .map((alias) => $itemDb[alias]?.componentOf)
-        .find((value): value is string => Boolean(value));
-      if (parent) {
-        const inherited =
-          masteryLookup.byUniqueName.get(parent) ??
-          masteryLookup.byName.get(normalizeLookupKey($itemDb[parent]?.name ?? ""));
-        if (inherited) return inherited;
-      }
-    }
-
-    return masteryLookup.byName.get(normalizeLookupKey(entry.name)) ?? "missing";
+    return (
+      inheritedMasteryStatus(masteryLookup, $itemDb, entry.productUniqueName, entry.name) ??
+      "missing"
+    );
   }
 
   function masteryLabelKeyFor(state: MasteryStatus | "unknown"): MessageKey {
