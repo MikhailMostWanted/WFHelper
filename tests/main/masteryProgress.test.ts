@@ -432,12 +432,11 @@ describe("recipes that consume the same ingredient twice", () => {
   const AKBRONCO_BLUEPRINT = "/Lotus/Types/Recipes/Weapons/AkbroncoPrimeBlueprint";
   const AKBRONCO_LINK = "/Lotus/Types/Recipes/Weapons/WeaponParts/AkbroncoPrimeLink";
 
-  // DE lists a doubled ingredient as two rows of one, so checking each row
-  // against the same total lets a single copy satisfy both.
   function akbroncoWithOneBronco() {
     const progress = masteryHelper.computeMasteryProgress({
       Pistols: [{ ItemType: BRONCO_PRIME, XP: weaponXpForRank(30) }],
-      MiscItems: [{ ItemType: AKBRONCO_LINK, ItemCount: 1 }],
+      // The set spells the part bare, the inventory holds it as ...LinkBlueprint.
+      MiscItems: [{ ItemType: `${AKBRONCO_LINK}Blueprint`, ItemCount: 1 }],
       Recipes: [{ ItemType: AKBRONCO_BLUEPRINT, ItemCount: 1 }],
     });
     return progress.items.find((entry) => entry.uniqueName === AKBRONCO_PRIME);
@@ -461,7 +460,7 @@ describe("recipes that consume the same ingredient twice", () => {
     expect(row?.owned).toBe(false);
   });
 
-  it("keeps the single-copy ingredients satisfied", () => {
+  it("keeps a single-copy ingredient satisfied under its inventory spelling", () => {
     const components = akbroncoWithOneBronco()?.components || [];
     const link = components.find((comp) => comp.uniqueName === AKBRONCO_LINK);
 

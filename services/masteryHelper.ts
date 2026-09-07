@@ -4,12 +4,14 @@ import path from "node:path";
 import * as itemDb from "./itemDatabase";
 import type { ComponentEntry } from "./types/gameData";
 import { MAX_ITEM_RANK } from "../config/game/constants";
+import { ownedComponentCount } from "../config/shared/componentNames";
 import { aggregateComponentOwnership } from "../config/shared/componentOwnership";
 import { sanitizeDisplayName } from "../config/shared/displayName";
 import { EQUIPMENT_COLLECTIONS, MODULAR_COLLECTIONS } from "../config/shared/gearCollections";
 import { withoutFoundryPending } from "../config/shared/foundryPending";
 import { masteryRankToXp, masteryXpToRank } from "../config/shared/masteryXp";
 import { toFiniteNumber } from "../config/shared/numeric";
+import { mergeDuplicateIngredients } from "../config/shared/recipeRows";
 import type { MasteryStatus } from "../config/shared/masteryTypes";
 
 // Newer items arrive as "Warframes"/"Primary", older ones singular; accept both.
@@ -797,7 +799,6 @@ function itemMasteryPerRank(category: string, uniqueName: string): number {
   return perRankSquared / 5;
 }
 
-/** A recipe component once ownership has been resolved against the inventory. */
 interface MasteryComponentEntry extends ComponentEntry {
   ownedCount: number;
   owned: boolean;
@@ -1055,25 +1056,14 @@ export function computeMasteryProgress(inventoryData: Record<string, unknown>): 
       masteryXp = Math.min(creditRank, maxRank) * owned.masteryPerRank;
     }
 
-    // Annotate components with ownership. DE lists a doubled ingredient as two
-    // rows of one, so merge by uniqueName first - checking each row against the
-    // same owned total would let a single copy satisfy both halves.
-    const mergedComponents: ComponentEntry[] = [];
-    const componentIndexByUniqueName = new Map<string, number>();
-    for (const comp of item.components || []) {
-      const key = comp.uniqueName || "";
-      const existing = key ? componentIndexByUniqueName.get(key) : undefined;
-      if (existing === undefined) {
-        if (key) componentIndexByUniqueName.set(key, mergedComponents.length);
-        mergedComponents.push({ ...comp, itemCount: comp.itemCount || 1 });
-        continue;
-      }
-      const target = mergedComponents[existing];
-      target.itemCount = (target.itemCount || 1) + (comp.itemCount || 1);
-    }
+    const mergedComponents = mergeDuplicateIngredients(
+      item.components || [],
+      (comp) => comp.itemCount,
+      (comp, itemCount) => ({ ...comp, itemCount }),
+    );
 
     const components = mergedComponents.map((comp: ComponentEntry) => {
-      const ownedCount = comp.uniqueName ? componentOwnership.get(comp.uniqueName) || 0 : 0;
+      const ownedCount = ownedComponentCount(comp.uniqueName, componentOwnership);
       return {
         name: comp.name || "",
         ...itemDb.localizedNameFields(comp.uniqueName, comp.name || ""),
