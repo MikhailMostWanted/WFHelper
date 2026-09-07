@@ -1,5 +1,5 @@
 import type { ComponentInfo, DropInfo, ItemDbEntry, ParsedItem } from "../types/inventory.js";
-import { enrichComponents } from "../stores/data.js";
+import { enrichComponents } from "./componentResolution.js";
 
 export function buildParsedItemFromDb(
   uniqueName: string,

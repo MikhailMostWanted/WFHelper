@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildItemNameIndex,
+  enrichComponents,
   resolveComponentByName,
   resolveComponentByUniqueName,
   resolveComponentLocation,
@@ -134,5 +135,34 @@ describe("componentResolution", () => {
 
     expect(resolveComponentLocation(entry)).toBe("Location: Lith T1, Meso T2");
     expect(resolveComponentWikiFallback(comp, "Trinity Prime", entry)).toBe("Trinity Prime");
+  });
+});
+
+describe("enrichComponents", () => {
+  const BRONCO_PRIME = "/Lotus/Weapons/Tenno/Pistol/BroncoPrime";
+  const AKBRONCO_LINK = "/Lotus/Types/Recipes/Weapons/WeaponParts/AkbroncoPrimeLink";
+
+  it("merges a doubled component row so one copy cannot cover both halves", () => {
+    const rows = enrichComponents(
+      [
+        { name: "Bronco Prime", uniqueName: BRONCO_PRIME },
+        { name: "Bronco Prime", uniqueName: BRONCO_PRIME },
+      ],
+      new Map([[BRONCO_PRIME, 1]]),
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.itemCount).toBe(2);
+    expect(rows[0]?.ownedCount).toBe(1);
+    expect(rows[0]?.owned).toBe(false);
+  });
+
+  it("reads a part the inventory holds under its blueprint spelling as owned", () => {
+    const rows = enrichComponents(
+      [{ name: "Link", uniqueName: AKBRONCO_LINK, itemCount: 1 }],
+      new Map([[`${AKBRONCO_LINK}Blueprint`, 1]]),
+    );
+
+    expect(rows[0]?.owned).toBe(true);
   });
 });

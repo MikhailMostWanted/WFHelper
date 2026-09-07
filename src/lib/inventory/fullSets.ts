@@ -1,4 +1,5 @@
 import { ownedComponentCount } from "../../../config/shared/componentNames.js";
+import { mergeDuplicateIngredients } from "../../../config/shared/recipeRows.js";
 import type { ComponentInfo, ItemDbEntry, ParsedItem, PartType } from "../../types/inventory.js";
 import {
   type ResolvedItem,
@@ -131,9 +132,13 @@ export function buildFullSetItems(
       : { ...dbEntry, name: dbEntry.name || "Unknown", imageUrl: dbEntry.imageUrl ?? null };
 
     const isPrimeRoot = resolved.isPrime === true || /\bPrime\b/.test(resolved.name);
-    const setComponents = explicitComponents
-      ? components
-      : components.filter((component) => isGenericSetComponent(component, itemDb, isPrimeRoot));
+    const setComponents = mergeDuplicateIngredients(
+      explicitComponents
+        ? components
+        : components.filter((component) => isGenericSetComponent(component, itemDb, isPrimeRoot)),
+      (component) => component.itemCount,
+      (component, itemCount) => ({ ...component, itemCount }),
+    );
     if (setComponents.length === 0) continue;
 
     if (

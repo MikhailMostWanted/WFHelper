@@ -1,5 +1,4 @@
 import { writable, derived } from "svelte/store";
-import { ownedComponentCount } from "../../config/shared/componentNames.js";
 import { aggregateComponentOwnership } from "../../config/shared/componentOwnership.js";
 import { withoutFoundryPending } from "../../config/shared/foundryPending.js";
 import { parseInventory } from "../lib/inventory.js";
@@ -7,13 +6,7 @@ import { parseFoundry } from "../lib/inventory/foundryResources.js";
 import { gameRefKey } from "../lib/marketNaming.js";
 import { hideFoundryClaims } from "./preferences.js";
 import type { WfmItemsLookup } from "../types/ipc.js";
-import type {
-  ComponentInfo,
-  FoundryData,
-  ItemDbEntry,
-  ParsedItem,
-  RawInventoryData,
-} from "../types/inventory.js";
+import type { FoundryData, ItemDbEntry, ParsedItem, RawInventoryData } from "../types/inventory.js";
 
 export const itemDb = writable<Record<string, ItemDbEntry>>({});
 export const wfmItems = writable<WfmItemsLookup>({});
@@ -31,22 +24,11 @@ const usableInventory = derived(
       : $inv,
 );
 
-/** Reactive map of uniqueName -> owned count, derived from MiscItems + Recipes. */
+/** Reactive map of uniqueName -> owned count: stacked slices plus built gear. */
 export const componentOwnership = derived(
   usableInventory,
   ($inv): Map<string, number> => ($inv ? aggregateComponentOwnership($inv) : new Map()),
 );
-
-/** Enrich raw db components with ownership counts from the reactive ownership map. */
-export function enrichComponents(
-  components: ComponentInfo[],
-  ownership: Map<string, number>,
-): ComponentInfo[] {
-  return components.map((comp) => {
-    const count = ownedComponentCount(comp.uniqueName, ownership);
-    return { ...comp, ownedCount: count, owned: count >= (comp.itemCount || 1) };
-  });
-}
 
 let _marketRefsWfmRef: WfmItemsLookup | null = null;
 let _marketRefsCache: ReadonlySet<string> = new Set();

@@ -2,6 +2,7 @@ import {
   componentUniqueNameAliases,
   ownedComponentCount,
 } from "../../config/shared/componentNames.js";
+import { mergeDuplicateIngredients } from "../../config/shared/recipeRows.js";
 import type { ComponentInfo, ItemDbEntry, ParsedItem } from "../types/inventory.js";
 import type { WfmItemsLookup } from "../types/ipc.js";
 
@@ -28,6 +29,18 @@ export function buildItemNameIndex(itemDb: Record<string, ItemDbEntry>): Map<str
 function withOwnership(comp: ComponentInfo, ownership: Map<string, number>): ComponentInfo {
   const count = ownedComponentCount(comp.uniqueName, ownership);
   return { ...comp, ownedCount: count, owned: count >= (comp.itemCount || 1) };
+}
+
+/** Raw db components with ownership counts; doubled rows merge first. */
+export function enrichComponents(
+  components: ComponentInfo[],
+  ownership: Map<string, number>,
+): ComponentInfo[] {
+  return mergeDuplicateIngredients(
+    components,
+    (comp) => comp.itemCount,
+    (comp, itemCount) => ({ ...comp, itemCount }),
+  ).map((comp) => withOwnership(comp, ownership));
 }
 
 function fallbackComponent(
@@ -57,7 +70,7 @@ export function resolveComponentByUniqueName(
 
   if (db.isBuildComponent && db.componentOf) {
     const parent = itemDb[db.componentOf];
-    const enriched = (parent?.components || []).map((comp) => withOwnership(comp, ownership));
+    const enriched = enrichComponents(parent?.components || [], ownership);
     const aliases = componentUniqueNameAliases(uniqueName);
     const parentComp = enriched.find((comp) =>
       Boolean(comp.uniqueName && aliases.includes(comp.uniqueName)),
