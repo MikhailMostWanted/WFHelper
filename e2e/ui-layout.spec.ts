@@ -4,6 +4,7 @@ import {
   closeElectronTestHarness,
   launchElectronTestHarness,
   openView,
+  selectOptionValues,
   setLayoutViewport,
   writeHarnessInventory,
   type ElectronTestHarness,
@@ -26,14 +27,14 @@ function testInventory(resourceCount = 1) {
 async function relicOwnershipSelect(page: Page): Promise<Locator> {
   const selects = page.locator("[data-relic-filter-controls] select");
   await expect(selects.first()).toBeVisible();
-  const index = await selects.evaluateAll((nodes) =>
-    nodes.findIndex((node) => {
-      const values = Array.from((node as HTMLSelectElement).options, (option) => option.value);
-      return values.length === 2 && values[0] === "owned" && values[1] === "all";
-    }),
-  );
-  expect(index, "relic ownership select not found").toBeGreaterThanOrEqual(0);
-  return selects.nth(index);
+  const count = await selects.count();
+  for (let index = 0; index < count; index += 1) {
+    const values = await selectOptionValues(selects.nth(index));
+    if (values.length === 2 && values[0] === "owned" && values[1] === "all") {
+      return selects.nth(index);
+    }
+  }
+  throw new Error("relic ownership select not found");
 }
 
 async function openRelics(page: Page, width: number): Promise<void> {

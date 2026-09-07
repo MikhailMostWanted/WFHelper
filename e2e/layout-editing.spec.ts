@@ -263,7 +263,7 @@ test.describe("Per-view layout editing", () => {
     await expect.poll(() => columnOf("world.darvo")).toBe(before);
 
     if ((await toggle.getAttribute("aria-pressed")) === "true") await toggle.click();
-    await page.setViewportSize({ width: 1280, height: 820 });
+    await setLayoutViewport(page, 1280, 820);
   });
 
   test("a stored layout from a build with different ids still lists every section", async () => {

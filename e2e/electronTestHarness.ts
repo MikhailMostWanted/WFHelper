@@ -7,6 +7,7 @@ import {
   expect,
   _electron as electron,
   type ElectronApplication,
+  type Locator,
   type Page,
 } from "@playwright/test";
 
@@ -92,19 +93,39 @@ export async function launchElectronTestHarness(
   }
 }
 
-/** Viewport in CSS pixels. setViewportSize sets the device viewport and the app
- * divides it by the zoom from config/runtime/uiScale.ts (1.15 on a 1440p panel,
- * 0.9 on a small CI display), so a raw 1800 lands at 1565 or 2000 CSS px. */
+/** Viewport in CSS pixels. setViewportSize takes device pixels and the app
+ * divides by the uiScale zoom, so the request is re-applied scaled. */
 export async function setLayoutViewport(page: Page, width: number, height: number): Promise<void> {
   await page.setViewportSize({ width, height });
-  const applied = await page.evaluate(() => window.innerWidth);
-  if (!applied) return;
+  // After a reload the zoom can land a frame late, so a single probe would read
+  // device pixels and skip the rescale. Settle on a width that repeats.
+  let previous = NaN;
+  let applied = await page.evaluate(() => window.innerWidth);
+  for (let attempt = 0; attempt < 6 && applied !== previous; attempt += 1) {
+    await page.waitForTimeout(75);
+    previous = applied;
+    applied = await page.evaluate(() => window.innerWidth);
+  }
+  if (applied !== previous || !applied) {
+    throw new Error(`viewport width never settled (${previous} -> ${applied})`);
+  }
   const zoom = width / applied;
   if (Math.abs(zoom - 1) < 0.01) return;
   await page.setViewportSize({
     width: Math.round(width * zoom),
     height: Math.round(height * zoom),
   });
+  await page.waitForTimeout(75);
+  const landed = await page.evaluate(() => window.innerWidth);
+  if (Math.abs(landed - width) > Math.max(1, width * 0.01)) {
+    throw new Error(`viewport landed at ${landed} CSS px, wanted ${width}`);
+  }
+}
+
+export function selectOptionValues(select: Locator): Promise<string[]> {
+  return select.evaluate((element) =>
+    Array.from((element as HTMLSelectElement).options, (option) => option.value),
+  );
 }
 
 /** Sidebar labels are translated, so navigate by data-view. */

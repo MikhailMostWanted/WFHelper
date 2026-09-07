@@ -1,9 +1,10 @@
-import { test, expect, type Locator } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 import {
   closeElectronTestHarness,
   launchElectronTestHarness,
   openView,
+  selectOptionValues,
   type ElectronTestHarness,
 } from "./electronTestHarness";
 
@@ -54,12 +55,6 @@ function inventory() {
       ),
     ],
   };
-}
-
-function optionValues(select: Locator): Promise<string[]> {
-  return select.evaluate((element) =>
-    Array.from((element as HTMLSelectElement).options, (option) => option.value),
-  );
 }
 
 test.describe("riven card size", () => {
@@ -127,8 +122,14 @@ test.describe("riven card size", () => {
     const attrGradeSelect = page.locator("[data-riven-attr-grade-select]");
     await expect(gradeSelect).toBeVisible({ timeout: 30_000 });
 
-    expect(await optionValues(gradeSelect)).toEqual(["all", "S", "A", "B", "C", "F"]);
-    expect(await optionValues(attrGradeSelect)).toEqual(["all", "Great", "Good", "OK", "Bad"]);
+    expect(await selectOptionValues(gradeSelect)).toEqual(["all", "S", "A", "B", "C", "F"]);
+    expect(await selectOptionValues(attrGradeSelect)).toEqual([
+      "all",
+      "Great",
+      "Good",
+      "OK",
+      "Bad",
+    ]);
 
     // The filter matches the letter family, so "C" keeps C+, C and C-.
     await gradeSelect.selectOption("C");
