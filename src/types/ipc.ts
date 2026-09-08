@@ -843,7 +843,7 @@ interface TradeRecordedEvent {
 
 export interface IpcEventMap {
   "overlay-edit-state": OverlayEditState;
-  "inventory-updated": RawInventoryData;
+  "inventory-updated": RawInventoryData | null;
   "profile-account-changed": void;
   "inventory-status-updated": InventoryStatus;
   "item-db-updated": undefined;

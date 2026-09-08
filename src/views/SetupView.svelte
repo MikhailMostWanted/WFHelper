@@ -50,7 +50,7 @@
     });
 
     removeInventoryListener = on("inventory-updated", async (data) => {
-      if (destroyed || loadingApi) return;
+      if (destroyed || loadingApi || inventorySource === "none") return;
       if (step === "configure") {
         // App.svelte already ingested it; don't yank the user off the theme step
         pendingInventoryData = data;
@@ -98,6 +98,7 @@
   async function refreshHelperStatus(): Promise<void> {
     try {
       const status = await invoke("getInventoryStatus");
+      if (status?.source === "none") inventorySource = "none";
       if (status?.found) {
         helperStatus = "found";
         helperPath = status.path || null;
@@ -150,16 +151,6 @@
     if (step === "downloading") {
       step = "error";
       errorMessage = result.error || $tr("setup.downloadFailedConnection");
-    }
-  }
-
-  // Remember the pick so a restart does not silently switch back to something
-  // else. Only the helper needs this - the file pickers record their own source.
-  async function persistHelperInventorySource(): Promise<void> {
-    try {
-      await invoke("setInventorySource", "helper");
-    } catch {
-      // non-fatal: the chosen data still loads for this session
     }
   }
 
@@ -238,8 +229,22 @@
   }
 
   async function useSelectedInventorySource(): Promise<void> {
+    if (inventorySource === "none") {
+      await continueWithoutInventory();
+      return;
+    }
     if (inventorySource === "helper") {
-      await persistHelperInventorySource();
+      loadingApi = true;
+      try {
+        await invoke("setInventorySource", "helper");
+      } catch {
+        errorMessage = $tr("settings.inventorySourceChangeFailed");
+        step = "error";
+        return;
+      } finally {
+        loadingApi = false;
+      }
+      if (destroyed) return;
       if (runnerStatus?.exeFound) {
         await loadApiHelper(false);
         return;
@@ -259,16 +264,34 @@
     }
   }
 
-  function completeSetup(nextView: "inventory" = "inventory"): void {
+  function completeSetup(nextView: "inventory" | "world" = "inventory"): void {
     writeStorage(SETUP_COMPLETED_KEY, "1");
     // legacy key: a downgrade to a pre-v2 build must not re-run setup either
     writeStorage("setup-completed", "1");
     // Arm the tour before navigating. currentView subscribers run synchronously
     // and the auto-focus-search guard reads tourActive, so navigating first would
     // let the search box steal focus as the tour paints its first step.
-    const autoStart = shouldAutoStartTour();
+    const autoStart = nextView === "inventory" && shouldAutoStartTour();
     if (autoStart) startTour();
     currentView.set(nextView);
+  }
+
+  async function continueWithoutInventory(): Promise<void> {
+    if (loadingApi) return;
+    loadingApi = true;
+    try {
+      await invoke("setInventorySource", "none");
+      if (destroyed) return;
+      inventorySource = "none";
+      pendingInventoryData = null;
+      statusText.set(null);
+      completeSetup("world");
+    } catch {
+      errorMessage = $tr("settings.inventorySourceChangeFailed");
+      step = "error";
+    } finally {
+      loadingApi = false;
+    }
   }
 
   async function continueFromConfigure(): Promise<void> {
@@ -284,7 +307,7 @@
   }
 
   const finish = (): void => void (step = "overlays");
-  const skip = (): void => completeSetup("inventory");
+  const skip = (): void => void continueWithoutInventory();
 
   function retry(): void {
     step = "configure";
@@ -495,6 +518,19 @@
                   {$tr("setup.source.aleca.desc")}
                 </div>
               </button>
+
+              <button
+                type="button"
+                class={sourceButtonClass("none", inventorySource)}
+                aria-pressed={inventorySource === "none"}
+                data-setup-source="none"
+                on:click={() => (inventorySource = "none")}
+              >
+                <span class="font-display text-sm font-semibold">
+                  {$tr("settings.inventorySourceNone")}
+                </span>
+                <div class="mt-1 text-xs leading-snug">{$tr("setup.source.none.desc")}</div>
+              </button>
             </div>
           {:else if step === "downloading"}
             <h2 class="mb-3 font-display text-lg font-bold tracking-[0.02em]">
@@ -557,15 +593,26 @@
 
         <div class="mt-2 flex justify-end gap-2 border-t border-border pt-4">
           {#if step === "configure"}
-            <button class="btn-secondary btn-sm" on:click={skip}>{$tr("setup.skip")}</button>
-            <button class="btn-primary btn-sm" on:click={continueFromConfigure}
+            <button
+              class="btn-secondary btn-sm"
+              disabled={loadingApi}
+              data-setup-without-inventory
+              on:click={skip}>{$tr("setup.withoutInventory")}</button
+            >
+            <button class="btn-primary btn-sm" data-setup-next on:click={continueFromConfigure}
               >{$tr("common.next")}</button
             >
           {:else if step === "inventory"}
-            <button class="btn-secondary btn-sm" on:click={skip}>{$tr("setup.skip")}</button>
+            <button
+              class="btn-secondary btn-sm"
+              disabled={loadingApi}
+              data-setup-without-inventory
+              on:click={skip}>{$tr("setup.withoutInventory")}</button
+            >
             <button
               class="btn-primary btn-sm"
               disabled={loadingApi}
+              data-setup-use-source
               on:click={useSelectedInventorySource}
             >
               {#if loadingApi}
@@ -576,12 +623,19 @@
                 {$tr("setup.importJsonButton")}
               {:else if inventorySource === "aleca"}
                 {$tr("setup.importAlecaButton")}
+              {:else if inventorySource === "none"}
+                {$tr("setup.withoutInventory")}
               {/if}
             </button>
           {:else if step === "done"}
             <button class="btn-primary btn-sm" on:click={finish}>{$tr("common.next")}</button>
           {:else if step === "error"}
-            <button class="btn-secondary btn-sm" on:click={skip}>{$tr("setup.skip")}</button>
+            <button
+              class="btn-secondary btn-sm"
+              disabled={loadingApi}
+              data-setup-without-inventory
+              on:click={skip}>{$tr("setup.withoutInventory")}</button
+            >
             <button class="btn-primary btn-sm" on:click={retry}>{$tr("common.retry")}</button>
           {/if}
         </div>

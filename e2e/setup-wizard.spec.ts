@@ -11,7 +11,11 @@ import {
 } from "@playwright/test";
 
 import { mainWindow } from "./mainWindow";
-import { evaluateInMain } from "./electronTestHarness";
+import {
+  closeElectronTestHarness,
+  evaluateInMain,
+  launchElectronTestHarness,
+} from "./electronTestHarness";
 
 // The shared harness seeds setup-completed-v2, so no other spec ever sees the
 // wizard. It is three components now, which is exactly why it needs covering.
@@ -81,7 +85,14 @@ test.describe.serial("First-run setup wizard", () => {
     await expect(page.getByRole("slider", { name: "App size" })).toBeVisible();
     await expect(page.locator("button[aria-pressed]").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Skip", exact: true })).toBeVisible();
+    await expect(page.locator("[data-setup-without-inventory]")).toBeVisible();
+    await page.locator("[data-setup-language] button").nth(1).click();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("app-language"))).toBe("de");
+    await page.locator("[data-setup-language] button").first().click();
+    await page.screenshot({
+      path: test.info().outputPath("welcome-language.png"),
+      animations: "disabled",
+    });
   });
 
   test("Next advances to the inventory step and the footer ladder follows", async () => {
@@ -91,14 +102,81 @@ test.describe.serial("First-run setup wizard", () => {
     // Body and footer are two {#if} ladders over the same step; prove both moved.
     await expect(page.getByRole("heading", { name: "App size" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Next", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Skip", exact: true })).toBeVisible();
+    await expect(page.locator("[data-setup-without-inventory]")).toBeVisible();
   });
 
-  test("Skip completes setup and reveals the sidebar", async () => {
+  test("no inventory completes setup, opens World and survives a reload", async () => {
     const { page } = wizard;
-    await page.getByRole("button", { name: "Skip", exact: true }).click();
+    await page.locator('[data-setup-source="none"]').click();
+    await page.locator("[data-setup-use-source]").click();
     await expect(page.locator("#sidebar")).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("[data-tour-card]")).toHaveCount(0);
+    expect(await page.evaluate(() => window.api.getInventoryStatus())).toMatchObject({
+      source: "none",
+      found: false,
+    });
+    await expect(page.locator('#sidebar [data-view="world"]')).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await page.reload();
+    await expect(page.locator('#sidebar [data-view="world"]')).toHaveAttribute(
+      "aria-current",
+      "page",
+      { timeout: 30_000 },
+    );
+    await expect(page.locator("#content.setup-active")).toHaveCount(0);
+    await page.locator('#sidebar [data-view="settings"]').click();
+    await expect(page.locator('[data-setting="inventory-source"] button').last()).toHaveClass(
+      /bg-accent/,
+    );
+    const hint = page.locator("[data-no-inventory-hint]");
+    await expect(hint).toBeVisible();
+    expect(await hint.evaluate((node) => node.getBoundingClientRect().width)).toBeGreaterThan(300);
+    for (const dismiss of await page.locator("article.pointer-events-auto button").all()) {
+      await dismiss.click();
+    }
+    await page.screenshot({
+      path: test.info().outputPath("no-inventory-settings.png"),
+      animations: "disabled",
+    });
   });
+});
+
+test("Settings can disconnect inventory while retaining its file and market access", async () => {
+  const harness = await launchElectronTestHarness("wf-no-inventory-settings-", {
+    inventory: { Suits: [], RegularCredits: 4200 },
+  });
+  try {
+    const { page } = harness;
+    const inventoryPath = path.join(harness.helperDir, "inventory.json");
+    const original = fs.readFileSync(inventoryPath, "utf8");
+    await expect
+      .poll(() => page.evaluate(() => window.api.getInventoryStatus()))
+      .toMatchObject({ found: true });
+    await page.locator('#sidebar [data-view="settings"]').click();
+    await page.locator('[data-setting="inventory-source"] button').last().click();
+    await expect
+      .poll(() => page.evaluate(() => window.api.getInventoryStatus()))
+      .toMatchObject({ source: "none", found: false });
+    expect(await page.evaluate(() => window.api.getInventory())).toBeNull();
+    expect(fs.readFileSync(inventoryPath, "utf8")).toBe(original);
+    await page.locator('#sidebar [data-view="market"]').click();
+    await expect(page.locator('#sidebar [data-view="market"]')).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(page.locator("#content.setup-active")).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator('#sidebar [data-view="world"]')).toHaveAttribute(
+      "aria-current",
+      "page",
+      { timeout: 30_000 },
+    );
+    expect(await page.evaluate(() => window.api.getInventory())).toBeNull();
+  } finally {
+    await closeElectronTestHarness(harness);
+  }
 });
 
 test.describe.serial("Setup overlay placement step", () => {

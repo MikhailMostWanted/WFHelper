@@ -118,6 +118,38 @@ describe("findInventoryFile", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  it("keeps no-inventory mode across startup despite an available helper file", async () => {
+    const file = writeValidInventory(
+      path.join(tmpDir, "userData", "api-helper", "inventory.json"),
+      "kept",
+      Date.now(),
+    );
+    writeState(file, "none");
+    const inventory = await loadModule();
+    expect(inventory.getInventorySource()).toBe("none");
+    expect(inventory.loadInitialInventory()).toBeNull();
+    expect(chokidarMock.watch).not.toHaveBeenCalled();
+    expect(fs.existsSync(file)).toBe(true);
+  });
+
+  it("disconnects the watcher without deleting inventory and can reconnect", async () => {
+    const file = writeValidInventory(
+      path.join(tmpDir, "userData", "api-helper", "inventory.json"),
+      "kept",
+      Date.now(),
+    );
+    const inventory = await loadModule();
+    expect(inventory.loadInitialInventory()?.data).toMatchObject({ marker: "kept" });
+    expect(inventory.setInventorySource("none")).toBe("none");
+    expect(chokidarMock.watcher.close).toHaveBeenCalled();
+    expect(inventory.loadInitialInventory()).toBeNull();
+    expect(readState().inventorySource).toBe("none");
+    expect(fs.existsSync(file)).toBe(true);
+    expect(syncMock.apply).toHaveBeenCalledWith("source none");
+    expect(inventory.setInventorySource("helper")).toBe("helper");
+    expect(inventory.loadInitialInventory()?.data).toMatchObject({ marker: "kept" });
+  });
+
   it("prefers a fresher manual import over a stale helper snapshot", async () => {
     const now = Date.now();
     writeInventoryFile(

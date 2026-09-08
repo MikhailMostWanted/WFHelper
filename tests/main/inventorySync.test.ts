@@ -62,6 +62,15 @@ describe("inventorySync.apply", () => {
     expect(runner.stopPolling).not.toHaveBeenCalled();
   });
 
+  it("never polls or retries login when no inventory is selected", async () => {
+    const { sync, runner } = await initSync("none", true);
+    sync.apply("startup");
+    sync.onGameLogin();
+    expect(runner.startPolling).not.toHaveBeenCalled();
+    expect(runner.runAfterGameLogin).not.toHaveBeenCalled();
+    expect(runner.stopPolling).toHaveBeenCalledOnce();
+  });
+
   it("skips and stops polling for a manually imported inventory", async () => {
     const { sync, runner } = await initSync("manual", true);
     sync.apply("startup");

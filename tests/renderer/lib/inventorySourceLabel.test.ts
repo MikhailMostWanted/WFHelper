@@ -7,6 +7,11 @@ describe("describeInventorySource", () => {
     expect(describeInventorySource("helper", null).labelKey).toBe("settings.inventorySourceHelper");
     expect(describeInventorySource("manual", null).labelKey).toBe("settings.inventorySourceManual");
     expect(describeInventorySource("aleca", null).labelKey).toBe("settings.inventorySourceAleca");
+    expect(describeInventorySource("none", "C:\\old-inventory.json")).toEqual({
+      labelKey: "settings.inventorySourceNone",
+      detail: "",
+      path: "",
+    });
   });
 
   it("shows the file name for a manual pick and keeps the full path as a tooltip", () => {

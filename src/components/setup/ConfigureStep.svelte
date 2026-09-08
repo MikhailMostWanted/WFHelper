@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
-  import { tr } from "../../lib/i18n.js";
+  import { tr, locale, LOCALE_OPTIONS, setLocale } from "../../lib/i18n.js";
   import type { MessageKey } from "../../lib/i18n.js";
   import { getPlatform } from "../../lib/ipc.js";
   import { PRESET_KEYS, THEME_PRESETS } from "../../config/themePresets.js";
@@ -66,6 +66,14 @@
 </h2>
 
 <div class="grid gap-3">
+  <div class="flex flex-wrap items-center justify-between gap-3" data-setup-language>
+    <span class="text-sm font-semibold">{$tr("settings.languageRow")}</span>
+    <SegmentedControl
+      value={$locale}
+      options={LOCALE_OPTIONS.map((option) => ({ value: option.code, label: option.label }))}
+      onChange={setLocale}
+    />
+  </div>
   <div
     class="rounded-lg border border-[var(--ui-panel-border)] bg-[var(--ui-control-bg)] px-3 py-3 [backdrop-filter:var(--ui-backdrop-blur)]"
   >

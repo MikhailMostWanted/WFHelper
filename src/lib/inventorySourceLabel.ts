@@ -19,6 +19,7 @@ const SOURCE_LABEL_KEYS: Record<InventorySource, MessageKey> = {
   helper: "settings.inventorySourceHelper",
   manual: "settings.inventorySourceManual",
   aleca: "settings.inventorySourceAleca",
+  none: "settings.inventorySourceNone",
 };
 
 export const INVENTORY_SOURCE_OPTIONS: ReadonlyArray<{
@@ -28,6 +29,7 @@ export const INVENTORY_SOURCE_OPTIONS: ReadonlyArray<{
   { value: "helper", labelKey: "settings.inventorySourceShortHelper" },
   { value: "manual", labelKey: "settings.inventorySourceShortManual" },
   { value: "aleca", labelKey: "settings.inventorySourceAleca" },
+  { value: "none", labelKey: "settings.inventorySourceNone" },
 ];
 
 function fileName(filePath: string): string {

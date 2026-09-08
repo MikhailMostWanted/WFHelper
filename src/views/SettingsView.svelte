@@ -138,8 +138,8 @@
     if (switchingSource || next === inventorySource) return;
     switchingSource = true;
     try {
-      if (next === "helper") {
-        await invoke("setInventorySource", "helper");
+      if (next === "helper" || next === "none") {
+        await invoke("setInventorySource", next);
       } else {
         const data =
           next === "aleca"
@@ -789,7 +789,11 @@
               <SettingsRow
                 as="div"
                 label={$tr("common.source")}
-                hint={`${sourceLabel}${sourceDescription.detail ? ` - ${sourceDescription.detail}` : ""}`}
+                dataSetting="inventory-source"
+                wrapControl
+                hint={inventorySource === "none"
+                  ? undefined
+                  : `${sourceLabel}${sourceDescription.detail ? ` - ${sourceDescription.detail}` : ""}`}
                 hintTitle={sourceTitle}
               >
                 <SegmentedControl
@@ -797,8 +801,14 @@
                   options={inventorySourceOptions}
                   onChange={(next) => void selectInventorySource(next)}
                   disabled={switchingSource}
+                  wrap
                 />
               </SettingsRow>
+              {#if inventorySource === "none"}
+                <p class="text-xs leading-relaxed text-text-secondary" data-no-inventory-hint>
+                  {$tr("setup.source.none.desc")}
+                </p>
+              {/if}
               <SettingsRow
                 label={$tr("settings.autoInventorySync")}
                 hint={autoSyncApplies ? undefined : $tr("settings.helperSourceOnly")}

@@ -172,6 +172,11 @@
         invoke("getInventoryStatus"),
         invoke("getHelperStatus"),
       ]);
+      if (inventoryStatus?.source === "none") {
+        if ($currentView === "inventory") currentView.set("world");
+        statusText.set(null);
+        return;
+      }
       if (inventoryStatus?.found || helperStatus?.inventoryLastModified) return;
 
       currentView.set("setup");

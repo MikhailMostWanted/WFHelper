@@ -65,7 +65,7 @@ let _loadedInventoryHash: string | null = null;
 let _lastListenerInventoryHash: string | null = null;
 let _trustedInventoryPath: string | null = null;
 /** Sources that read plain inventory JSON; only their acquisition differs. */
-type JsonInventorySource = Exclude<InventorySource, "aleca">;
+type JsonInventorySource = Exclude<InventorySource, "aleca" | "none">;
 let _trustedInventorySource: InventorySource = DEFAULT_INVENTORY_SOURCE;
 let _activeInventorySource: InventorySource = DEFAULT_INVENTORY_SOURCE;
 let _loadedInventoryModifiedAt: number | null = null;
@@ -394,7 +394,10 @@ function readAlecaFrameInventory(filePath: string): unknown {
   }
 }
 
-function watchInventoryFile(filePath: string, source: InventorySource = "helper"): void {
+function watchInventoryFile(
+  filePath: string,
+  source: Exclude<InventorySource, "none"> = "helper",
+): void {
   stopInventoryWatcher();
   const generation = _watchGeneration;
   ctx.currentInventoryPath = filePath;
@@ -485,6 +488,7 @@ function getLoadedInventoryModifiedAt(): number | null {
 }
 
 function loadInitialInventory(): { path: string; data: unknown } | null {
+  if (_trustedInventorySource === "none") return null;
   if (_trustedInventorySource === "aleca" && _trustedInventoryPath) {
     const alecaPath = newestExistingInventoryPath([_trustedInventoryPath]);
     if (alecaPath) {
@@ -525,6 +529,7 @@ function loadInitialInventory(): { path: string; data: unknown } | null {
 }
 
 function readCurrentInventory(): unknown {
+  if (_trustedInventorySource === "none" || _activeInventorySource === "none") return null;
   if (!ctx.currentInventoryPath) return loadInitialInventory()?.data ?? null;
   if (_activeInventorySource === "aleca") {
     return readAlecaFrameInventory(ctx.currentInventoryPath);
@@ -557,10 +562,9 @@ function reattachHelperInventory(): void {
 function setInventorySource(source: InventorySource): InventorySource {
   if (_trustedInventorySource === source) return _trustedInventorySource;
 
-  // Only the helper can be switched to on its own; the others ARE a file, and
-  // the file pickers commit them. Persisting one here would leave the helper's
-  // last snapshot remembered as a hand-picked import that nothing refreshes.
-  if (source !== "helper" && _activeInventorySource !== source) {
+  // File-backed sources must be selected through a picker, or the helper's
+  // last snapshot would be remembered as a hand-picked file.
+  if (source !== "helper" && source !== "none" && _activeInventorySource !== source) {
     log.warn(`Ignoring switch to "${source}" - no file has been chosen for it yet`);
     return _trustedInventorySource;
   }
@@ -572,6 +576,16 @@ function setInventorySource(source: InventorySource): InventorySource {
   _persistState();
   log.info(`Inventory source set to "${source}"`);
   if (source === "helper") reattachHelperInventory();
+  if (source === "none") {
+    stopInventoryWatcher();
+    ctx.currentInventoryPath = null;
+    ctx.currentInventoryData = null;
+    _activeInventorySource = "none";
+    _loadedInventoryHash = null;
+    _loadedInventoryModifiedAt = null;
+    _lastReadError = null;
+    broadcastToRenderers(INVENTORY_UPDATED, null);
+  }
   inventorySync.apply(`source ${source}`);
   notifyInventoryStatus();
   return _trustedInventorySource;

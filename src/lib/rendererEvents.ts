@@ -9,8 +9,9 @@ import { statusText } from "../stores/app.js";
 import { pendingArbiRunId, subscribeArbiRunSaved } from "../stores/arbiRuns.js";
 import { subscribePtRunSaved } from "../stores/ptRuns.js";
 import { currentView } from "../stores/app.js";
-import { inventoryModifiedAt, itemDb, parsedItems } from "../stores/data.js";
+import { inventoryData, inventoryModifiedAt, itemDb, parsedItems } from "../stores/data.js";
 import { masteryData } from "../stores/mastery.js";
+import { relicOwnedCounts } from "../stores/relics.js";
 import { applyClosedWfmListing } from "../stores/market.js";
 import { addNotificationEntry, loadNotificationHistory } from "../stores/notifications.js";
 import { detectedWarframeUiScale, overlaySettings } from "../stores/overlaySettings.js";
@@ -42,11 +43,20 @@ export function initRendererEvents(): () => void {
     subscribePtRunSaved(),
 
     on("inventory-updated", async (data) => {
+      if (data === null) {
+        inventoryData.set(null);
+        masteryData.set(null);
+        relicOwnedCounts.set({});
+        inventoryModifiedAt.set(null);
+        statusText.set(null);
+        return;
+      }
       if (data && !(data as { error?: unknown }).error) {
         await onInventoryLoaded(data);
         // Main only pushes a status on watcher errors and source switches, so the
         // mtime behind this payload has to be pulled.
         await refreshInventoryModifiedAt();
+        if (!get(inventoryData)) return;
         // SetupView routes itself during the wizard; navigating here would tear it down
         statusText.set({
           key: "app.liveUpdateStatus",
@@ -57,6 +67,10 @@ export function initRendererEvents(): () => void {
 
     on("inventory-status-updated", (status) => {
       inventoryModifiedAt.set(status.modifiedAt ?? null);
+      if (status.source === "none") {
+        statusText.set(null);
+        return;
+      }
       if (status.lastError) {
         statusText.set({
           key: "app.inventoryWatcherError",
@@ -99,8 +113,12 @@ export function initRendererEvents(): () => void {
     on("item-db-updated", async () => {
       const db = await invoke("getItemDatabase");
       itemDb.set(db || {});
+      const inventory = get(inventoryData);
+      if (!inventory) return;
       invoke("getMasteryProgress")
-        .then((md) => masteryData.set(md))
+        .then((md) => {
+          if (get(inventoryData) === inventory) masteryData.set(md);
+        })
         .catch((err) => console.warn("[Mastery] getMasteryProgress failed:", err));
     }),
   ];

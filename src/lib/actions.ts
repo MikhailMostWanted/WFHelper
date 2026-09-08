@@ -21,7 +21,9 @@ export async function onInventoryLoaded(data: RawInventoryData): Promise<void> {
   }
 
   invoke("getMasteryProgress")
-    .then((md) => masteryData.set(md))
+    .then((md) => {
+      if (get(inventoryData) === parsedData) masteryData.set(md);
+    })
     .catch((err) => console.warn("[Mastery] getMasteryProgress failed:", err));
 }
 

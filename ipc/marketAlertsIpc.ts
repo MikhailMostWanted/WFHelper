@@ -86,8 +86,10 @@ function indexOwnedCounts(data: Record<string, unknown>): void {
  *  slug has no gameRef, so only the renderer can count one. */
 async function liveOwnedCount(itemUrlName: string): Promise<number | null> {
   const owned = _ownedByType;
-  if (!owned) return null;
+  const inventory = ctx.currentInventoryData;
+  if (!owned || !inventory) return null;
   const item = await wfmCatalog.lookupBySlug(itemUrlName);
+  if (ctx.currentInventoryData !== inventory) return null;
   const gameRef = item?.gameRef;
   return gameRef ? (owned.get(gameRef) ?? 0) : null;
 }

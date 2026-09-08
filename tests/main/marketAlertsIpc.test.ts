@@ -13,6 +13,10 @@ const h = vi.hoisted(() => ({
   getWeaponDisposition: vi.fn(),
   getRivenFamilySlug: vi.fn(),
   isRivenWeaponSlug: vi.fn(),
+  initMarketAlerts: vi.fn(),
+  addInventoryListener: vi.fn(),
+  lookupBySlug: vi.fn(),
+  context: { mainWindow: null, currentInventoryData: null as Record<string, unknown> | null },
 }));
 
 vi.mock("../../ipc/ipcSecurity", () => ({
@@ -22,16 +26,16 @@ vi.mock("../../ipc/ipcSecurity", () => ({
   },
 }));
 
-vi.mock("../../ipc/context", () => ({ default: { mainWindow: null } }));
+vi.mock("../../ipc/context", () => ({ default: h.context }));
 vi.mock("../../ipc/worldStateIpc", () => ({ sendDesktopNotificationRaw: vi.fn() }));
-vi.mock("../../ipc/inventoryIpc", () => ({ addInventoryListener: vi.fn() }));
+vi.mock("../../ipc/inventoryIpc", () => ({ addInventoryListener: h.addInventoryListener }));
 
 vi.mock("../../services/logger", () => ({
   withScope: () => ({ info: vi.fn(), warn: h.warn, error: vi.fn(), debug: vi.fn() }),
 }));
 
 vi.mock("../../services/marketAlerts", () => ({
-  initMarketAlerts: vi.fn(),
+  initMarketAlerts: h.initMarketAlerts,
   listMarketAlertRules: vi.fn(),
   saveMarketAlertRule: h.saveMarketAlertRule,
   deleteMarketAlertRule: vi.fn(),
@@ -49,7 +53,7 @@ vi.mock("../../services/rivenData", () => ({
   getRivenFamilySlug: h.getRivenFamilySlug,
 }));
 
-vi.mock("../../services/wfmCatalog", () => ({ lookupBySlug: vi.fn() }));
+vi.mock("../../services/wfmCatalog", () => ({ lookupBySlug: h.lookupBySlug }));
 vi.mock("../../services/wfmSession", () => ({ getInGameName: vi.fn(() => null) }));
 vi.mock("../../services/wfmRivenItems", () => ({ isRivenWeaponSlug: h.isRivenWeaponSlug }));
 
@@ -80,6 +84,10 @@ function savePayload(weaponName: string): unknown {
 }
 
 beforeEach(async () => {
+  h.context.currentInventoryData = null;
+  h.initMarketAlerts.mockClear();
+  h.addInventoryListener.mockClear();
+  h.lookupBySlug.mockReset();
   h.warn.mockReset();
   h.saveMarketAlertRule.mockReset().mockReturnValue({ ok: true, rule: { id: "rule-1" } });
   h.importMarketAlertRules.mockReset().mockReturnValue({ ok: true, added: 1 });
@@ -90,6 +98,21 @@ beforeEach(async () => {
 });
 
 describe("marketAlertsIpc save", () => {
+  it("stops using live ownership after inventory disconnect, including pending lookups", async () => {
+    const inventory = { MiscItems: [{ ItemType: "/item", ItemCount: 7 }] };
+    h.context.currentInventoryData = inventory;
+    h.addInventoryListener.mock.calls[0]![0](inventory);
+    const live = h.initMarketAlerts.mock.calls[0]![0].getLiveOwnedCount as (
+      slug: string,
+    ) => Promise<number | null>;
+    h.lookupBySlug.mockResolvedValue({ gameRef: "/item" });
+    expect(await live("item")).toBe(7);
+    const pending = live("item");
+    h.context.currentInventoryData = null;
+    expect(await pending).toBeNull();
+    expect(await live("item")).toBeNull();
+  });
+
   it("stores the resolved slug when WFM lists a riven market", async () => {
     const result = await call(MARKET_ALERTS_SAVE, savePayload("Rubico"));
 

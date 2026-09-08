@@ -21,6 +21,8 @@
 </script>
 
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { invoke, on, send } from "../lib/ipc.js";
   import { itemLabel } from "../lib/itemLabel.js";
   import { SvelteMap } from "svelte/reactivity";
   import EditLayoutBar from "../components/layout/EditLayoutBar.svelte";
@@ -85,9 +87,26 @@
   import ArchonShardSummary from "../components/archon/ArchonShardSummary.svelte";
   import { parseArchonShards, summarizeArchonShards } from "../lib/inventory/archonShards.js";
   import { fallbackNameFromUniqueName } from "../../config/shared/displayName.js";
-  import { send } from "../lib/ipc.js";
   import type { ComponentInfo, MasteryCategoryStats, ProgressPair } from "../types/inventory.js";
   import type { FoundryState } from "../types/filters.js";
+
+  let withoutInventory = false;
+  onMount(() => {
+    let sourceUpdated = false;
+    const unsubscribe = on("inventory-status-updated", (status) => {
+      sourceUpdated = true;
+      withoutInventory = status.source === "none";
+    });
+    void invoke("getInventoryStatus")
+      .then((status) => {
+        if (!sourceUpdated) withoutInventory = status.source === "none";
+      })
+      .catch(() => {});
+    return () => {
+      sourceUpdated = true;
+      unsubscribe();
+    };
+  });
 
   const CAT_ORDER = [
     "Warframes",
@@ -1110,7 +1129,7 @@
     </LayoutGrid>
   {:else}
     <div class="empty-state">
-      <p>{$tr("mastery.loadingData")}</p>
+      <p>{$tr(withoutInventory ? "app.noInventoryLoaded" : "mastery.loadingData")}</p>
     </div>
   {/if}
 </section>

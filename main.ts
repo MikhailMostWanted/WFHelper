@@ -493,7 +493,7 @@ function registerIpcHandlers(profileStage: ProfileStage): void {
   inventorySelectionIpc.register();
 
   const attachInventoryAfterHelperRun = (ok: boolean) => {
-    if (!ok || ctx.currentInventoryPath) return;
+    if (!ok || ctx.currentInventoryPath || inventoryIpc.getInventorySource() !== "helper") return;
     const discovered = inventoryIpc.findInventoryFile();
     if (!discovered) return;
     ctx.currentInventoryPath = discovered;
@@ -522,11 +522,13 @@ function registerIpcHandlers(profileStage: ProfileStage): void {
     inventoryLastModified: inventoryIpc.getLoadedInventoryModifiedAt(),
   }));
   handleAuthorized(HELPER_RUN_NOW, assertMainRendererSender, async () => {
+    if (inventoryIpc.getInventorySource() === "none") return { ok: false };
     const ok = await apiHelperRunner.runOnce();
     attachInventoryAfterHelperRun(ok);
     return { ok };
   });
   handleAuthorized(HELPER_DOWNLOAD, assertMainRendererSender, async () => {
+    if (inventoryIpc.getInventorySource() === "none") return { ok: false };
     const ok = await apiHelperRunner.downloadHelper((progress) => {
       if (ctx.mainWindow) {
         ctx.mainWindow.webContents.send(HELPER_DOWNLOAD_PROGRESS, progress);
@@ -589,7 +591,11 @@ function initGameMonitoring(profileStage: ProfileStage): void {
     if (data && ctx.mainWindow) {
       const wc = ctx.mainWindow.webContents;
       const sendInventory = () => {
-        if (ctx.mainWindow) {
+        if (
+          ctx.mainWindow &&
+          ctx.currentInventoryData === data &&
+          inventoryIpc.getInventorySource() !== "none"
+        ) {
           ctx.mainWindow.webContents.send(INVENTORY_UPDATED, data);
         }
       };

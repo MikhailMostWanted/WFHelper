@@ -196,6 +196,29 @@ test.describe("Settings rows degrade without colliding", () => {
     );
   });
 
+  test("supporters stay beside Settings on a wide window", async () => {
+    await setFontScale(page, null);
+    await openSettings(page, 1920);
+    const panel = page.locator("[data-supporters]");
+    await expect(panel).toBeVisible();
+    const layout = await page.evaluate(() => {
+      const panel = document.querySelector("[data-supporters]")!.getBoundingClientRect();
+      const grid = document.querySelector(".settings-masonry")!.getBoundingClientRect();
+      return {
+        left: panel.left,
+        top: panel.top,
+        right: panel.right,
+        gridRight: grid.right,
+        gridTop: grid.top,
+        viewport: innerWidth,
+      };
+    });
+    expect(layout.left).toBeGreaterThan(layout.gridRight);
+    expect(Math.abs(layout.top - layout.gridTop)).toBeLessThan(30);
+    expect(layout.right).toBeLessThanOrEqual(layout.viewport);
+    await page.screenshot({ path: test.info().outputPath("settings-supporters-wide.png") });
+  });
+
   // The About rows are a label beside a link, and the narrowest masonry column
   // lands around 1040px. Each row keeps label and link on one line or stacks
   // them, never splitting into two ragged columns. A raised font scale is what

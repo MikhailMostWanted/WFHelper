@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
 
   import { DAY_MS } from "../lib/format.js";
-  import { invoke, send } from "../lib/ipc.js";
+  import { invoke, on, send } from "../lib/ipc.js";
   import { locale, tr, type MessageKey } from "../lib/i18n.js";
   import { useInterval } from "../lib/timers.js";
   import { APP_LOGO_URL } from "../lib/assetUrls.js";
@@ -17,6 +17,7 @@
   $: appName = $themeSettings.branding.appName || DEFAULT_APP_NAME;
 
   let helperStatus: HelperStatus | null = null;
+  let withoutInventory = false;
 
   // Show just the clock time, plus the date once the data is over a day old.
   function formatHelperTime(ms: number | null, localeCode: string): string {
@@ -70,13 +71,29 @@
     return "bg-danger";
   }
 
-  $: statusMessage = helperStatusMessage(helperStatus, helperInventoryIsOld, $locale);
+  $: statusMessage = withoutInventory
+    ? { key: "settings.inventorySourceNone" as const }
+    : helperStatusMessage(helperStatus, helperInventoryIsOld, $locale);
   $: helperStatusText = $tr(statusMessage.key, statusMessage.params);
-  $: helperTooltipText = $tr(helperTooltipKey(helperStatus));
-  $: helperDotClass = computeHelperDotClass(helperStatus, helperInventoryIsOld);
-  $: helperDotPulse = helperStatus?.running ?? false;
+  $: helperTooltipText = $tr(
+    withoutInventory ? "setup.source.none.desc" : helperTooltipKey(helperStatus),
+  );
+  $: helperDotClass = withoutInventory
+    ? "bg-text-muted"
+    : computeHelperDotClass(helperStatus, helperInventoryIsOld);
+  $: helperDotPulse = !withoutInventory && (helperStatus?.running ?? false);
 
   onMount(() => {
+    let sourceUpdated = false;
+    const unsubscribe = on("inventory-status-updated", (status) => {
+      sourceUpdated = true;
+      withoutInventory = status.source === "none";
+    });
+    void invoke("getInventoryStatus")
+      .then((status) => {
+        if (!sourceUpdated) withoutInventory = status.source === "none";
+      })
+      .catch(() => {});
     const refreshHelperStatus = (): void => {
       invoke("getHelperStatus")
         .then((status) => {
@@ -85,7 +102,11 @@
         .catch(() => {});
     };
 
-    return useInterval(refreshHelperStatus, HELPER_STATUS_POLL_MS, { immediate: true });
+    const stop = useInterval(refreshHelperStatus, HELPER_STATUS_POLL_MS, { immediate: true });
+    return () => {
+      unsubscribe();
+      stop();
+    };
   });
 </script>
 
