@@ -266,8 +266,28 @@ describe("trackerLive", () => {
 
     const live = trackerLive("archonHunt", wd, t, NOW);
 
-    expect(live.detail).toBe("dailies.boss(name=Nira)");
+    expect(live.detail).toBe(
+      "dailies.boss(name=Nira) - dailies.bird3Shard(color=Amber,plain=dailies.shardYellow)",
+    );
     expect(live.lines).toEqual(["Extermination - Arval (Mars)", "Assassination - War (Mars)"]);
+  });
+
+  it.each([
+    ["Amar", "Crimson", "Red"],
+    ["Boreal", "Azure", "Blue"],
+    ["Archon Nira", "Amber", "Yellow"],
+  ])("shows the fixed shard reward for %s", (boss, color, plain) => {
+    const wd = world({ archonHunt: { boss, missions: [], activation: "", expiry: "" } });
+    expect(trackerLive("archonHunt", wd, t, NOW).detail).toBe(
+      `dailies.boss(name=${boss}) - dailies.bird3Shard(color=${color},plain=dailies.shard${plain})`,
+    );
+  });
+
+  it("does not guess a shard for an unknown Archon", () => {
+    const wd = world({
+      archonHunt: { boss: "Unknown", missions: [], activation: "", expiry: "" },
+    });
+    expect(trackerLive("archonHunt", wd, t, NOW).detail).toBe("dailies.boss(name=Unknown)");
   });
 
   it("names this week's circuit rewards per difficulty", () => {

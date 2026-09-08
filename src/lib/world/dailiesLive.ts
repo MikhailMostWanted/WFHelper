@@ -81,6 +81,11 @@ const SHARD_PLAIN_KEYS: Record<string, MessageKey> = {
   Amber: "dailies.shardYellow",
   Crimson: "dailies.shardRed",
 };
+const ARCHON_SHARDS = new Map([
+  ["Boreal", "Azure"],
+  ["Nira", "Amber"],
+  ["Amar", "Crimson"],
+]);
 
 export function bird3ShardColor(nowMs: number): string {
   const offset = (((nowMs - BIRD3_ANCHOR_MS) % (3 * WEEK_MS)) + 3 * WEEK_MS) % (3 * WEEK_MS);
@@ -165,8 +170,15 @@ export function trackerLive(
     case "archonHunt": {
       const hunt: ArchonHunt | null | undefined = wd.archonHunt;
       if (!hunt) return {};
+      const color = ARCHON_SHARDS.get(hunt.boss?.replace(/^Archon\s+/i, "").trim() ?? "");
+      const shard = color
+        ? t("dailies.bird3Shard", { color, plain: t(SHARD_PLAIN_KEYS[color]) })
+        : "";
       return {
-        detail: hunt.boss ? t("dailies.boss", { name: hunt.boss }) : undefined,
+        detail:
+          [hunt.boss ? t("dailies.boss", { name: hunt.boss }) : "", shard]
+            .filter(Boolean)
+            .join(" - ") || undefined,
         lines: hunt.missions.map((mission) => `${mission.mission} - ${mission.node}`),
         expiry: hunt.expiry ?? null,
       };

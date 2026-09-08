@@ -13,6 +13,55 @@ import {
   type ElectronTestHarness,
 } from "./electronTestHarness";
 
+test("Archon Hunt names the boss and its shard reward", async () => {
+  const harness = await launchElectronTestHarness("wfh-archon-shard-e2e-");
+  const page = harness.page;
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  try {
+    await evaluateInMain(
+      harness.app,
+      ({ app, ipcMain }, channel) => {
+        const moduleApi = process.getBuiltinModule("module") as typeof import("node:module");
+        const load = moduleApi.createRequire(`${app.getAppPath()}/.electron-build/main.js`);
+        const parser = load("./services/worldStateParser.js") as {
+          parseRaw: (raw: WorldStateRaw) => WorldState;
+        };
+        const world = parser.parseRaw({
+          LiteSorties: [
+            {
+              _id: { $oid: "archon-shard-fixture" },
+              Activation: { $date: { $numberLong: String(Date.now() - 60_000) } },
+              Expiry: { $date: { $numberLong: String(Date.now() + 86_400_000) } },
+              Boss: "SORTIE_BOSS_NIRA",
+              Missions: [{ node: "SolNode25", missionType: "MT_RESCUE" }],
+            },
+          ],
+        });
+        ipcMain.removeHandler(channel);
+        ipcMain.handle(channel, () => world);
+      },
+      DB_GET_WORLD_STATE,
+    );
+    await setLayoutViewport(page, 1440, 1000);
+    await openView(page, "world");
+    await page.locator('[data-tour-tab="dailies"]').click();
+    await page.locator("[data-tracker-search]").fill("Archon");
+    const row = page.locator('[data-task="archonHunt"]').locator("xpath=ancestor::div[1]");
+    await expect(row).toContainText("Nira");
+    await expect(row).toContainText("Amber (yellow) Archon Shard");
+    await row.locator('[data-task-expand="archonHunt"]').click();
+    await expect(page.locator(".dailies-sublist")).toContainText("Callisto (Jupiter)");
+    await page.screenshot({
+      path: test.info().outputPath("archon-shard.png"),
+      animations: "disabled",
+    });
+    expect(errors).toEqual([]);
+  } finally {
+    await closeElectronTestHarness(harness);
+  }
+});
+
 // Each test is self-contained: a failed test restarts the worker, which re-runs
 // beforeAll with a fresh sandbox and empty localStorage.
 test.describe("World dailies tracker", () => {
