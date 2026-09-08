@@ -1,3 +1,4 @@
+import { asRecord as record } from "./objectValidation";
 import { isBoundedBase64 } from "./base64";
 
 export const FEEDBACK_LIMITS = {
@@ -33,12 +34,6 @@ export interface FeedbackReport {
 export type FeedbackResult =
   | { ok: true }
   | { ok: false; error: "invalid" | "unavailable" | "rate_limited" | "failed" };
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
 
 export function normalizeFeedback(value: unknown): FeedbackReport | null {
   const raw = record(value);

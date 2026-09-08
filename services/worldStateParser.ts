@@ -1,3 +1,4 @@
+import { HUB_NODE } from "../config/shared/relayNames";
 import { withScope } from "./logger";
 import { storeItemPath } from "../config/shared/itemPath";
 import { normalizeErrorMessage } from "../config/shared/errors";
@@ -298,23 +299,6 @@ const SORTIE_MODIFIER: Record<string, string> = {
   SORTIE_MODIFIER_HAZARD_COLD: "Cryogenic Leakage",
   SORTIE_MODIFIER_HAZARD_ELECTRICITY: "Electromagnetic Anomalies",
   SORTIE_MODIFIER_HAZARD_FOG: "Dense Fog",
-};
-
-const HUB_NODE: Record<string, string> = {
-  SaturnHUB: "Kronia Relay (Saturn)",
-  MarsHUB: "Strata Relay (Mars)",
-  CerberusHUB: "Orcus Relay (Pluto)",
-  PlutoHUB: "Orcus Relay (Pluto)",
-  EarthHUB: "Larunda Relay (Earth)",
-  VenusHUB: "Vesper Relay (Venus)",
-  EuropaHUB: "Leonov Relay (Europa)",
-  NeptuneHUB: "Maroo's Bazaar (Mars)",
-  "Relay Node 0": "Larunda Relay (Earth)",
-  "Relay Node 4": "Strata Relay (Mars)",
-  "Relay Node 9": "Vesper Relay (Venus)",
-  "Relay Node 12": "Kronia Relay (Saturn)",
-  "Relay Node 17": "Orcus Relay (Pluto)",
-  "Relay Node 20": "Leonov Relay (Europa)",
 };
 
 function resolveDictValue(value: unknown): string | null {

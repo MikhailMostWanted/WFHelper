@@ -1,3 +1,4 @@
+import { asRecord as record } from "./objectValidation";
 export const REWARD_OVERLAY_CANVAS = { width: 980, height: 236 } as const;
 
 export const REWARD_OVERLAY_FIELDS = [
@@ -80,12 +81,6 @@ export type RewardOverlayEditCommand =
 
 export function isRewardOverlayField(value: unknown): value is RewardOverlayField {
   return typeof value === "string" && (REWARD_OVERLAY_FIELDS as readonly string[]).includes(value);
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }
 
 export function normalizeRewardFieldStyle(value: unknown): RewardOverlayFieldStyle {

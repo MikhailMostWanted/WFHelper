@@ -1,3 +1,4 @@
+import { readResponseText } from "../config/shared/readResponseText";
 import dns from "node:dns";
 import net from "node:net";
 
@@ -404,33 +405,6 @@ function failed(error: string): SendOutcome {
   return { ok: false, rateLimited: false, retryAfterMs: 0, error };
 }
 
-async function readCappedBody(res: Response): Promise<string> {
-  const stream = res.body;
-  if (!stream || typeof stream.getReader !== "function") return "";
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    // getReader throws on an already-locked body, which must not fail the send.
-    const reader = stream.getReader();
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      const room = MAX_RESPONSE_BYTES - total;
-      if (value.byteLength >= room) {
-        chunks.push(value.subarray(0, room));
-        await reader.cancel();
-        break;
-      }
-      chunks.push(value);
-      total += value.byteLength;
-    }
-  } catch {
-    // A truncated body still leaves the status, which is what decides the retry.
-  }
-  return Buffer.concat(chunks).toString("utf8");
-}
-
 // Discord reports whole seconds in the header and a float in the JSON body.
 function retryDelayMs(res: Response, body: string): number {
   const headers = res.headers;
@@ -460,7 +434,10 @@ async function postOnce(url: string, body: string): Promise<SendOutcome> {
         redirect: "manual",
         signal,
       });
-      const text = await readCappedBody(res);
+      const text = await readResponseText(res, MAX_RESPONSE_BYTES, {
+        truncate: true,
+        allowPartial: true,
+      });
       if (res.status >= 300 && res.status < 400) return failed(`redirect refused (${res.status})`);
       if (res.status === 429) {
         return {

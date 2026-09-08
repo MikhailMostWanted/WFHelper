@@ -1,3 +1,4 @@
+import { asRecord as record } from "./objectValidation";
 import { storeItemPath } from "./itemPath";
 
 export interface BaroHistoryItem {
@@ -30,12 +31,6 @@ export interface BaroHistory {
 export const BARO_HISTORY_KEY = "baro:history:v1";
 export const BARO_HISTORY_MAX_VISITS = 128;
 export const BARO_HISTORY_MAX_ITEMS = 5000;
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
 
 function timestamp(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= 8.64e15;
