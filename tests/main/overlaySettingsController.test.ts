@@ -202,6 +202,14 @@ describe("overlay settings controller", () => {
     }
   });
 
+  it("keeps the saved notification volume when a save omits it", () => {
+    const { controller, ctx } = buildController();
+    controller.setOverlaySettings({ notificationSoundVolume: 0.37 });
+    controller.setOverlaySettings({ notificationSoundEnabled: false });
+    expect(ctx.overlaySettings.notificationSoundVolume).toBe(0.37);
+    expect(ctx.overlaySettings.notificationSoundEnabled).toBe(false);
+  });
+
   it("normalizes notification sound and overlay availability settings", () => {
     const { controller } = buildController();
 

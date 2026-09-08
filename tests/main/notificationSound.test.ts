@@ -8,6 +8,7 @@ import {
   NOTIFICATION_SOUND_MAX_WAV_BYTES,
   NOTIFICATION_SOUND_SAMPLE_RATE,
 } from "../../config/shared/notificationSound";
+import { pcm16WavBytes } from "../../config/shared/wav";
 import {
   NOTIFICATION_SOUND_GET,
   NOTIFICATION_SOUND_RESET,
@@ -35,20 +36,9 @@ vi.mock("../../ipc/ipcSecurity", () => ({
 }));
 
 function wav(size = 48): Buffer {
-  const bytes = Buffer.alloc(size);
-  bytes.write("RIFF");
-  bytes.writeUInt32LE(size - 8, 4);
-  bytes.write("WAVEfmt ", 8);
-  bytes.writeUInt32LE(16, 16);
-  bytes.writeUInt16LE(1, 20);
-  bytes.writeUInt16LE(1, 22);
-  bytes.writeUInt32LE(NOTIFICATION_SOUND_SAMPLE_RATE, 24);
-  bytes.writeUInt32LE(NOTIFICATION_SOUND_SAMPLE_RATE * 2, 28);
-  bytes.writeUInt16LE(2, 32);
-  bytes.writeUInt16LE(16, 34);
-  bytes.write("data", 36);
-  bytes.writeUInt32LE(size - 44, 40);
-  return bytes;
+  return Buffer.from(
+    pcm16WavBytes(new Int16Array((size - 44) / 2), NOTIFICATION_SOUND_SAMPLE_RATE),
+  );
 }
 
 const upload = () => ({ name: "My chime.wav", data: wav().toString("base64") });
@@ -130,6 +120,25 @@ describe("notification sound storage", () => {
     expect(() => sound.saveNotificationSound({ ...upload(), name: "replacement.wav" })).toThrow();
     expect(sound.getNotificationSound()).toEqual(previous);
     expect(fs.readFileSync(storedPath(), "utf8")).toBe(persisted);
+  });
+
+  it("retries a locked file on the next read and settles only on a missing one", async () => {
+    const sound = await load();
+    sound.saveNotificationSound(upload());
+    vi.resetModules();
+    const reloaded = await load();
+    const readFile = vi.spyOn(fs, "readFileSync").mockImplementationOnce(() => {
+      throw Object.assign(new Error("busy"), { code: "EBUSY" });
+    });
+    expect(reloaded.getNotificationSound()).toBeNull();
+    expect(reloaded.getNotificationSound()?.name).toBe("My chime.wav");
+    readFile.mockRestore();
+    fs.rmSync(storedPath());
+    vi.resetModules();
+    const missing = await load();
+    expect(missing.getNotificationSound()).toBeNull();
+    fs.writeFileSync(storedPath(), JSON.stringify(upload()));
+    expect(missing.getNotificationSound()).toBeNull();
   });
 
   it("resets the saved asset and remains empty after reload", async () => {

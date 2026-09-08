@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { NotificationSoundAsset } from "../../config/shared/notificationSound.js";
+  import {
+    normalizeNotificationVolume,
+    type NotificationSoundAsset,
+  } from "../../config/shared/notificationSound.js";
   import { tr, type MessageKey } from "../lib/i18n.js";
   import { invoke } from "../lib/ipc.js";
   import { previewNotificationSound, stopNotificationSound } from "../lib/notificationSound.js";
@@ -23,11 +26,13 @@
   let pending = $state(false);
   let previewing = $state(false);
   let errorKey = $state<MessageKey | null>(null);
+  let loadFailed = $state(false);
+  let sliderPercent = $state<number | null>(null);
   let fileInput = $state<HTMLInputElement>();
   let alive = true;
   let previewRequest = 0;
   const disabled = $derived(!enabled || system || loading || pending);
-  const percent = $derived(Math.round(Math.min(1, Math.max(0, volume)) * 100));
+  const percent = $derived(sliderPercent ?? Math.round(normalizeNotificationVolume(volume) * 100));
 
   function stopPreview(): void {
     previewRequest++;
@@ -41,7 +46,10 @@
         if (alive) sound = value;
       })
       .catch(() => {
-        if (alive) errorKey = "settings.notificationSoundLoadFailed";
+        if (alive) {
+          loadFailed = true;
+          errorKey = "settings.notificationSoundLoadFailed";
+        }
       })
       .finally(() => {
         if (alive) loading = false;
@@ -86,13 +94,16 @@
   }
 
   async function reset(): Promise<void> {
-    if (disabled || !sound) return;
+    if (loading || pending || (!sound && !loadFailed)) return;
     stopPreview();
     pending = true;
     errorKey = null;
     try {
       await invoke("resetNotificationSound");
-      if (alive) sound = null;
+      if (alive) {
+        sound = null;
+        loadFailed = false;
+      }
     } catch {
       if (alive) errorKey = "settings.notificationSoundSaveFailed";
     } finally {
@@ -116,7 +127,13 @@
     }
   }
 
+  function slideVolume(event: Event): void {
+    sliderPercent = Number((event.currentTarget as HTMLInputElement).value);
+  }
+
+  // The slider only persists on change; every input event would be an atomic write.
   function changeVolume(event: Event): void {
+    sliderPercent = null;
     if (disabled) return;
     stopPreview();
     onVolumeChange(Number((event.currentTarget as HTMLInputElement).value) / 100);
@@ -157,7 +174,7 @@
         type="button"
         class="btn-secondary btn-sm"
         data-setting="notification-sound-reset"
-        disabled={disabled || !sound}
+        disabled={loading || pending || (!sound && !loadFailed)}
         onclick={reset}>{$tr("common.reset")}</button
       >
     </div>
@@ -174,7 +191,8 @@
       max="100"
       step="1"
       value={percent}
-      oninput={changeVolume}
+      oninput={slideVolume}
+      onchange={changeVolume}
       {disabled}
       data-setting="notification-sound-volume"
       class="min-w-24 flex-1 accent-accent disabled:opacity-50"

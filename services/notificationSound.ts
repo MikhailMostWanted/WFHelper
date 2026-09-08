@@ -7,6 +7,7 @@ import {
   type NotificationSoundAsset,
   type NotificationSoundUpload,
 } from "../config/shared/notificationSound";
+import { isBoundedBase64 } from "../config/shared/base64";
 import { writeFileAtomicSync } from "./atomicFile";
 import { userDataPath } from "./userDataPath";
 
@@ -22,9 +23,7 @@ function validate(raw: unknown): NotificationSoundUpload {
     name.length > 120 ||
     /[/\\]/.test(name) ||
     Array.from(name).some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) ||
-    typeof data !== "string" ||
-    data.length > Math.ceil(NOTIFICATION_SOUND_MAX_WAV_BYTES / 3) * 4 ||
-    !/^[A-Za-z0-9+/]+={0,2}$/.test(data)
+    !isBoundedBase64(data, NOTIFICATION_SOUND_MAX_WAV_BYTES)
   )
     throw new Error("Invalid notification sound");
   const bytes = Buffer.from(data, "base64");
@@ -61,10 +60,18 @@ function asset(upload: NotificationSoundUpload): NotificationSoundAsset {
 
 export function getNotificationSound(): NotificationSoundAsset | null {
   if (cached !== undefined) return cached;
+  let text: string;
   try {
     if (fs.statSync(filePath()).size > Math.ceil(NOTIFICATION_SOUND_MAX_WAV_BYTES / 3) * 4 + 1024)
       return (cached = null);
-    cached = asset(validate(JSON.parse(fs.readFileSync(filePath(), "utf8"))));
+    text = fs.readFileSync(filePath(), "utf8");
+  } catch (error) {
+    // Only a missing file is a settled answer; a locked one is retried on the next notification.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") cached = null;
+    return null;
+  }
+  try {
+    cached = asset(validate(JSON.parse(text)));
   } catch {
     cached = null;
   }

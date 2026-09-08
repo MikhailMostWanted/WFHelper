@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 import { NOTIFICATION_SOUND_PLAY } from "../config/shared/ipcChannels";
+import { NOTIFICATION_SOUND_SAMPLE_RATE } from "../config/shared/notificationSound";
+import { pcm16WavBytes } from "../config/shared/wav";
 import {
   closeElectronTestHarness,
   evaluateInMain,
@@ -11,22 +13,10 @@ import {
 } from "./electronTestHarness";
 
 function soundFixture(): Buffer {
-  const bytes = Buffer.alloc(44 + 4800);
-  bytes.write("RIFF");
-  bytes.writeUInt32LE(bytes.length - 8, 4);
-  bytes.write("WAVEfmt ", 8);
-  bytes.writeUInt32LE(16, 16);
-  bytes.writeUInt16LE(1, 20);
-  bytes.writeUInt16LE(1, 22);
-  bytes.writeUInt32LE(24000, 24);
-  bytes.writeUInt32LE(48000, 28);
-  bytes.writeUInt16LE(2, 32);
-  bytes.writeUInt16LE(16, 34);
-  bytes.write("data", 36);
-  bytes.writeUInt32LE(bytes.length - 44, 40);
-  for (let index = 0; index < 2400; index++)
-    bytes.writeInt16LE(Math.round(Math.sin(index / 8) * 1000), 44 + index * 2);
-  return bytes;
+  const samples = Int16Array.from({ length: 2400 }, (_, index) =>
+    Math.round(Math.sin(index / 8) * 1000),
+  );
+  return Buffer.from(pcm16WavBytes(samples, NOTIFICATION_SOUND_SAMPLE_RATE));
 }
 
 test("custom sound persists, previews and plays while hidden without native audio", async () => {
@@ -69,6 +59,13 @@ test("custom sound persists, previews and plays while hidden without native audi
       },
     });
     const { app, page } = harness;
+    // The play() patch above records plays; muting the windows keeps the first load silent too.
+    await evaluateInMain(app, ({ app: electronApp, BrowserWindow }) => {
+      for (const window of BrowserWindow.getAllWindows()) window.webContents.setAudioMuted(true);
+      electronApp.on("browser-window-created", (_event, window) =>
+        window.webContents.setAudioMuted(true),
+      );
+    });
     await setLayoutViewport(page, 1280, 1000);
     await openView(page, "settings");
     const file = page.locator('[data-setting="notification-sound-file"]');

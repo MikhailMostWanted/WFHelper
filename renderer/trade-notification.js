@@ -131,8 +131,6 @@
     scheduleDismiss(payload.timing.visibleMs, payload.timing.fadeMs);
   }
 
-  // Listen for IPC events from main. The preload script is the only loader
-  // that produces this window, so the bridge is always installed.
   let messagesLoaded = false;
   let pendingShow = null;
   let pendingRepResult = null;

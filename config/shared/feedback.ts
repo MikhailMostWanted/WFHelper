@@ -1,3 +1,5 @@
+import { isBoundedBase64 } from "./base64";
+
 export const FEEDBACK_LIMITS = {
   title: 120,
   description: 4000,
@@ -84,13 +86,7 @@ export function normalizeFeedback(value: unknown): FeedbackReport | null {
   }
   if (raw.screenshot !== undefined) {
     const image = record(raw.screenshot);
-    if (
-      !image ||
-      typeof image.data !== "string" ||
-      image.data.length > Math.ceil(FEEDBACK_LIMITS.screenshotBytes / 3) * 4 ||
-      !/^[A-Za-z0-9+/]+={0,2}$/.test(image.data)
-    )
-      return null;
+    if (!image || !isBoundedBase64(image.data, FEEDBACK_LIMITS.screenshotBytes)) return null;
     let bytes: string;
     try {
       bytes = atob(image.data);

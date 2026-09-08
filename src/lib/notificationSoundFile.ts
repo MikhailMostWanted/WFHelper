@@ -4,6 +4,7 @@ import {
   NOTIFICATION_SOUND_SAMPLE_RATE,
   type NotificationSoundUpload,
 } from "../../config/shared/notificationSound.js";
+import { pcm16WavBytes } from "../../config/shared/wav.js";
 
 export async function prepareNotificationSound(file: File): Promise<NotificationSoundUpload> {
   if (
@@ -44,30 +45,12 @@ export async function prepareNotificationSound(file: File): Promise<Notification
   }
 
   const samples = rendered.getChannelData(0);
-  const bytes = new Uint8Array(44 + samples.length * 2);
-  const header = new DataView(bytes.buffer);
-  const text = (offset: number, value: string) => {
-    for (let index = 0; index < value.length; index++) {
-      bytes[offset + index] = value.charCodeAt(index);
-    }
-  };
-  text(0, "RIFF");
-  header.setUint32(4, bytes.length - 8, true);
-  text(8, "WAVE");
-  text(12, "fmt ");
-  header.setUint32(16, 16, true);
-  header.setUint16(20, 1, true);
-  header.setUint16(22, 1, true);
-  header.setUint32(24, NOTIFICATION_SOUND_SAMPLE_RATE, true);
-  header.setUint32(28, NOTIFICATION_SOUND_SAMPLE_RATE * 2, true);
-  header.setUint16(32, 2, true);
-  header.setUint16(34, 16, true);
-  text(36, "data");
-  header.setUint32(40, samples.length * 2, true);
+  const pcm = new Int16Array(samples.length);
   for (let index = 0; index < samples.length; index++) {
     const sample = Math.max(-1, Math.min(1, samples[index] ?? 0));
-    header.setInt16(44 + index * 2, Math.round(sample * (sample < 0 ? 32768 : 32767)), true);
+    pcm[index] = Math.round(sample * (sample < 0 ? 32768 : 32767));
   }
+  const bytes = pcm16WavBytes(pcm, NOTIFICATION_SOUND_SAMPLE_RATE);
 
   const chunks: string[] = [];
   for (let offset = 0; offset < bytes.length; offset += 0x8000) {

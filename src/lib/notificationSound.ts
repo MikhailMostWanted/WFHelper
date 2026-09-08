@@ -16,7 +16,7 @@ let playbackVolume = 1;
 export function updateNotificationSoundSettings(volume: number, enabled: boolean): void {
   playbackVolume = normalizeNotificationVolume(volume);
   if (notificationAudio) notificationAudio.volume = playbackVolume;
-  if (!enabled || volume === 0) {
+  if (!enabled || playbackVolume === 0) {
     playSequence++;
     notificationAudio?.pause();
     stopNotificationSound();
@@ -28,7 +28,7 @@ export function stopNotificationSound(): void {
   previewAudio = null;
 }
 
-export async function previewNotificationSound(
+export function previewNotificationSound(
   asset: NotificationSoundAsset | null,
   volume: number,
 ): Promise<void> {
@@ -36,7 +36,15 @@ export async function previewNotificationSound(
   const audio = new Audio(asset?.dataUrl ?? NOTIFICATION_SOUND_URL);
   previewAudio = audio;
   audio.volume = normalizeNotificationVolume(volume);
-  await audio.play();
+  // Settles when the clip ends, is stopped or fails, so Settings can hold the button meanwhile.
+  return new Promise((resolve, reject) => {
+    audio.addEventListener("ended", () => resolve(), { once: true });
+    audio.addEventListener("pause", () => resolve(), { once: true });
+    audio.addEventListener("error", () => reject(new Error("Preview playback failed")), {
+      once: true,
+    });
+    audio.play().catch(reject);
+  });
 }
 
 export async function playNotificationSound(payload: NotificationSoundPlayback): Promise<void> {

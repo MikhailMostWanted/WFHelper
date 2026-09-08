@@ -7,15 +7,18 @@ vi.mock("../../../src/lib/ipc.js", () => ({ invoke: mocks.invoke }));
 vi.mock("../../../src/lib/log.js", () => ({ log: { warn: mocks.warn } }));
 vi.mock("../../../src/lib/assetUrls.js", () => ({ NOTIFICATION_SOUND_URL: "file:///default.wav" }));
 
-class MockAudio {
+class MockAudio extends EventTarget {
   static instances: MockAudio[] = [];
   src: string;
   volume = 1;
   currentTime = 0;
-  pause = vi.fn();
+  pause = vi.fn(() => {
+    this.dispatchEvent(new Event("pause"));
+  });
   play = vi.fn(async () => {});
 
   constructor(src: string) {
+    super();
     this.src = src;
     MockAudio.instances.push(this);
   }
@@ -109,6 +112,14 @@ describe("notification sound playback", () => {
     expect(mocks.invoke).not.toHaveBeenCalled();
   });
 
+  it("stops live audio for a negative volume the same as zero", async () => {
+    const sound = await load();
+    await sound.playNotificationSound({ volume: 1, revision: null });
+    sound.updateNotificationSoundSettings(-0.5, true);
+    expect(MockAudio.instances[0].pause).toHaveBeenCalledOnce();
+    expect(MockAudio.instances[0].volume).toBe(0);
+  });
+
   it.each([2, NaN, Infinity])("clamps or defaults volume %s to one", async (volume) => {
     const sound = await load();
     await sound.playNotificationSound({ volume, revision: null });
@@ -184,25 +195,41 @@ describe("notification sound preview", () => {
     const sound = await load();
     await sound.playNotificationSound({ volume: 0.5, revision: null });
     const live = MockAudio.instances[0];
-    await sound.previewNotificationSound(custom, 0.3);
+    const done = sound.previewNotificationSound(custom, 0.3);
     const preview = MockAudio.instances[1];
     expect(preview.src).toBe(custom.dataUrl);
     expect(preview.volume).toBe(0.3);
     expect(mocks.invoke).not.toHaveBeenCalled();
     sound.stopNotificationSound();
+    await done;
     expect(preview.pause).toHaveBeenCalledOnce();
     expect(live.pause).not.toHaveBeenCalled();
   });
 
   it("stops the previous preview on replacement and on a real notification", async () => {
     const sound = await load();
-    await sound.previewNotificationSound(custom, 1);
-    await sound.previewNotificationSound(null, 0);
+    const first = sound.previewNotificationSound(custom, 1);
+    const second = sound.previewNotificationSound(null, 0);
+    await first;
     expect(MockAudio.instances[0].pause).toHaveBeenCalledOnce();
     expect(MockAudio.instances[1].src).toBe("file:///default.wav");
     expect(MockAudio.instances[1].volume).toBe(0);
     await sound.playNotificationSound({ volume: 1, revision: null });
+    await second;
     expect(MockAudio.instances[1].pause).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a preview pending until the clip ends", async () => {
+    const sound = await load();
+    let settled = false;
+    const done = sound.previewNotificationSound(custom, 1).then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    MockAudio.instances[0].dispatchEvent(new Event("ended"));
+    await done;
+    expect(settled).toBe(true);
   });
 
   it("passes preview failures to its caller so Settings can display an error", async () => {
