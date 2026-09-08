@@ -1,4 +1,5 @@
 import { entryInstanceId } from "./entryNormalization.js";
+import { asRecord } from "../../../config/shared/objectValidation.js";
 import type { MessageKey } from "../i18n.js";
 import type {
   ItemDbEntry,
@@ -158,12 +159,6 @@ export function archonShardDisplaySlots(slots: ArchonShardSlot[]): ArchonShardSl
     out.push({ index, color: null, tauforged: false, filled: false, upgradeType: null });
   }
   return out;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }
 
 function parseSlot(entry: unknown, index: number): ArchonShardSlot {

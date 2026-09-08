@@ -15,7 +15,7 @@ import { moveOverlayWindowBy } from "./overlay/windows";
 import { hideTradeNotification } from "./tradeNotificationIpc";
 import { writeFileAtomicSync } from "../services/atomicFile";
 import { userDataPath } from "../services/userDataPath";
-import { asRecord } from "./ipcValidators";
+import { asRecord } from "../config/shared/objectValidation";
 import { withScope } from "../services/logger";
 import { resolveWarframeUiScale } from "../services/eeLogPath";
 import * as warframeStatus from "../services/warframeStatus";
@@ -37,6 +37,7 @@ import {
   isTradeNotificationOverlayEnabled,
   OVERLAY_SETTINGS_DEFAULTS,
   OVERLAY_SETTINGS_FILE_NAME,
+  OVERLAY_WINDOW_KEYS,
   type OverlaySettings,
   type OverlayWindowKey,
 } from "../config/runtime/overlaySettings";
@@ -505,13 +506,7 @@ function register(): void {
     };
   });
 
-  const placementKeys = new Set<OverlayWindowKey>([
-    "reward",
-    "planner",
-    "rivenLeft",
-    "rivenRight",
-    "arbiSummary",
-  ]);
+  const placementKeys = new Set<OverlayWindowKey>(OVERLAY_WINDOW_KEYS);
   handleAuthorized(
     OVERLAY_SAVE_PLACEMENT,
     assertMainRendererSender,

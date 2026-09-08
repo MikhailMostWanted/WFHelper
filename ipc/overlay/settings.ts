@@ -4,9 +4,10 @@ import { normalizeErrorMessage } from "../../config/shared/errors";
 import { clampNumber } from "../../config/shared/numeric";
 import { normalizeRewardOverlayLayout } from "../../config/shared/rewardOverlayLayout";
 import { normalizeWfmAwayIdleMinutes, normalizeWfmHoldMinutes } from "../../config/shared/wfm";
-import { asRecord } from "../ipcValidators";
+import { asRecord } from "../../config/shared/objectValidation";
 import {
   LEGACY_INTERACTION_HOTKEY,
+  OVERLAY_WINDOW_KEYS,
   REFERENCE_WARFRAME_UI_SCALE,
 } from "../../config/runtime/overlaySettings";
 import type {
@@ -155,15 +156,8 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
   function normalizeWindowScales(value: unknown): Partial<Record<OverlayWindowKey, number>> {
     const input = asRecord(value);
     if (!input) return {};
-    const keys: OverlayWindowKey[] = [
-      "reward",
-      "planner",
-      "rivenLeft",
-      "rivenRight",
-      "arbiSummary",
-    ];
     const out: Partial<Record<OverlayWindowKey, number>> = {};
-    for (const key of keys) {
+    for (const key of OVERLAY_WINDOW_KEYS) {
       const scale = clampNumber(input[key], 0.75, 1.5, NaN);
       if (Number.isFinite(scale)) out[key] = Number(scale.toFixed(2));
     }
@@ -175,15 +169,8 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
   ): Partial<Record<OverlayWindowKey, OverlaySavedWindowBounds>> {
     const input = asRecord(value);
     if (!input) return {};
-    const keys: OverlayWindowKey[] = [
-      "reward",
-      "planner",
-      "rivenLeft",
-      "rivenRight",
-      "arbiSummary",
-    ];
     const out: Partial<Record<OverlayWindowKey, OverlaySavedWindowBounds>> = {};
-    for (const key of keys) {
+    for (const key of OVERLAY_WINDOW_KEYS) {
       const record = asRecord(input[key]);
       if (!record) continue;
       const x = Math.round(clampNumber(record.x, -20000, 20000, NaN));

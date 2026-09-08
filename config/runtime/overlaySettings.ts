@@ -19,7 +19,14 @@ export interface FissureAlert {
   planet: string;
 }
 
-export type OverlayWindowKey = "reward" | "planner" | "rivenLeft" | "rivenRight" | "arbiSummary";
+export const OVERLAY_WINDOW_KEYS = [
+  "reward",
+  "planner",
+  "rivenLeft",
+  "rivenRight",
+  "arbiSummary",
+] as const;
+export type OverlayWindowKey = (typeof OVERLAY_WINDOW_KEYS)[number];
 
 export interface OverlaySavedWindowBounds {
   x: number;

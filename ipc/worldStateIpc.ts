@@ -2,7 +2,7 @@ import { normalizeNotificationVolume } from "../config/shared/notificationSound"
 import { getNotificationSound } from "../services/notificationSound";
 import ctx from "./context";
 import { assertAuthorizedSender, assertMainRendererSender } from "./ipcSecurity";
-import { asRecord } from "./ipcValidators";
+import { asRecord } from "../config/shared/objectValidation";
 import { recordNotification } from "./notificationLogIpc";
 import { broadcastToRenderers } from "./popoutIpc";
 import type { NotificationKind } from "../config/shared/notifications";

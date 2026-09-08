@@ -1,4 +1,5 @@
 import { unwrapInventoryPayload } from "../../../config/shared/inventoryPayload.js";
+import { asRecord } from "../../../config/shared/objectValidation.js";
 import { PET_TRAITS } from "../../data/petTraits.js";
 import { entryInstanceId } from "./entryNormalization.js";
 import type { LocaleCode, MessageKey, Translator } from "../i18n.js";
@@ -211,12 +212,6 @@ export function resolvePetTrait(
   if (pattern) return { label: pattern.name[locale] || pattern.name.en, hex: null };
 
   return { label: fallbackLabel(kind, path, translate), hex: null };
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }
 
 function readTraits(value: unknown): PetTraits {

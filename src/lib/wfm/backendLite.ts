@@ -196,7 +196,12 @@ async function requestBackend(
 /** Authenticated GET; raw Response on 2xx, null on any error. Caller parses. */
 export async function fetchBackendRaw(
   pathname: string,
-  options?: { timeoutMs?: number; headers?: Record<string, string>; cache?: BackendRequestCache },
+  options?: {
+    timeoutMs?: number;
+    headers?: Record<string, string>;
+    cache?: BackendRequestCache;
+    signal?: AbortSignal;
+  },
 ): Promise<Response | null> {
   return requestBackend(pathname, { ...options, allowStatuses: [304] });
 }

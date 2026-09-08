@@ -10,6 +10,7 @@ export async function readResponseText(
   let total = 0;
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
+    // A locked body also falls back to partial diagnostics when requested.
     reader = response.body.getReader();
     for (;;) {
       const { done, value } = await reader.read();
@@ -26,6 +27,7 @@ export async function readResponseText(
       text += decoder.decode(value, { stream: true });
     }
   } catch (error) {
+    // Partial diagnostics preserve the HTTP status that decides the retry.
     if (!options.allowPartial) throw error;
   } finally {
     reader?.releaseLock?.();

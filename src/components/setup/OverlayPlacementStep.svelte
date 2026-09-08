@@ -1,5 +1,9 @@
 <script lang="ts">
   import {
+    OVERLAY_WINDOW_KEYS,
+    type OverlayWindowKey,
+  } from "../../../config/runtime/overlaySettings.js";
+  import {
     getOverlayDescriptor,
     type OverlayLayoutKind,
   } from "../../../config/shared/overlayLayout.js";
@@ -24,13 +28,11 @@
 
   // The preview maps directly to the primary display work area, so dummy panel
   // positions can be saved for the real overlays.
-  const PLACEMENT_KEYS = ["reward", "planner", "rivenLeft", "rivenRight", "arbiSummary"] as const;
-  type PlacementKey = (typeof PLACEMENT_KEYS)[number];
   type PlacementRect = { x: number; y: number; width: number; height: number };
 
   const overlayPlacementSteps: Array<{
     key: "reward" | "planner" | "riven" | "arbiSummary";
-    dummies: PlacementKey[];
+    dummies: OverlayWindowKey[];
     titleKey: MessageKey;
     textKey: MessageKey;
   }> = [
@@ -60,7 +62,7 @@
     },
   ];
 
-  const dummyLabelKeys: Record<PlacementKey, MessageKey> = {
+  const dummyLabelKeys: Record<OverlayWindowKey, MessageKey> = {
     reward: "setup.dummy.rewardLabel",
     planner: "setup.dummy.plannerLabel",
     rivenLeft: "setup.dummy.rivenLeftLabel",
@@ -77,15 +79,18 @@
     void loadLayout();
   }
   let placementArea = $state({ width: 1920, height: 1080 });
-  let placementPos: Record<PlacementKey, PlacementRect> | null = $state(null);
-  let placementScales: Record<PlacementKey, number> = $state(
-    Object.fromEntries(PLACEMENT_KEYS.map((key) => [key, 1])) as Record<PlacementKey, number>,
+  let placementPos: Record<OverlayWindowKey, PlacementRect> | null = $state(null);
+  let placementScales: Record<OverlayWindowKey, number> = $state(
+    Object.fromEntries(OVERLAY_WINDOW_KEYS.map((key) => [key, 1])) as Record<
+      OverlayWindowKey,
+      number
+    >,
   );
   let previewW = $state(0);
   // The step promises "saved instantly", so a failed write has to say so.
   let placementSaveFailed = $state(false);
   let dragging: {
-    key: PlacementKey;
+    key: OverlayWindowKey;
     pointerId: number;
     offsetX: number;
     offsetY: number;
@@ -103,9 +108,9 @@
     try {
       const layout = await invoke("getOverlayPlacementLayout");
       placementArea = layout.area;
-      const pos = {} as Record<PlacementKey, PlacementRect>;
-      const scales = {} as Record<PlacementKey, number>;
-      for (const key of PLACEMENT_KEYS) {
+      const pos = {} as Record<OverlayWindowKey, PlacementRect>;
+      const scales = {} as Record<OverlayWindowKey, number>;
+      for (const key of OVERLAY_WINDOW_KEYS) {
         pos[key] = clampToArea(layout.overlays[key]);
         scales[key] = layout.overlays[key].scale;
       }
@@ -135,7 +140,7 @@
     onFinish();
   }
 
-  function onDummyPointerDown(key: PlacementKey, event: PointerEvent): void {
+  function onDummyPointerDown(key: OverlayWindowKey, event: PointerEvent): void {
     if (event.button !== 0 || !placementPos || previewScale <= 0) return;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     const p = placementPos[key];

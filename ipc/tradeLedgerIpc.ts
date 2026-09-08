@@ -11,6 +11,7 @@ import { patchArchivedEvent, queryLedger, selectLedgerEvents } from "../services
 import { stripPlatformGlyphs } from "../services/tradeLogSanitize";
 import { withScope } from "../services/logger";
 import { normalizeErrorMessage } from "../config/shared/errors";
+import { asRecord } from "../config/shared/objectValidation";
 import {
   LEDGER_EXPORT,
   LEDGER_IMPORT_APPLY,
@@ -40,12 +41,6 @@ const MAX_CURRENCY = 10_000_000_000;
 const MAX_EXPORT_ROWS = 100_000;
 
 const EMPTY_PAGE: LedgerPage = { events: [], total: 0, unreadableYears: [] };
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
 
 function asDateOnly(value: unknown): string | null {
   return typeof value === "string" && DATE_ONLY.test(value) ? value : null;

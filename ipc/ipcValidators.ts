@@ -1,12 +1,9 @@
 import { toFiniteNumber } from "../config/shared/numeric";
 import { toNonEmptyString } from "../config/shared/stringValidation";
+import { asRecord } from "../config/shared/objectValidation";
 
 export function isObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-export function asRecord(value: unknown): Record<string, unknown> | null {
-  return isObject(value) ? value : null;
+  return asRecord(value) !== null;
 }
 
 function boundedNumber(value: unknown, min: number, max: number): number | null {
