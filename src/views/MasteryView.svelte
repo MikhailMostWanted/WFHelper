@@ -77,6 +77,7 @@
   import { sharedFilters } from "../stores/filters.js";
   import { relicDb } from "../stores/relics.js";
   import ItemImage from "../components/ItemImage.svelte";
+  import MasteryBreakdownRow from "../components/mastery/MasteryBreakdownRow.svelte";
   import MasteryRoadmap from "../components/mastery/MasteryRoadmap.svelte";
   import MasteryPlanner from "../components/mastery/MasteryPlanner.svelte";
   import CodexPanel from "../components/mastery/CodexPanel.svelte";
@@ -142,6 +143,11 @@
   let statusFilter = restoreStatusTab();
   let viewTab = restoreViewTab();
   const breakdownExpanded = persistedBoolean("mastery-breakdown-expanded", false);
+  const breakdownDisplay = persistedString(
+    "mastery-breakdown-display",
+    ["bars", "rings"] as const,
+    "bars",
+  );
   const archonExpanded = persistedBoolean("mastery-archon-expanded", false);
   const masteryFilters = sharedFilters("mastery");
 
@@ -574,10 +580,6 @@
   function formatPercent(n: number, total: number): string {
     return total > 0 ? ((n / total) * 100).toFixed(1) : "0.0";
   }
-  function boundedPercent(n: number, total: number): number {
-    const percent = total > 0 ? (n / total) * 100 : 0;
-    return Math.max(0, Math.min(100, percent));
-  }
   const RING_R = 52;
   const RING_C = 2 * Math.PI * RING_R;
 
@@ -709,90 +711,94 @@
               collapsed={!$breakdownExpanded}
               onToggle={() => breakdownExpanded.update((value) => !value)}
             >
-              <ThemedPanel className="grid gap-2 p-2.5">
+              <div
+                slot="actions"
+                class="inline-flex items-center gap-1"
+                role="group"
+                aria-label={$tr("mastery.breakdownStyle")}
+                data-mastery-breakdown-display
+              >
+                <button
+                  type="button"
+                  class="filter-tab"
+                  class:active={$breakdownDisplay === "bars"}
+                  aria-pressed={$breakdownDisplay === "bars"}
+                  data-breakdown-style="bars"
+                  on:click={() => breakdownDisplay.set("bars")}
+                  >{$tr("mastery.breakdownBars")}</button
+                >
+                <button
+                  type="button"
+                  class="filter-tab"
+                  class:active={$breakdownDisplay === "rings"}
+                  aria-pressed={$breakdownDisplay === "rings"}
+                  data-breakdown-style="rings"
+                  on:click={() => breakdownDisplay.set("rings")}
+                  >{$tr("mastery.breakdownRings")}</button
+                >
+              </div>
+              <ThemedPanel
+                className={$breakdownDisplay === "rings"
+                  ? "grid content-start [grid-template-columns:repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-x-3 gap-y-4 p-4"
+                  : "grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 p-2.5 sm:grid-cols-[minmax(72px,140px)_auto_minmax(60px,1fr)]"}
+              >
                 {#each categories as cat}
                   {@const cs = stats.byCategory[cat]}
-                  {@const masteredWidth = boundedPercent(cs.mastered, cs.total)}
-                  {@const progressWidth = boundedPercent(cs.inProgress, cs.total)}
-                  <div class="grid items-center gap-2 grid-cols-[minmax(72px,110px)_1fr_auto]">
-                    <span class="text-xs text-text-secondary">{cat}</span>
-                    <svg
-                      class="block h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
-                      viewBox="0 0 100 1"
-                      preserveAspectRatio="none"
-                      aria-hidden="true"
-                    >
-                      <rect class="fill-success" x="0" y="0" width={masteredWidth} height="1"
-                      ></rect>
-                      <rect
-                        class="fill-warning opacity-60"
-                        x={masteredWidth}
-                        y="0"
-                        width={progressWidth}
-                        height="1"
-                      ></rect>
-                    </svg>
-                    <span class="whitespace-nowrap text-xs text-text-secondary"
-                      >{cs.mastered}/{cs.total}
-                      <small class="text-text-muted"
-                        >({formatPercent(cs.mastered, cs.total)}%)</small
-                      ></span
-                    >
-                  </div>
+                  <MasteryBreakdownRow
+                    label={cat}
+                    done={cs.mastered}
+                    total={cs.total}
+                    inProgress={cs.inProgress}
+                    display={$breakdownDisplay}
+                  />
                 {/each}
               </ThemedPanel>
 
               {#if completion}
                 <div class="mt-3 grid gap-2 min-[900px]:grid-cols-2">
-                  <ThemedPanel className="grid gap-2 p-2.5">
-                    <span class="font-display text-sm font-semibold text-text-secondary"
-                      >{$tr("mastery.starChart")}</span
+                  <ThemedPanel
+                    className={$breakdownDisplay === "rings"
+                      ? "p-4"
+                      : "grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 p-2.5 sm:grid-cols-[minmax(72px,130px)_auto_minmax(60px,1fr)]"}
+                  >
+                    <span
+                      class="col-span-full block font-display text-sm font-semibold text-text-secondary"
+                      class:mb-4={$breakdownDisplay === "rings"}>{$tr("mastery.starChart")}</span
                     >
-                    {#each starChartRows as [label, pair] (label)}
-                      {@const width = boundedPercent(pair.done, pair.total)}
-                      <div class="grid items-center gap-2 grid-cols-[minmax(96px,130px)_1fr_auto]">
-                        <span class="text-xs text-text-secondary">{label}</span>
-                        <svg
-                          class="block h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
-                          viewBox="0 0 100 1"
-                          preserveAspectRatio="none"
-                          aria-hidden="true"
-                        >
-                          <rect class="fill-info" x="0" y="0" {width} height="1"></rect>
-                        </svg>
-                        <span class="whitespace-nowrap text-xs text-text-secondary"
-                          >{pair.done}/{pair.total}
-                          <small class="text-text-muted"
-                            >({formatPercent(pair.done, pair.total)}%)</small
-                          ></span
-                        >
-                      </div>
-                    {/each}
+                    <div
+                      class={$breakdownDisplay === "rings"
+                        ? "grid [grid-template-columns:repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-x-3 gap-y-4"
+                        : "contents"}
+                    >
+                      {#each starChartRows as [label, pair] (label)}
+                        <MasteryBreakdownRow
+                          {label}
+                          done={pair.done}
+                          total={pair.total}
+                          display={$breakdownDisplay}
+                          tone="info"
+                        />
+                      {/each}
+                    </div>
                   </ThemedPanel>
 
-                  <ThemedPanel className="grid content-start gap-2 p-2.5">
-                    <span class="font-display text-sm font-semibold text-text-secondary"
+                  <ThemedPanel
+                    className={$breakdownDisplay === "rings"
+                      ? "grid grid-cols-2 content-start gap-x-3 gap-y-4 p-4"
+                      : "grid content-start grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 p-2.5 sm:grid-cols-[minmax(72px,130px)_auto_minmax(60px,1fr)]"}
+                  >
+                    <span
+                      class="col-span-full font-display text-sm font-semibold text-text-secondary"
                       >{$tr("mastery.intrinsics")}</span
                     >
                     {#each intrinsicRows as [label, pair] (label)}
-                      {@const width = boundedPercent(pair.done, pair.total)}
-                      <div class="grid items-center gap-2 grid-cols-[minmax(96px,130px)_1fr_auto]">
-                        <span class="text-xs text-text-secondary">{label}</span>
-                        <svg
-                          class="block h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
-                          viewBox="0 0 100 1"
-                          preserveAspectRatio="none"
-                          aria-hidden="true"
-                        >
-                          <rect class="fill-accent" x="0" y="0" {width} height="1"></rect>
-                        </svg>
-                        <span class="whitespace-nowrap text-xs text-text-secondary"
-                          >{pair.done}/{pair.total}
-                          <small class="text-text-muted"
-                            >({formatPercent(pair.done, pair.total)}%)</small
-                          ></span
-                        >
-                      </div>
+                      <MasteryBreakdownRow
+                        {label}
+                        done={pair.done}
+                        total={pair.total}
+                        display={$breakdownDisplay}
+                        tone="accent"
+                      />
                     {/each}
                   </ThemedPanel>
                 </div>
