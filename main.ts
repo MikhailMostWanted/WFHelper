@@ -713,6 +713,7 @@ void app.whenReady().then(async () => {
 
   // Keep prewarming off the first-paint path.
   setTimeout(() => {
+    if (isQuitting()) return;
     try {
       rewardOverlayIpc.warmPlannerOverlayWindow();
     } catch (err) {
@@ -722,6 +723,7 @@ void app.whenReady().then(async () => {
 
   // Load Paddle before the first reward scan needs it.
   setTimeout(() => {
+    if (isQuitting()) return;
     void rewardOcrOnnx.warmupRewardStripOnnx();
   }, 6000).unref();
 
