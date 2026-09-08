@@ -1,4 +1,8 @@
 <script lang="ts">
+  import {
+    getOverlayDescriptor,
+    type OverlayLayoutKind,
+  } from "../../../config/shared/overlayLayout.js";
   import { onMount } from "svelte";
   import { tr } from "../../lib/i18n.js";
   import type { MessageKey } from "../../lib/i18n.js";
@@ -66,6 +70,7 @@
 
   let overlayStepIndex = $state(0);
   let rewardEditorOpen = $state(false);
+  let editorKind = $state<OverlayLayoutKind>("reward");
 
   function closeRewardEditor(): void {
     rewardEditorOpen = false;
@@ -340,13 +345,23 @@
           >{Math.round(stepScale * 100)}%</span
         >
       </div>
-      {#if placementStep.key === "reward"}
-        <button
-          class="btn-secondary btn-sm mt-3"
-          data-reward-editor-open
-          onclick={() => (rewardEditorOpen = true)}>{$tr("rewardEditor.customize")}</button
-        >
-      {/if}
+      <!-- One button per panel in the preview above, so the editor matches what is on screen. -->
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        {#each placementStep.dummies as kind (kind)}
+          <button
+            class="btn-secondary btn-sm"
+            data-reward-editor-open
+            data-overlay-editor-open={kind}
+            onclick={() => {
+              editorKind = kind;
+              rewardEditorOpen = true;
+            }}
+            >{$tr("overlayEditor.customizeNamed", {
+              name: $tr(getOverlayDescriptor(kind).titleKey),
+            })}</button
+          >
+        {/each}
+      </div>
       <div class="mt-3 flex items-center justify-between">
         <button class="btn-secondary btn-sm" onclick={finishOverlaysStep}
           >{$tr("setup.skip")}</button
@@ -355,7 +370,7 @@
           {#if overlayStepIndex > 0}
             <button class="btn-secondary btn-sm" onclick={overlayBack}>{$tr("common.back")}</button>
           {/if}
-          <button class="btn-primary btn-sm" onclick={overlayNext}>
+          <button class="btn-primary btn-sm" data-setup-overlay-next onclick={overlayNext}>
             {overlayStepIndex === overlayPlacementSteps.length - 1
               ? $tr("setup.finish")
               : $tr("common.next")}
@@ -367,5 +382,5 @@
 {/if}
 
 {#if rewardEditorOpen}
-  <RewardOverlayEditor onClose={closeRewardEditor} />
+  <RewardOverlayEditor kind={editorKind} onClose={closeRewardEditor} />
 {/if}

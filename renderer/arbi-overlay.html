@@ -12,49 +12,174 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="arbi-overlay.css" />
+    <link rel="stylesheet" href="overlay-layout.css" />
   </head>
   <body>
     <div id="panel">
       <div id="header">
         <div id="header-left">
-          <div id="panel-label">
-            &#9670; <span data-i18n="overlay.arbi.complete">Arbitration Complete</span>
+          <div id="panel-label" data-reward-field="summaryLabel" data-i18n="overlay.arbi.complete">
+            Arbitration Complete
           </div>
-          <div id="run-node">&mdash;</div>
+          <div id="run-node" data-reward-field="node">&mdash;</div>
         </div>
         <div id="header-right">
-          <div id="run-meta">&mdash;</div>
-          <button id="btn-close" data-i18n-title="common.dismiss" title="Dismiss">&times;</button>
+          <div id="run-meta">
+            <span id="run-type" data-reward-field="missionType"></span>
+            <span id="run-duration" data-reward-field="duration"></span>
+            <span id="run-rotations" data-reward-field="rotations"></span>
+          </div>
+          <button
+            id="btn-close"
+            data-reward-field="closeButton"
+            data-i18n-title="common.dismiss"
+            title="Dismiss"
+          >
+            &times;
+          </button>
         </div>
       </div>
-
       <div id="kpi-grid">
         <div class="kpi">
-          <div class="kpi-value" id="kpi-vitus">&mdash;</div>
-          <div class="kpi-label" data-i18n="overlay.arbi.expectedVitus">Expected Vitus</div>
+          <div class="kpi-value">
+            <span id="kpi-vitus" data-reward-field="vitusValue">&mdash;</span
+            ><span class="kpi-sub" id="kpi-uncertainty" data-reward-field="vitusUncertainty"></span>
+          </div>
+          <div
+            class="kpi-label"
+            data-reward-field="vitusLabel"
+            data-i18n="overlay.arbi.expectedVitus"
+          >
+            Expected Vitus
+          </div>
         </div>
         <div class="kpi">
-          <div class="kpi-value" id="kpi-drones">&mdash;</div>
-          <div class="kpi-label" data-i18n="overlay.arbi.droneKills">Drone Kills</div>
+          <div class="kpi-value">
+            <span class="reward-field-hidden" id="kpi-actual" data-reward-field="actualVitusValue"
+              >&mdash;</span
+            >
+          </div>
+          <div
+            class="kpi-label reward-field-hidden"
+            data-reward-field="actualVitusLabel"
+            data-i18n="arbi.vitus.actual"
+          >
+            Actual Vitus:
+          </div>
         </div>
         <div class="kpi">
-          <div class="kpi-value" id="kpi-kills">&mdash;</div>
-          <div class="kpi-label" data-i18n="overlay.arbi.totalKills">Total Kills</div>
+          <div class="kpi-value">
+            <span class="reward-field-hidden" id="kpi-vitus-rate" data-reward-field="vitusRateValue"
+              >&mdash;</span
+            >
+          </div>
+          <div
+            class="kpi-label reward-field-hidden"
+            data-reward-field="vitusRateLabel"
+            data-i18n="arbi.metric.expectedVitusPerMin"
+          >
+            Expected Vitus / min
+          </div>
         </div>
         <div class="kpi">
-          <div class="kpi-value" id="kpi-saturation">&mdash;</div>
-          <div class="kpi-label" data-i18n="overlay.arbi.saturation">Time at 15+ Enemies</div>
+          <div class="kpi-value">
+            <span id="kpi-drones" data-reward-field="dronesValue">&mdash;</span>
+          </div>
+          <div
+            class="kpi-label"
+            data-reward-field="dronesLabel"
+            data-i18n="overlay.arbi.droneKills"
+          >
+            Drone Kills
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-value">
+            <span id="kpi-kills" data-reward-field="killsValue">&mdash;</span>
+          </div>
+          <div class="kpi-label" data-reward-field="killsLabel" data-i18n="overlay.arbi.totalKills">
+            Total Kills
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-value">
+            <span class="reward-field-hidden" id="kpi-kill-rate" data-reward-field="killRateValue"
+              >&mdash;</span
+            >
+          </div>
+          <div
+            class="kpi-label reward-field-hidden"
+            data-reward-field="killRateLabel"
+            data-i18n="arbi.metric.enemiesPerMin"
+          >
+            Enemies / min
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-value">
+            <span id="kpi-saturation" data-reward-field="saturationValue">&mdash;</span>
+          </div>
+          <div
+            class="kpi-label"
+            data-reward-field="saturationLabel"
+            data-i18n="overlay.arbi.saturation"
+          >
+            Time at 15+ Enemies
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-value">
+            <span
+              class="reward-field-hidden"
+              id="kpi-kills-per-drone"
+              data-reward-field="killsPerDroneValue"
+              >&mdash;</span
+            >
+          </div>
+          <div
+            class="kpi-label reward-field-hidden"
+            data-reward-field="killsPerDroneLabel"
+            data-i18n="arbi.kpi.killsPerDrone"
+          >
+            Kills / Drone
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-value">
+            <span
+              class="reward-field-hidden"
+              id="kpi-drone-interval"
+              data-reward-field="droneIntervalValue"
+              >&mdash;</span
+            >
+          </div>
+          <div
+            class="kpi-label reward-field-hidden"
+            data-reward-field="droneIntervalLabel"
+            data-i18n="arbi.kpi.avgInterval"
+          >
+            Avg Drone Interval
+          </div>
         </div>
       </div>
-
+      <div id="run-extra">
+        <div class="reward-field-hidden" id="run-squad" data-reward-field="squad"></div>
+        <div class="reward-field-hidden" id="run-end" data-reward-field="endReason"></div>
+      </div>
       <div id="footer">
-        <div id="drag-hint" data-i18n="overlay.hint.rightClickDrag">Right-click drag to move</div>
-        <button id="btn-details" data-i18n="overlay.arbi.details">Detailed Stats</button>
+        <div id="drag-hint" data-reward-field="dragHint" data-i18n="overlay.hint.rightClickDrag">
+          Right-click drag to move
+        </div>
+        <button id="btn-details" data-reward-field="detailsButton" data-i18n="overlay.arbi.details">
+          Detailed Stats
+        </button>
       </div>
     </div>
+    <script src="reward-editor-bridge.js"></script>
     <script src="overlay-drag.js"></script>
     <script src="overlay-theme.js"></script>
     <script src="overlay-i18n.js"></script>
+    <script src="reward-layout.js"></script>
     <script src="arbi-overlay.js"></script>
   </body>
 </html>

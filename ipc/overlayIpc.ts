@@ -1,3 +1,4 @@
+import { registerOverlayEditor } from "./overlay/editorIpc";
 import ctx from "./context";
 import {
   assertLocalizedOverlaySender,
@@ -351,6 +352,19 @@ function moveInteractiveOverlayWindow(sender: WebContents, rawDelta: unknown): v
 }
 
 function register(): void {
+  registerOverlayEditor(settingsController.saveOverlaySettings, (kind) => {
+    if (kind === "reward")
+      rewardOverlayIpc.rewardWindowsController.positionOverlayWindow(
+        rewardOverlayIpc.rewardWindowsController.getAnchorMeta(),
+      );
+    else if (kind === "planner")
+      rewardOverlayIpc.plannerWindowsController.positionOverlayWindow(
+        rewardOverlayIpc.plannerWindowsController.getAnchorMeta(),
+      );
+    else if (kind === "arbiSummary") arbiOverlayIpc.positionArbiSummaryWindow();
+    else if (kind === "rivenLeft" || kind === "rivenRight")
+      rivenOverlayIpc.positionRivenOverlayWindows();
+  });
   // Delegate domain-specific IPC to sub-modules
   rivenOverlayIpc.register();
   rewardOverlayIpc.register(pushOverlayInteractionMode, pushOverlayThemeVars);
@@ -365,7 +379,7 @@ function register(): void {
     return resolveWarframeUiScale();
   });
 
-  handleAuthorized(OVERLAY_GET_THEME_VARS, assertOverlayRendererSender, async () => {
+  handleAuthorized(OVERLAY_GET_THEME_VARS, assertLocalizedOverlaySender, async () => {
     return { ...(ctx.overlayThemeVars || {}) };
   });
 

@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DEFAULT_REWARD_FIELD_STYLE,
-  isRewardOverlayField,
-  normalizeRewardFieldStyle,
-  normalizeRewardOverlayLayout,
-} from "../../config/shared/rewardOverlayLayout";
+  DEFAULT_OVERLAY_FIELD_STYLE as DEFAULT_REWARD_FIELD_STYLE,
+  isOverlayField,
+  normalizeOverlayFieldStyle,
+} from "../../config/shared/overlayLayout";
+import { normalizeRewardOverlayLayout } from "../../config/shared/rewardOverlayLayout";
+
+const normalizeRewardFieldStyle = (value: unknown) => normalizeOverlayFieldStyle("reward", value);
+const isRewardOverlayField = (value: unknown) => isOverlayField("reward", value);
 
 describe("reward overlay saved layouts", () => {
   it.each([null, undefined, [], "layout", 7, {}, { version: 2, fields: {} }])(

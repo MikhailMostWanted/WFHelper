@@ -1,6 +1,6 @@
+import { getOverlayDescriptor } from "../config/shared/overlayLayout";
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { BrowserWindow, screen, app } from "electron";
 import ctx from "./context";
 import {
@@ -10,8 +10,6 @@ import {
   onAuthorized,
 } from "./ipcSecurity";
 import { createOverlayScanController } from "./overlay/scan";
-import { createRewardEditor } from "./overlay/rewardEditor";
-import { overlayMessages } from "./overlayI18n";
 import { createRelicSelectionController } from "./overlay/relicSelection";
 import { registerZOrderSubscriber, syncOverlayWindowZOrder } from "./overlay/zOrder";
 import {
@@ -41,22 +39,12 @@ import {
   TOGGLE_OVERLAY,
   SIMULATE_RELIC_TRIGGER,
   OVERLAY_PUSH_RELIC_FILTERS,
-  REWARD_EDIT_BEGIN,
-  REWARD_EDIT_PREVIEW,
-  REWARD_EDIT_UPDATE,
-  REWARD_EDIT_END,
-  REWARD_EDIT_STATE,
-  REWARD_LAYOUT_GET,
 } from "../config/shared/ipcChannels";
-import {
-  DEFAULT_REWARD_FIELD_STYLE,
-  REWARD_OVERLAY_CANVAS,
-} from "../config/shared/rewardOverlayLayout";
+import { REWARD_OVERLAY_CANVAS } from "../config/shared/rewardOverlayLayout";
 
 const log = withScope("rewardOverlayIpc");
 
 let persistOverlaySettings: (() => boolean) | null = null;
-let rewardEditor: ReturnType<typeof createRewardEditor> | undefined;
 const rememberOverlayWindowBounds = createOverlayWindowBoundsChangeHandler({
   ctx,
   save: () => {
@@ -112,8 +100,8 @@ export const plannerWindowsController = createOverlayWindowsController({
   hardenBrowserWindowNavigation,
   overlayWindowFile: OVERLAY_WINDOW_FILE,
   placement: "top-right",
-  windowWidth: 460,
-  windowHeight: 320,
+  windowWidth: getOverlayDescriptor("planner").canvas.width,
+  windowHeight: getOverlayDescriptor("planner").canvas.height,
   fileSearch: "mode=planner",
   transparent: false,
   backgroundColor: "#060a12",
@@ -150,15 +138,6 @@ const relicSelectionController = createRelicSelectionController({
   warframeStatus,
   fs,
   cacheFilePath: PRICE_CACHE_FILE,
-});
-
-rewardEditor = createRewardEditor({
-  ctx,
-  persist: () => persistOverlaySettings?.() ?? false,
-  applySaved: (state) => {
-    rewardWindowsController.sendOverlayEvent(REWARD_EDIT_STATE, state);
-    rewardWindowsController.positionOverlayWindow(rewardWindowsController.getAnchorMeta());
-  },
 });
 
 export function configureOverlaySettingsPersistence(persist: () => boolean): void {
@@ -237,32 +216,6 @@ export function register(
   pushOverlayInteractionMode: () => void,
   pushOverlayThemeVars: () => void,
 ): void {
-  const editor = rewardEditor!;
-  const assertRewardSender: typeof assertOverlayRendererSender = (event, channel) => {
-    assertOverlayRendererSender(event, channel);
-    if (event.sender?.id !== ctx.overlayWindow?.webContents.id)
-      throw new Error("Expected reward window");
-  };
-  handleAuthorized(REWARD_EDIT_BEGIN, assertMainRendererSender, (event) =>
-    editor.begin(event.sender),
-  );
-  handleAuthorized(REWARD_EDIT_PREVIEW, assertMainRendererSender, () => ({
-    url: `${pathToFileURL(OVERLAY_WINDOW_FILE).href}?mode=editor`,
-    theme: { ...ctx.overlayThemeVars },
-    messages: overlayMessages(),
-    defaultFieldStyle: DEFAULT_REWARD_FIELD_STYLE,
-  }));
-  handleAuthorized(
-    REWARD_EDIT_UPDATE,
-    assertMainRendererSender,
-    (event, token: unknown, command: unknown) => editor.update(token, command, event.sender),
-  );
-  handleAuthorized(
-    REWARD_EDIT_END,
-    assertMainRendererSender,
-    (event, token: unknown, save: unknown) => editor.end(token, save, event.sender),
-  );
-  handleAuthorized(REWARD_LAYOUT_GET, assertRewardSender, () => editor.savedState());
   onAuthorized(OVERLAY_CLOSE, assertOverlayRendererSender, (event) => {
     rewardWindowsController.clearOverlayAutoHideTimer();
     plannerWindowsController.clearOverlayAutoHideTimer();

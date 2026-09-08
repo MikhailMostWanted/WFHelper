@@ -1,4 +1,9 @@
 <script lang="ts">
+  import {
+    OVERLAY_LAYOUT_KINDS,
+    getOverlayDescriptor,
+    type OverlayLayoutKind,
+  } from "../../config/shared/overlayLayout.js";
   import { onDestroy, onMount } from "svelte";
   import {
     overlaySettings,
@@ -160,6 +165,7 @@
   ];
   let windowScales: Partial<Record<OverlayWindowKey, number>> = {};
   let rewardEditorOpen = false;
+  let editorKind: OverlayLayoutKind = "reward";
 
   async function closeRewardEditor(): Promise<void> {
     rewardEditorOpen = false;
@@ -1047,11 +1053,25 @@
               </SettingsRow>
             {/each}
 
-            <SettingsRow label={$tr("rewardEditor.title")} as="div">
+            <SettingsRow label={$tr("overlayEditor.title")} as="div">
+              <select
+                class="shared-filter-select"
+                bind:value={editorKind}
+                data-overlay-editor-kind
+                aria-label={$tr("overlayEditor.title")}
+              >
+                {#each OVERLAY_LAYOUT_KINDS as kind}<option value={kind}
+                    >{$tr(getOverlayDescriptor(kind).titleKey)}</option
+                  >{/each}
+              </select>
               <button
                 class="btn-secondary btn-sm"
                 data-reward-editor-open
-                on:click={() => (rewardEditorOpen = true)}>{$tr("rewardEditor.customize")}</button
+                data-overlay-editor-open
+                on:click={() => (rewardEditorOpen = true)}
+                >{$tr("overlayEditor.customizeNamed", {
+                  name: $tr(getOverlayDescriptor(editorKind).titleKey),
+                })}</button
               >
             </SettingsRow>
 
@@ -1116,7 +1136,7 @@
 </section>
 
 {#if rewardEditorOpen}
-  <RewardOverlayEditor onClose={() => void closeRewardEditor()} />
+  <RewardOverlayEditor kind={editorKind} onClose={() => void closeRewardEditor()} />
 {/if}
 
 <style>

@@ -127,7 +127,7 @@ function buildStatRow(stat) {
     barFill.className = "roll-bar-fill";
     var pct = Math.round(Math.max(0, Math.min(1, stat.rollFloat)) * 100);
     barFill.style.width = pct + "%";
-    barFill.style.background = rollBarColor(stat.rollFloat, !stat.positive);
+    barFill.style.setProperty("--roll-grade-color", rollBarColor(stat.rollFloat, !stat.positive));
     barWrap.appendChild(barFill);
     row.appendChild(barWrap);
   }
@@ -409,7 +409,13 @@ function renderSimilarListings(listings) {
     var priceEl = document.createElement("span");
     priceEl.className = "listing-price";
     var price = item.buyoutPrice || item.startingPrice || item.platinum || 0;
-    priceEl.textContent = price + "p";
+    const priceValue = document.createElement("span");
+    priceValue.className = "listing-price-value";
+    priceValue.textContent = String(price);
+    const priceUnit = document.createElement("span");
+    priceUnit.className = "listing-price-unit";
+    priceUnit.textContent = "p";
+    priceEl.append(priceValue, priceUnit);
     topRow.appendChild(priceEl);
 
     var rerollsEl = document.createElement("span");
@@ -431,7 +437,13 @@ function renderSimilarListings(listings) {
         line.className = "listing-stat-line " + (s.positive ? "pos" : "neg");
         if (!isMatch) line.classList.add("crossed");
         var sign = s.positive ? "+" : "\u2212";
-        line.textContent = sign + Math.round(s.value) + "% " + abbreviateStat(s.name);
+        const statValue = document.createElement("span");
+        statValue.className = "listing-stat-value";
+        statValue.textContent = sign + Math.round(s.value) + "%";
+        const statName = document.createElement("span");
+        statName.className = "listing-stat-name";
+        statName.textContent = abbreviateStat(s.name);
+        line.append(statValue, statName);
         statsCol.appendChild(line);
       }
       card.appendChild(statsCol);
@@ -611,6 +623,10 @@ function onSessionEnd() {
 
 /* Rebuilds every string this panel writes from JS, for a live language change. */
 function renderDynamicText() {
+  if (layoutPreviewState) {
+    renderLayoutPreview(layoutPreviewState);
+    return;
+  }
   renderPanelLabel();
   renderRollBadge();
   renderScanningText();
@@ -620,6 +636,111 @@ function renderDynamicText() {
   const banner = el("error-banner");
   if (banner && banner.classList.contains("visible")) return;
   renderStats(_renderedStats);
+}
+
+let layoutEditor = null;
+let layoutPreviewState = null;
+
+function tagRivenLayoutFields() {
+  const tag = (selector, field, root = document) => {
+    const target = root.querySelector(selector);
+    if (target) target.dataset.rewardField = field;
+  };
+  for (const [selector, field] of Object.entries({
+    "#panel-label": "panelLabel",
+    "#weapon-name": "weaponName",
+    "#roll-badge": "rollBadge",
+    "#btn-rescan": "rescanButton",
+    "#btn-close": "closeButton",
+    "#overall-grade-badge": "overallGrade",
+    ".scan-spinner": "scanSpinner",
+    "#scanning-text": "scanText",
+    "#error-banner": "errorText",
+    "#weapon-warning": "weaponWarning",
+    ".stat-empty": "emptyText",
+    "#interaction-hint": "interactionHint",
+    "#best-pos .best-row-label": "bestPositiveLabel",
+    "#best-neg .best-row-label": "bestNegativeLabel",
+    "#similar-header": "listingsLabel",
+  }))
+    tag(selector, field);
+  document.querySelectorAll(".stat-row").forEach((row, index) => {
+    for (const [selector, role] of Object.entries({
+      ".stat-dot": "Dot",
+      ".stat-value": "Value",
+      ".stat-name": "Name",
+      ".stat-grade": "Grade",
+      ".roll-bar-wrap": "Track",
+    }))
+      tag(selector, `stat${index}${role}`, row);
+    const dot = row.querySelector(".stat-dot");
+    if (dot) dot.dataset.layoutTint = "background";
+  });
+  for (const [selector, field] of [
+    ["#best-pos .best-chip", "bestPositiveChip"],
+    ["#best-neg .best-chip", "bestNegativeChip"],
+  ]) {
+    document.querySelectorAll(selector).forEach((element) => {
+      element.dataset.rewardField = field;
+    });
+  }
+  document.querySelectorAll(".listing-card").forEach((card) => {
+    tag(".listing-similarity", "listingMatch", card);
+    tag(".listing-price-value", "listingPlatinum", card);
+    tag(".listing-price-unit", "listingPlatinumUnit", card);
+    tag(".listing-rerolls", "listingRolls", card);
+    card.querySelectorAll(".listing-stat-line").forEach((line, index) => {
+      tag(".listing-stat-value", `listingStat${index}Value`, line);
+      tag(".listing-stat-name", `listingStat${index}Name`, line);
+    });
+  });
+}
+
+function renderLayoutPreview(state) {
+  layoutPreviewState = state;
+  onSessionStart("Rubico");
+  hideScanning();
+  _rollCount = state.previewVariant === "unrolled" ? 0 : 12;
+  renderRollBadge();
+  setOverlayInteractiveMode(true);
+  el("btn-rescan").classList.remove("is-hidden");
+  _interactionHotkey = "Ctrl+O";
+  renderInteractionHint();
+  el("interaction-hint").classList.remove("is-hidden");
+  if (state.previewVariant === "scanning") {
+    showScanning();
+    return;
+  }
+  if (state.previewVariant === "error") {
+    showScanError("overlay.riven.readFailed");
+    setWeaponWarningVisible(true);
+    return;
+  }
+  if (state.previewVariant === "waiting") {
+    renderStats([]);
+    return;
+  }
+  const stats = [
+    { name: "Critical Chance", value: 153.4, positive: true, grade: "A", rollFloat: 0.82 },
+    { name: "Critical Damage", value: 120.6, positive: true, grade: "S", rollFloat: 0.98 },
+    { name: "Multishot", value: 84.3, positive: true, grade: "B+", rollFloat: 0.64 },
+    { name: "Zoom", value: 40.2, positive: false, grade: "A-", rollFloat: 0.21 },
+  ];
+  renderStats(state.previewVariant === "unrolled" ? [stats[0], stats[1], stats[3]] : stats);
+  renderOverallGrade("Great");
+  renderBestAttributes({
+    positives: ["Critical Chance", "Critical Damage", "Multishot", "Damage"],
+    negatives: ["Zoom", "Ammo Maximum", "Weapon Recoil"],
+  });
+  if (state.previewVariant !== "noListings") {
+    renderSimilarListings(
+      [0, 1, 2, 3, 4, 5].map((index) => ({
+        platinum: 400 + index * 75,
+        rerolls: index * 3,
+        stats: stats.map((stat) => ({ ...stat, value: stat.value + index })),
+      })),
+    );
+  }
 }
 
 function startOverlay() {
@@ -639,6 +760,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!loaded || bootstrapped) return;
     bootstrapped = true;
     startOverlay();
+    layoutEditor = window.installOverlayLayout({
+      defaultFieldStyle: window.overlayLayoutApi.defaultFieldStyle,
+      tagFields: tagRivenLayoutFields,
+      boundsFor: (element) => element.closest(".listing-card"),
+      renderPreview: renderLayoutPreview,
+      resetPreview: () => {
+        layoutPreviewState = null;
+        startOverlay();
+      },
+    });
     window.rivenOverlay.ready();
   };
   window.overlayTheme.bootstrapOverlayTheme(() => window.rivenOverlay.getThemeVars());
@@ -646,7 +777,7 @@ document.addEventListener("DOMContentLoaded", () => {
   el("btn-close").addEventListener("click", () => window.rivenOverlay.close());
   el("btn-rescan").addEventListener("click", () => window.rivenOverlay.requestRescan());
   window.installOverlayDrag({
-    isInteractive: () => _overlayInteractiveMode,
+    isInteractive: () => _overlayInteractiveMode && !layoutEditor?.isEditing(),
     moveBy: (dx, dy) => window.rivenOverlay.moveBy(dx, dy),
   });
   document.addEventListener("keydown", (event) => {

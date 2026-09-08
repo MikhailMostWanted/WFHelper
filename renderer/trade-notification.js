@@ -23,12 +23,16 @@
   const tradeLabel = document.getElementById("trade-label");
   const tradeBadge = document.getElementById("trade-badge");
   const itemName = document.getElementById("item-name");
+  const itemQuantity = document.getElementById("item-quantity");
+  const platValue = document.getElementById("plat-value");
   const platAmount = document.getElementById("plat-amount");
   const partnerName = document.getElementById("partner-name");
   const repLine = document.getElementById("rep-line");
 
   let dismissTimer = null;
   let fadeTimer = null;
+  const isPreview = Boolean(window.overlayPreview);
+  if (isPreview) document.body.classList.add("layout-preview");
   // Last rendered payloads, so a language change repaints the visible toast.
   let lastNotification = null;
   let lastRepResult = null;
@@ -36,6 +40,7 @@
   const t = window.overlayI18n.t;
 
   function scheduleDismiss(visibleMs, fadeMs) {
+    if (isPreview) return;
     if (dismissTimer) clearTimeout(dismissTimer);
     if (fadeTimer) clearTimeout(fadeTimer);
     dismissTimer = setTimeout(function () {
@@ -53,9 +58,11 @@
     const match = payload.match;
 
     if (match.itemThumb) {
-      const src = match.itemThumb.startsWith("http")
-        ? match.itemThumb
-        : WFM_ASSET_BASE + match.itemThumb;
+      const src =
+        match.itemThumb.startsWith("http") ||
+        (isPreview && match.itemThumb.startsWith("../assets/"))
+          ? match.itemThumb
+          : WFM_ASSET_BASE + match.itemThumb;
       itemThumb.src = src;
       itemThumb.style.display = "block";
     } else {
@@ -76,13 +83,14 @@
         : t("stats.filterTrade");
     tradeBadge.className = isSale ? "sale" : isPurchase ? "purchase" : "trade";
 
-    const qty = match.quantity > 1 ? match.quantity + "× " : "";
-    itemName.textContent = qty + (match.itemName || t("overlay.trade.unknownItem"));
+    itemQuantity.textContent = match.quantity > 1 ? match.quantity + "×" : "";
+    itemQuantity.hidden = match.quantity <= 1;
+    itemName.textContent = match.itemName || t("overlay.trade.unknownItem");
 
     const showPlatinum = (isSale || isPurchase) && match.platinum > 0;
     platAmount.hidden = !showPlatinum;
     if (showPlatinum) {
-      platAmount.textContent = (isSale ? "+" : "−") + match.platinum + "p";
+      platValue.textContent = (isSale ? "+" : "−") + match.platinum;
       platAmount.className = isSale ? "positive" : "negative";
     }
 
@@ -131,7 +139,62 @@
     scheduleDismiss(payload.timing.visibleMs, payload.timing.fadeMs);
   }
 
+  function renderLayoutPreview(state) {
+    const variant = state.previewVariant;
+    showNotification({
+      status: variant === "unmatched" ? "no-match" : "closed",
+      match: {
+        type: variant === "purchase" ? "purchase" : variant === "swap" ? "trade" : "sale",
+        itemName: "Ash Prime Neuroptics",
+        quantity: 2,
+        platinum: 45,
+        itemThumb: variant === "unmatched" ? "" : "../assets/GenericWarframePrimeHelmet.png",
+        partner: "ExampleTenno",
+      },
+      rep: { partner: "ExampleTenno", hotkey: "Ctrl+R" },
+      timing: { visibleMs: 5000, fadeMs: 400 },
+    });
+    if (variant === "reputation")
+      showRepResult({
+        result: "sent",
+        partner: "ExampleTenno",
+        timing: { visibleMs: 5000, fadeMs: 400 },
+      });
+  }
+
+  function installLayout() {
+    window.installOverlayLayout({
+      root: notification,
+      defaultFieldStyle: window.overlayLayoutApi.defaultFieldStyle,
+      tagFields: () => {
+        for (const [selector, field] of Object.entries({
+          "#icon-area": "thumbnail",
+          "#trade-label": "statusLabel",
+          "#trade-badge": "tradeBadge",
+          "#item-quantity": "quantity",
+          "#item-name": "itemName",
+          "#plat-value": "platinumValue",
+          "#plat-unit": "platinumUnit",
+          "#partner-name": "partnerName",
+          "#rep-line": "reputationText",
+        })) {
+          const element = notification.querySelector(selector);
+          if (element) element.dataset.rewardField = field;
+        }
+      },
+      renderPreview: renderLayoutPreview,
+      resetPreview: () => notification.classList.add("hidden"),
+    });
+  }
+
   let messagesLoaded = false;
+  let layoutInstalled = false;
+  function ensureLayout() {
+    if (!layoutInstalled) {
+      layoutInstalled = true;
+      installLayout();
+    }
+  }
   let pendingShow = null;
   let pendingRepResult = null;
 
@@ -155,6 +218,7 @@
   window.tradeNotificationApi.onMessages(function (messages) {
     if (!window.overlayI18n.apply(messages)) return;
     messagesLoaded = true;
+    ensureLayout();
     flushPending();
   });
 
@@ -164,6 +228,8 @@
     if (lastRepResult) renderRepResult(lastRepResult);
   });
 
+  window.overlayTheme.bootstrapOverlayTheme(() => window.tradeNotificationApi.getThemeVars());
+  window.tradeNotificationApi.onThemeVars(window.overlayTheme.applyThemeVars);
   void window.overlayI18n
     .load(function () {
       return window.tradeNotificationApi.getMessages();
@@ -171,6 +237,7 @@
     .then(function (loaded) {
       if (!loaded) return;
       messagesLoaded = true;
+      ensureLayout();
       flushPending();
     });
 })();

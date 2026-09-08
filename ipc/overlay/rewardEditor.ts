@@ -2,47 +2,60 @@ import { randomUUID } from "node:crypto";
 import type { WebContents } from "electron";
 import type context from "../context";
 import {
-  DEFAULT_REWARD_FIELD_STYLE,
-  isRewardOverlayField,
-  normalizeRewardFieldStyle,
-  normalizeRewardOverlayLayout,
-  type RewardOverlayEditState,
-} from "../../config/shared/rewardOverlayLayout";
-import { REWARD_EDIT_STATE } from "../../config/shared/ipcChannels";
-import { asRecord } from "../ipcValidators";
+  DEFAULT_OVERLAY_FIELD_STYLE,
+  getOverlayDescriptor,
+  isOverlayField,
+  normalizeOverlayFieldStyle,
+  normalizeOverlayLayout,
+  type OverlayEditState,
+  type OverlayLayoutKind,
+} from "../../config/shared/overlayLayout";
+import { OVERLAY_EDIT_STATE } from "../../config/shared/ipcChannels";
+import { asRecord } from "../../config/shared/objectValidation";
 
-export function createRewardEditor(options: {
+export function createOverlayEditor(options: {
   ctx: typeof context;
   persist: () => boolean;
-  applySaved: (state: RewardOverlayEditState) => void;
+  applySaved: (state: OverlayEditState) => void;
 }) {
   const { ctx } = options;
   let session: {
     owner: WebContents;
-    state: RewardOverlayEditState;
+    state: OverlayEditState;
   } | null = null;
   let revision = 0;
-  const savedScale = () =>
-    ctx.overlaySettings.overlayWindowScales?.reward ?? ctx.overlaySettings.overlayScale ?? 1;
-  function savedState(): RewardOverlayEditState {
+  let selectedKind: OverlayLayoutKind = "reward";
+  function savedState(kind: OverlayLayoutKind = selectedKind): OverlayEditState {
+    const descriptor = getOverlayDescriptor(kind);
     return {
+      kind,
       sessionId: null,
       revision,
-      layout: normalizeRewardOverlayLayout(ctx.overlaySettings.rewardLayout),
-      selectedField: "platinumValue",
-      previewCount: 4,
-      previewVariant: "rewards",
-      scale: savedScale(),
+      layout: normalizeOverlayLayout(
+        kind,
+        kind === "reward"
+          ? ctx.overlaySettings.rewardLayout
+          : ctx.overlaySettings.overlayLayouts?.[kind],
+      ),
+      selectedField: descriptor.defaultSelectedField,
+      previewCount: kind === "reward" ? 4 : descriptor.previewCounts[0],
+      previewVariant: descriptor.variants[0].value,
+      scale:
+        kind === "tradeNotification"
+          ? 1
+          : (ctx.overlaySettings.overlayWindowScales?.[kind] ??
+            ctx.overlaySettings.overlayScale ??
+            1),
     };
   }
-  function state(): RewardOverlayEditState {
+  function state(): OverlayEditState {
     return session?.state ?? savedState();
   }
-  function publish(): RewardOverlayEditState {
+  function publish(): OverlayEditState {
     revision += 1;
     if (session) session.state.revision = revision;
     const next = state();
-    if (session && !session.owner.isDestroyed()) session.owner.send(REWARD_EDIT_STATE, next);
+    if (session && !session.owner.isDestroyed()) session.owner.send(OVERLAY_EDIT_STATE, next);
     return next;
   }
   function finish(save: boolean): void {
@@ -50,14 +63,22 @@ export function createRewardEditor(options: {
     const current = session;
     if (save) {
       const previous = ctx.overlaySettings;
+      const kind = current.state.kind;
+      const layout = normalizeOverlayLayout(kind, current.state.layout);
       ctx.overlaySettings = {
         ...previous,
-        rewardLayout: normalizeRewardOverlayLayout(current.state.layout),
-        overlayWindowScales: { ...previous.overlayWindowScales, reward: current.state.scale },
+        ...(kind === "reward"
+          ? { rewardLayout: layout }
+          : { overlayLayouts: { ...previous.overlayLayouts, [kind]: layout } }),
+        ...(kind === "tradeNotification"
+          ? {}
+          : {
+              overlayWindowScales: { ...previous.overlayWindowScales, [kind]: current.state.scale },
+            }),
       };
       if (!options.persist()) {
         ctx.overlaySettings = previous;
-        throw new Error("Could not save reward layout");
+        throw new Error("Could not save overlay layout");
       }
     }
     current.owner.removeListener("destroyed", cancel);
@@ -66,7 +87,7 @@ export function createRewardEditor(options: {
     session = null;
     const next = publish();
     if (save) options.applySaved(next);
-    if (!current.owner.isDestroyed()) current.owner.send(REWARD_EDIT_STATE, next);
+    if (!current.owner.isDestroyed()) current.owner.send(OVERLAY_EDIT_STATE, next);
   }
   function cancel(): void {
     finish(false);
@@ -76,16 +97,17 @@ export function createRewardEditor(options: {
   }
   function requireSession(token: unknown, owner?: WebContents) {
     if (!session || token !== session.state.sessionId || (owner && owner !== session.owner)) {
-      throw new Error("Reward editor session is no longer active");
+      throw new Error("Overlay editor session is no longer active");
     }
     return session;
   }
-  function begin(owner: WebContents): RewardOverlayEditState {
+  function begin(owner: WebContents, kind: OverlayLayoutKind = "reward"): OverlayEditState {
     if (session) {
-      if (session.owner === owner) return state();
-      throw new Error("Reward editor is already open");
+      if (session.owner === owner && session.state.kind === kind) return state();
+      throw new Error("Overlay editor is already open");
     }
-    const initial = state();
+    selectedKind = kind;
+    const initial = savedState(kind);
     session = {
       owner,
       state: { ...initial, sessionId: randomUUID() },
@@ -95,24 +117,24 @@ export function createRewardEditor(options: {
     owner.on("did-start-navigation", navigation);
     return publish();
   }
-  function update(token: unknown, raw: unknown, owner?: WebContents): RewardOverlayEditState {
+  function update(token: unknown, raw: unknown, owner?: WebContents): OverlayEditState {
     const current = requireSession(token, owner);
     const command = asRecord(raw);
-    if (!command) throw new Error("Invalid reward editor command");
+    if (!command) throw new Error("Invalid overlay editor command");
     const draft = current.state;
     const field = command.field;
     switch (command.type) {
       case "field": {
         const patch = asRecord(command.patch);
         if (
-          !isRewardOverlayField(field) ||
+          !isOverlayField(draft.kind, field) ||
           !patch ||
           Object.keys(patch).some((key) => !["x", "y", "scale", "color", "hidden"].includes(key))
         )
-          throw new Error("Invalid reward field");
+          throw new Error("Invalid overlay field");
         for (const key of ["x", "y", "scale"]) {
           if (key in patch && (typeof patch[key] !== "number" || !Number.isFinite(patch[key])))
-            throw new Error("Invalid reward field number");
+            throw new Error("Invalid overlay field number");
         }
         if ("hidden" in patch && typeof patch.hidden !== "boolean")
           throw new Error("Invalid visibility");
@@ -122,39 +144,47 @@ export function createRewardEditor(options: {
           (typeof patch.color !== "string" || !/^#[\da-f]{6}$/i.test(patch.color))
         )
           throw new Error("Invalid field color");
-        draft.layout.fields[field] = normalizeRewardFieldStyle({
-          ...(draft.layout.fields[field] ?? DEFAULT_REWARD_FIELD_STYLE),
+        draft.layout.fields[field] = normalizeOverlayFieldStyle(draft.kind, {
+          ...(draft.layout.fields[field] ?? DEFAULT_OVERLAY_FIELD_STYLE),
           ...patch,
         });
         break;
       }
       case "select":
-        if (!isRewardOverlayField(field)) throw new Error("Invalid reward field");
+        if (!isOverlayField(draft.kind, field)) throw new Error("Invalid overlay field");
         draft.selectedField = field;
         break;
       case "reset":
-        if (field === undefined) draft.layout = { version: 1, fields: {} };
-        else if (isRewardOverlayField(field)) delete draft.layout.fields[field];
-        else throw new Error("Invalid reward field");
+        if (field === undefined) draft.layout = normalizeOverlayLayout(draft.kind, undefined);
+        else if (isOverlayField(draft.kind, field)) {
+          delete draft.layout.fields[field];
+          draft.layout = normalizeOverlayLayout(draft.kind, draft.layout);
+        } else throw new Error("Invalid overlay field");
         break;
       case "preview":
         if (
-          ![1, 2, 3, 4].includes(Number(command.count)) ||
+          !getOverlayDescriptor(draft.kind).previewCounts.includes(
+            Number(command.count) as 1 | 2 | 3 | 4,
+          ) ||
           typeof command.count !== "number" ||
           typeof command.variant !== "string" ||
-          !["rewards", "missing", "scanning", "error"].includes(String(command.variant))
+          !getOverlayDescriptor(draft.kind).variants.some(
+            (variant) => variant.value === command.variant,
+          )
         )
           throw new Error("Invalid preview");
-        draft.previewCount = command.count as RewardOverlayEditState["previewCount"];
-        draft.previewVariant = command.variant as RewardOverlayEditState["previewVariant"];
+        draft.previewCount = command.count as OverlayEditState["previewCount"];
+        draft.previewVariant = command.variant as OverlayEditState["previewVariant"];
         break;
       case "scale":
+        if (draft.kind === "tradeNotification")
+          throw new Error("Trade notification uses a fixed window scale");
         if (typeof command.scale !== "number" || !Number.isFinite(command.scale))
           throw new Error("Invalid overlay scale");
         draft.scale = Math.min(1.5, Math.max(0.75, command.scale));
         break;
       default:
-        throw new Error("Unknown reward editor command");
+        throw new Error("Unknown overlay editor command");
     }
     return publish();
   }

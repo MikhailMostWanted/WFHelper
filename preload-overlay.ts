@@ -1,4 +1,5 @@
-﻿import { contextBridge, ipcRenderer } from "electron";
+import { installOverlayLayoutBridge } from "./ipc/overlayLayoutPreload";
+import { contextBridge, ipcRenderer } from "electron";
 import { onIpc } from "./ipc/preloadListeners";
 import { installOverlayContentVisibility } from "./ipc/overlayContentVisibility";
 import {
@@ -16,19 +17,15 @@ import {
   OVERLAY_INTERACTION_MODE,
   OVERLAY_DRAG_MOVE,
   OVERLAY_READY,
-  REWARD_LAYOUT_GET,
-  REWARD_EDIT_STATE,
 } from "./config/shared/ipcChannels";
 
 const onOverlayIpc = (channel: string, listener: Parameters<typeof onIpc>[2]): (() => void) =>
   onIpc(ipcRenderer, channel, listener);
 
 installOverlayContentVisibility(ipcRenderer);
+installOverlayLayoutBridge();
 
 contextBridge.exposeInMainWorld("overlay", {
-  getRewardLayout: () => ipcRenderer.invoke(REWARD_LAYOUT_GET),
-  onRewardLayout: (cb: (state: unknown) => void) =>
-    onOverlayIpc(REWARD_EDIT_STATE, (_event: unknown, state: unknown) => cb(state)),
   close: () => ipcRenderer.send(OVERLAY_CLOSE),
   getPrice: (slug: string) => ipcRenderer.invoke(OVERLAY_GET_PRICE, slug),
   getThemeVars: () => ipcRenderer.invoke(OVERLAY_GET_THEME_VARS),

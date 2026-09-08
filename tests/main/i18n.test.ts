@@ -8,8 +8,10 @@ import de from "../../src/i18n/de.json";
 import zh from "../../src/i18n/zh.json";
 import { en } from "../../src/i18n/en";
 
-// The overlay keys are named in ipc/, not src/, because main resolves them.
-const REFERENCE_ROOTS = ["src", "ipc"].map((dir) => path.resolve(__dirname, "../..", dir));
+// Shared overlay descriptors name labels used by both the editor and main.
+const REFERENCE_ROOTS = ["src", "ipc", "config/shared"].map((dir) =>
+  path.resolve(__dirname, "../..", dir),
+);
 
 // warframe.market whispers are sent to other players, so they must stay English.
 const ENGLISH_ONLY = ["common.whisperBuy", "common.whisperSell"];
@@ -176,7 +178,7 @@ function overlayKeysReferenced(): Set<string> {
   for (const file of fs.readdirSync(dir)) {
     if (!/\.(js|html)$/.test(file)) continue;
     const source = fs.readFileSync(path.join(dir, file), "utf8");
-    for (const [, , key] of source.matchAll(/(["'`])([\w.]+)\1/g)) {
+    for (const [, , key] of source.matchAll(/(["'`])([\w.-]+)\1/g)) {
       if (key in en) keys.add(key);
     }
   }

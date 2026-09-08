@@ -73,6 +73,57 @@ describe("buildArbiSummaryPayload", () => {
     expect(payload?.pctTimeAt15Plus).toBe(35.8);
   });
 
+  it("reports distinct actual and expected Vitus with measured rates and squad names", () => {
+    const payload = buildArbiSummaryPayload(
+      makeRun({
+        durationSec: 120,
+        vitusActual: 0,
+        players: [" Alice ", "Bob", "Alice", "", "Cara", "Dan", "Unexpected"],
+      }),
+    );
+    expect(payload).toMatchObject({
+      vitusActual: 0,
+      expectedVitusPerMin: 7.3,
+      killsPerMin: 400,
+      avgDroneIntervalSec: 51.2,
+      players: ["Alice", "Bob", "Cara", "Dan"],
+      squadSize: 4,
+      endReason: "mission-end",
+    });
+    expect(payload?.killsPerDrone).toBeCloseTo(800 / 120);
+    expect(buildArbiSummaryPayload(makeRun())).toMatchObject({
+      vitusActual: null,
+      players: [],
+      squadSize: null,
+    });
+  });
+
+  it.each([0, -1, NaN, Infinity])("keeps rates unknown for invalid duration %s", (durationSec) => {
+    expect(buildArbiSummaryPayload(makeRun({ durationSec }))).toMatchObject({
+      killsPerMin: null,
+      expectedVitusPerMin: null,
+    });
+  });
+
+  it("does not turn absent drone or invalid counters into zero rates", () => {
+    expect(
+      buildArbiSummaryPayload(
+        makeRun({
+          drones: 0,
+          totalEnemies: NaN,
+          vitusActual: -1,
+          stats: makeStats({ avgDroneIntervalSec: Infinity, expectedVitusMean: NaN }),
+        }),
+      ),
+    ).toMatchObject({
+      vitusActual: null,
+      killsPerDrone: null,
+      killsPerMin: null,
+      expectedVitusPerMin: null,
+      avgDroneIntervalSec: null,
+    });
+  });
+
   it("also shows for aborted runs (leaving mid-mission after 2+ rotations)", () => {
     expect(buildArbiSummaryPayload(makeRun({ endReason: "aborted" }))).not.toBeNull();
   });

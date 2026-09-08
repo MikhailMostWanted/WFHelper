@@ -19,17 +19,19 @@ export interface PreloadAPI {
   submitFeedback: (
     ...args: IpcInvokeMap["submitFeedback"]["args"]
   ) => Promise<IpcInvokeMap["submitFeedback"]["return"]>;
-  getRewardOverlayPreview: () => Promise<IpcInvokeMap["getRewardOverlayPreview"]["return"]>;
-  beginRewardOverlayEdit: () => Promise<IpcInvokeMap["beginRewardOverlayEdit"]["return"]>;
-  updateRewardOverlayEdit: (
-    ...args: IpcInvokeMap["updateRewardOverlayEdit"]["args"]
-  ) => Promise<IpcInvokeMap["updateRewardOverlayEdit"]["return"]>;
-  endRewardOverlayEdit: (
-    ...args: IpcInvokeMap["endRewardOverlayEdit"]["args"]
-  ) => Promise<IpcInvokeMap["endRewardOverlayEdit"]["return"]>;
-  onRewardOverlayEditState: (
-    cb: (state: IpcEventMap["reward-overlay-edit-state"]) => void,
-  ) => () => void;
+  getOverlayPreview: (
+    ...args: IpcInvokeMap["getOverlayPreview"]["args"]
+  ) => Promise<IpcInvokeMap["getOverlayPreview"]["return"]>;
+  beginOverlayEdit: (
+    ...args: IpcInvokeMap["beginOverlayEdit"]["args"]
+  ) => Promise<IpcInvokeMap["beginOverlayEdit"]["return"]>;
+  updateOverlayEdit: (
+    ...args: IpcInvokeMap["updateOverlayEdit"]["args"]
+  ) => Promise<IpcInvokeMap["updateOverlayEdit"]["return"]>;
+  endOverlayEdit: (
+    ...args: IpcInvokeMap["endOverlayEdit"]["args"]
+  ) => Promise<IpcInvokeMap["endOverlayEdit"]["return"]>;
+  onOverlayEditState: (cb: (state: IpcEventMap["overlay-edit-state"]) => void) => () => void;
   platform: string;
   getInventory: () => Promise<IpcInvokeMap["getInventory"]["return"]>;
   openInventoryFile: (

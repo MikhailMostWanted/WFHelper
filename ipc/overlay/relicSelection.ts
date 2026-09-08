@@ -7,6 +7,10 @@ import { rewardOcrOnnxAvailable } from "../../services/rewardOcrOnnx";
 import { normalizeOcrPhrase } from "../../config/shared/ocrPhrase";
 import { normalizeWfmSlugKey } from "../../config/shared/wfm";
 import { RELIC_MISSION_TIER_CACHE_TTL_MS } from "../../config/runtime/cacheConfig";
+import { aggregateComponentOwnership } from "../../config/shared/componentOwnership";
+import { ownedComponentCount } from "../../config/shared/componentNames";
+import { withoutFoundryPending } from "../../config/shared/foundryPending";
+import * as itemDatabase from "../../services/itemDatabase";
 
 const RECOMMENDATION_SQUAD_SIZE = 4;
 /** How long computed recommendations stay cached before a full recompute. */
@@ -44,6 +48,9 @@ const QUALITY_LABEL: Readonly<Record<keyof OwnedCountRow, string>> = Object.free
 });
 
 type Reward = {
+  name?: string;
+  uniqueName?: string | null;
+  imageUrl?: string | null;
   urlName?: string | null;
   chance?: number;
   ducats?: number | null;
@@ -89,6 +96,15 @@ type RecommendationRow = {
   platEv: number | null;
   ducatEv: number | null;
   vaulted: boolean;
+  rewards: Array<{
+    uniqueName: string | null;
+    name: string;
+    imageUrl: string | null;
+    urlName: string | null;
+    rarity: string | null;
+    chance: number;
+    ownedCount: number | null;
+  }>;
 };
 
 type OverlayRecommendationControllerOptions = {
@@ -366,6 +382,9 @@ function pickBestOwnedQuality(
     if (rewards.length === 0) continue;
 
     const normalizedRewards = rewards.map((reward) => ({
+      name: reward.name,
+      uniqueName: reward.uniqueName,
+      imageUrl: reward.imageUrl,
       chance: clampNumber(toFiniteOr(reward?.chance, 0), 0, 100),
       ducats: reward?.ducats,
       urlName: reward?.urlName,
@@ -404,6 +423,15 @@ function pickBestOwnedQuality(
       platEv,
       ducatEv,
       vaulted: Boolean(group.vaulted),
+      rewards: normalizedRewards.slice(0, 6).map((reward) => ({
+        uniqueName: reward.uniqueName || null,
+        name: reward.name || "",
+        imageUrl: reward.imageUrl || null,
+        urlName: normalizeWfmSlugKey(reward.urlName) || null,
+        rarity: reward.rarity || null,
+        chance: reward.chance,
+        ownedCount: null,
+      })),
     };
 
     if (!best) {
@@ -494,7 +522,7 @@ export function createRelicSelectionController(options: OverlayRecommendationCon
   }
 
   function buildRecommendations(era: string | null): {
-    rows: RecommendationRow[];
+    rows: ReturnType<typeof enrichOwnership>;
     totalOwnedCount: number;
   } {
     const db = relicService.getRelicDatabase();
@@ -503,7 +531,7 @@ export function createRelicSelectionController(options: OverlayRecommendationCon
 
     const cacheKey = `${era || "all"}|${toStableOwnedFingerprint(owned)}`;
     if (cache && cache.key === cacheKey && Date.now() - cache.ts < RECOMMENDATION_CACHE_TTL_MS) {
-      return { rows: cache.rows, totalOwnedCount: cache.totalOwnedCount };
+      return { rows: enrichOwnership(cache.rows), totalOwnedCount: cache.totalOwnedCount };
     }
 
     const { prices: persistedPrices, ducats: persistedDucats } = getPersistedCacheMaps();
@@ -574,10 +602,36 @@ export function createRelicSelectionController(options: OverlayRecommendationCon
       ts: Date.now(),
     };
 
-    return { rows, totalOwnedCount };
+    return { rows: enrichOwnership(rows), totalOwnedCount };
   }
 
-  function rememberOverlayRows(rows: readonly RecommendationRow[]): void {
+  function enrichOwnership(rows: readonly RecommendationRow[]) {
+    if (!rows.length) return [];
+    const inventory = ctx.currentInventoryData;
+    const owned = inventory
+      ? aggregateComponentOwnership(
+          withoutFoundryPending(inventory, itemDatabase.isReusableBlueprint),
+        )
+      : null;
+    // Relic counts can stay unchanged while rewards are acquired or built.
+    return rows.map((row) => ({
+      ...row,
+      rewards: row.rewards.map((reward) => {
+        const resolved = itemDatabase.lookupItemByNameOrSlug(reward.name, reward.urlName);
+        const uniqueName = resolved?.uniqueName || reward.uniqueName;
+        const item = resolved?.item || (uniqueName ? itemDatabase.lookupItem(uniqueName) : null);
+        return {
+          rarity: reward.rarity,
+          chance: reward.chance,
+          name: reward.name || item?.name || reward.urlName || "",
+          imageUrl: reward.imageUrl || item?.imageUrl || null,
+          ownedCount: owned && uniqueName ? ownedComponentCount(uniqueName, owned) : null,
+        };
+      }),
+    }));
+  }
+
+  function rememberOverlayRows(rows: readonly Pick<RecommendationRow, "label">[]): void {
     overlayRowSignatures = rows
       .map((row) => overlayRowSignature(row.label))
       .filter((signature): signature is string => signature !== null);

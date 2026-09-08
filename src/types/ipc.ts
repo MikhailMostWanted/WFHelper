@@ -191,10 +191,12 @@ import type {
 export type { RivenGoodRollAttribute, RivenGoodRollGroup };
 
 import type {
-  RewardOverlayEditState,
-  RewardOverlayEditCommand,
-  RewardOverlayFieldStyle,
-} from "../../config/shared/rewardOverlayLayout.js";
+  OverlayEditState,
+  OverlayEditCommand,
+  OverlayFieldStyle,
+  OverlayLayoutKind,
+  OverlayDescriptor,
+} from "../../config/shared/overlayLayout.js";
 
 export interface IpcInvokeMap {
   getPersonalProfile: {
@@ -222,21 +224,22 @@ export interface IpcInvokeMap {
     args: [report: import("../../config/shared/feedback.js").FeedbackReport];
     return: import("../../config/shared/feedback.js").FeedbackResult;
   };
-  getRewardOverlayPreview: {
-    args: [];
+  getOverlayPreview: {
+    args: [kind: OverlayLayoutKind];
     return: {
       url: string;
       theme: Record<string, string>;
       messages: { locale: string; messages: Record<string, string> };
-      defaultFieldStyle: RewardOverlayFieldStyle;
+      defaultFieldStyle: OverlayFieldStyle;
+      descriptor: OverlayDescriptor;
     };
   };
-  beginRewardOverlayEdit: { args: []; return: RewardOverlayEditState };
-  updateRewardOverlayEdit: {
-    args: [sessionId: string, command: RewardOverlayEditCommand];
-    return: RewardOverlayEditState;
+  beginOverlayEdit: { args: [kind: OverlayLayoutKind]; return: OverlayEditState };
+  updateOverlayEdit: {
+    args: [sessionId: string, command: OverlayEditCommand];
+    return: OverlayEditState;
   };
-  endRewardOverlayEdit: { args: [sessionId: string, save: boolean]; return: { ok: true } };
+  endOverlayEdit: { args: [sessionId: string, save: boolean]; return: { ok: true } };
   getInventory: {
     args: [];
     return: RawInventoryData | null;
@@ -839,7 +842,7 @@ interface TradeRecordedEvent {
 }
 
 export interface IpcEventMap {
-  "reward-overlay-edit-state": RewardOverlayEditState;
+  "overlay-edit-state": OverlayEditState;
   "inventory-updated": RawInventoryData;
   "profile-account-changed": void;
   "inventory-status-updated": InventoryStatus;

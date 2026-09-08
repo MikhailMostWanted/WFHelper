@@ -58,13 +58,32 @@
       else waiting.resolve(message.state);
     }
   });
-  window.overlay = {
+  window.overlayPreview = {
+    subscribe,
+    emit,
+    configured,
+    get config() {
+      return config;
+    },
+  };
+  window.overlayLayoutApi = {
     get defaultFieldStyle() {
       return config.defaultFieldStyle;
     },
-    getRewardLayout: async () => {
+    getLayout: async () => {
       await configured;
       return config.state;
+    },
+    onLayout: (cb) => subscribe("layout", cb),
+    editLayout: (_sessionId, command) => request(command),
+    endLayout: async () => {
+      window.parent.postMessage({ type: "reward-preview-cancel" }, "*");
+      return config.state;
+    },
+  };
+  window.overlay = {
+    get defaultFieldStyle() {
+      return config.defaultFieldStyle;
     },
     getThemeVars: async () => {
       await configured;
@@ -76,15 +95,9 @@
     },
     getDragHint: async () => ({ hotkey: null, dismissed: true }),
     getPrice: async () => 0,
-    editRewardLayout: (_sessionId, command) => request(command),
-    endRewardLayout: async () => {
-      window.parent.postMessage({ type: "reward-preview-cancel" }, "*");
-      return config.state;
-    },
-    close: () => window.parent.postMessage({ type: "reward-preview-cancel" }, "*"),
+    close: () => {},
     ready: () => {},
     moveBy: () => {},
-    onRewardLayout: (cb) => subscribe("layout", cb),
     onMessages: (cb) => subscribe("messages", cb),
     onThemeVars: (cb) => subscribe("theme", cb),
     onItems: () => () => {},
@@ -92,6 +105,45 @@
     onPlannerTrigger: () => () => {},
     onRecommendations: () => () => {},
     onInteractionMode: () => () => {},
+  };
+  const previewApi = {
+    getThemeVars: window.overlay.getThemeVars,
+    getMessages: window.overlay.getMessages,
+    onThemeVars: window.overlay.onThemeVars,
+    onMessages: window.overlay.onMessages,
+    getDragHint: async () => ({ hotkey: "Ctrl+O", dismissed: true }),
+    close: () => {},
+    ready: () => {},
+    moveBy: () => {},
+  };
+  window.rivenOverlay = {
+    ...previewApi,
+    requestRescan: () => {},
+    openAuction: () => {},
+  };
+  for (const name of [
+    "SessionStart",
+    "InitialStats",
+    "Scanning",
+    "RollResult",
+    "ChoiceMade",
+    "Rescan",
+    "SessionEnd",
+    "WeaponUpdate",
+    "WeaponMissing",
+    "InteractionMode",
+    "GradingInitial",
+    "GradingRoll",
+    "BestAttributes",
+    "SimilarListings",
+  ]) {
+    window.rivenOverlay[`on${name}`] = () => () => {};
+  }
+  window.tradeNotificationApi = {
+    ...previewApi,
+    dismiss: () => {},
+    onShow: () => () => {},
+    onRepResult: () => () => {},
   };
   window.parent.postMessage({ type: "reward-preview-ready" }, "*");
 })();

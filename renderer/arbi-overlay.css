@@ -63,6 +63,11 @@ body {
   color: var(--warn);
 }
 
+#panel-label::before {
+  content: "\25c6";
+  margin-right: 0.4em;
+}
+
 #run-node {
   font-family: var(--font-display, "Rajdhani", sans-serif);
   font-size: 1.15rem;
@@ -84,6 +89,14 @@ body {
   white-space: nowrap;
 }
 
+#run-meta > span {
+  display: inline-block;
+}
+
+#run-meta > span + span::before {
+  content: "\00b7\00a0";
+}
+
 #btn-close {
   background: none;
   border: none;
@@ -101,10 +114,12 @@ body {
 #kpi-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(62px, 1fr);
   gap: 1px;
   background: color-mix(in oklab, var(--border) 40%, transparent);
   min-height: 0;
+  overflow-y: auto;
 }
 
 .kpi {
@@ -115,6 +130,7 @@ body {
   justify-content: center;
   gap: 0.15rem;
   padding: 0.45rem 0.5rem;
+  min-width: 0;
 }
 
 .kpi-value {
@@ -132,12 +148,21 @@ body {
   color: var(--muted);
 }
 
+.kpi-value > span {
+  display: inline-block;
+}
+
 .kpi-label {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--text-dim);
   white-space: nowrap;
+}
+
+.kpi:not(:has([data-reward-field]:not(.reward-field-hidden))),
+#run-extra:not(:has([data-reward-field]:not(.reward-field-hidden))) {
+  display: none;
 }
 
 #footer {
@@ -185,4 +210,25 @@ html.is-overlay-dragging * {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+#header-left {
+  min-width: 0;
+}
+
+#run-node {
+  overflow-wrap: anywhere;
+}
+#run-extra {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--muted);
+  background: var(--surface);
+}
+#run-squad {
+  overflow-wrap: anywhere;
+}
+#run-end {
+  color: var(--text-dim);
 }

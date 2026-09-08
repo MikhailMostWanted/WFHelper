@@ -7,6 +7,7 @@ import { RELIC_RECOMMENDATIONS } from "../../config/shared/ipcChannels";
 import type { OverlaySettings } from "../../config/runtime/overlaySettings";
 import { createRelicSelectionController } from "../../ipc/overlay/relicSelection";
 import { detectRelicEraFromBandText } from "../../services/rewardScannerMatch";
+import * as itemDatabase from "../../services/itemDatabase";
 
 const tempDirs: string[] = [];
 
@@ -33,6 +34,135 @@ describe("relic selection planner", () => {
     for (const dir of tempDirs.splice(0)) {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  function makeRewardController() {
+    const relic = "/Lotus/Types/Game/Projections/LithTestIntact";
+    const blueprint = "/Lotus/Types/Recipes/TestPrimeBlueprint";
+    const ctx = {
+      overlaySettings: { autoTriggerEnabled: true } as OverlaySettings,
+      currentInventoryData: {
+        LevelKeys: [{ ItemType: relic, ItemCount: 1 }],
+        Recipes: [{ ItemType: blueprint, ItemCount: 3 }],
+        PendingRecipes: [{ ItemType: blueprint }],
+      } as Record<string, unknown> | null,
+    };
+    const prices = vi.fn(() => 5);
+    const events: unknown[] = [];
+    const rewards = Array.from({ length: 7 }, (_, index) => ({
+      name: `Test reward ${index}`,
+      uniqueName: index === 1 ? null : blueprint,
+      imageUrl: "https://assets.wfhelper.com/test.png",
+      urlName: `test_reward_${index}`,
+      chance: 100 / 7,
+      ducats: 15,
+      rarity: "Common",
+    }));
+    const controller = createRelicSelectionController({
+      eraStartDelayMs: 0,
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      ctx,
+      windows: {
+        createOverlayWindow: vi.fn(),
+        clearOverlayAutoHideTimer: vi.fn(),
+        scheduleOverlayAutoHide: vi.fn(),
+        sendOverlayEvent: (channel, payload) => {
+          if (channel === RELIC_RECOMMENDATIONS) events.push(payload);
+        },
+        positionOverlayWindow: vi.fn(),
+        getAnchorMeta: () => null,
+        setAnchorMeta: vi.fn(),
+      },
+      relicService: {
+        getRelicDatabase: () => ({
+          groups: {
+            test: {
+              key: "test",
+              name: "Lith Test",
+              tier: "Lith",
+              qualities: { intact: { rewards } },
+            },
+          },
+          byUniqueName: { [relic]: { groupKey: "test", quality: "intact" } },
+        }),
+      },
+      rewardScanner: { detectRelicSelectionEra: async () => ({ era: "Lith", confidence: 1 }) },
+      wfmStatsPrice: { getCachedPriceBySlug: prices },
+      fs,
+      cacheFilePath: makeTempSnapshot({}),
+    });
+    const latest = () =>
+      events.at(-1) as {
+        rows: Array<{
+          rewards: Array<{
+            ownedCount: number | null;
+            name: string;
+            imageUrl: string | null;
+          }>;
+        }>;
+      };
+    const trigger = async () => {
+      await controller.onRelicSelectionTrigger("manual");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    };
+    return { ctx, blueprint, prices, latest, trigger };
+  }
+
+  it("refreshes reward ownership after cached ranking and subtracts foundry blueprints", async () => {
+    const { ctx, blueprint, prices, latest, trigger } = makeRewardController();
+    await trigger();
+    const first = latest();
+    expect(first.rows[0].rewards).toHaveLength(6);
+    expect(first.rows[0].rewards[0]).toMatchObject({
+      name: "Test reward 0",
+      ownedCount: 2,
+      imageUrl: "https://assets.wfhelper.com/test.png",
+    });
+    expect(Object.keys(first.rows[0].rewards[0]).sort()).toEqual([
+      "chance",
+      "imageUrl",
+      "name",
+      "ownedCount",
+      "rarity",
+    ]);
+    expect(first.rows[0].rewards[1].ownedCount).toBeNull();
+    const priceCalls = prices.mock.calls.length;
+    ctx.currentInventoryData = {
+      ...ctx.currentInventoryData,
+      Recipes: [{ ItemType: blueprint, ItemCount: 5 }],
+      PendingRecipes: [{ ItemType: blueprint }, { ItemType: blueprint }],
+    };
+    await trigger();
+    expect(latest().rows[0].rewards[0].ownedCount).toBe(3);
+    expect(first.rows[0].rewards[0].ownedCount).toBe(2);
+    expect(prices).toHaveBeenCalledTimes(priceCalls);
+  });
+
+  it("does not retain cached owned recommendations when inventory becomes unavailable", async () => {
+    const { ctx, latest, trigger } = makeRewardController();
+    await trigger();
+    expect(latest().rows).toHaveLength(1);
+    ctx.currentInventoryData = null;
+    await trigger();
+    expect(latest().rows).toEqual([]);
+  });
+
+  it("uses component aliases without adding the same pile twice", async () => {
+    const { ctx, blueprint, latest, trigger } = makeRewardController();
+    ctx.currentInventoryData = {
+      ...ctx.currentInventoryData,
+      PendingRecipes: [],
+      MiscItems: [{ ItemType: blueprint.replace("Blueprint", "Component"), ItemCount: 8 }],
+    };
+    await trigger();
+    expect(latest().rows[0].rewards[0].ownedCount).toBe(8);
+  });
+
+  it("keeps reusable blueprints owned while their foundry build is pending", async () => {
+    const { blueprint, latest, trigger } = makeRewardController();
+    vi.spyOn(itemDatabase, "isReusableBlueprint").mockImplementation((name) => name === blueprint);
+    await trigger();
+    expect(latest().rows[0].rewards[0].ownedCount).toBe(3);
   });
 
   it("uses snapshot prices even when their entry timestamp is older than the live cache ttl", async () => {

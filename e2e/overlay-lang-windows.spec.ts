@@ -125,7 +125,8 @@ test.describe("Riven, arbitration and trade windows follow the language", () => 
     await expect(arbi.locator('[data-i18n="overlay.arbi.saturation"]')).toHaveText(
       "Zeit bei 15+ Gegnern",
     );
-    await expect(arbi.locator("#kpi-vitus")).toHaveText("14,2 ±3,1");
+    await expect(arbi.locator("#kpi-vitus")).toHaveText("14,2");
+    await expect(arbi.locator("#kpi-uncertainty")).toHaveText("±3,1");
     await expect(arbi.locator("#kpi-kills")).toHaveText("12.345");
 
     await switchTo("en");
@@ -137,7 +138,8 @@ test.describe("Riven, arbitration and trade windows follow the language", () => 
     await expect(arbi.locator('[data-i18n="overlay.arbi.saturation"]')).toHaveText(
       "Time at 15+ Enemies",
     );
-    await expect(arbi.locator("#kpi-vitus")).toHaveText("14.2 ±3.1");
+    await expect(arbi.locator("#kpi-vitus")).toHaveText("14.2");
+    await expect(arbi.locator("#kpi-uncertainty")).toHaveText("±3.1");
     await expect(arbi.locator("#kpi-kills")).toHaveText("12,345");
 
     await switchTo("de");

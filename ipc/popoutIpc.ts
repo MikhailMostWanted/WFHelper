@@ -2,6 +2,8 @@ import path from "node:path";
 
 import { BrowserWindow, app, screen } from "electron";
 
+import { overlayPreviewFilePaths } from "../services/overlayPreview";
+
 import ctx from "./context";
 import {
   assertMainRendererSender,
@@ -240,6 +242,7 @@ function openPopout(target: PopoutTarget, options?: PopoutOpenOptions): void {
   hardenBrowserWindowNavigation(win, {
     label: `popout:${key}`,
     allowedFilePaths: [entryFile],
+    allowedSubframeFilePaths: overlayPreviewFilePaths(app.getAppPath()),
     log,
   });
 

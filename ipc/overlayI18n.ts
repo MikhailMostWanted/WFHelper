@@ -8,6 +8,21 @@ type Dictionary = Partial<Record<MessageKey, string>>;
 // The overlays are plain HTML windows with no access to the renderer's i18n
 // store, so main resolves their text and pushes the finished strings over IPC.
 const OVERLAY_MESSAGE_KEYS = [
+  "relics.quality.intact",
+  "relics.quality.exceptional",
+  "relics.quality.flawless",
+  "relics.quality.radiant",
+  "arbi.vitus.actual",
+  "arbi.metric.expectedVitusPerMin",
+  "arbi.metric.enemiesPerMin",
+  "arbi.kpi.killsPerDrone",
+  "arbi.kpi.avgInterval",
+  "relics.squadLabel",
+  "common.unknown",
+  "arbi.end.aborted",
+  "arbi.end.mission-end",
+
+  "market.ownedCount",
   "arbi.type.defense",
   "arbi.type.interception",
   "common.arbitrationSummary",

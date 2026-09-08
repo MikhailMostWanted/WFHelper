@@ -4,7 +4,6 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { app, BrowserWindow, crashReporter, globalShortcut, powerMonitor } from "electron";
 
@@ -51,12 +50,16 @@ if (DISPLAY_BACKEND === "x11") {
 import { getLogFilePath, withScope } from "./services/logger";
 import { resolveWarframeUiScale } from "./services/eeLogPath";
 import { MAIN_WINDOW_CSP, PERMISSIONS_POLICY } from "./config/runtime/security";
+import { OVERLAY_LAYOUT_KINDS } from "./config/shared/overlayLayout";
+import { overlayPreviewFilePaths, overlayPreviewUrl } from "./services/overlayPreview";
 import * as windowSecurity from "./services/windowSecurity";
 
 const log = withScope("Main");
 
 const MAIN_WINDOW_ENTRY_FILE = path.join(app.getAppPath(), "renderer", "dist", "index.html");
-const REWARD_EDITOR_FRAME_URL = `${pathToFileURL(path.join(app.getAppPath(), "renderer", "overlay.html")).href}?mode=editor`;
+const OVERLAY_EDITOR_FRAME_URLS = new Set(
+  OVERLAY_LAYOUT_KINDS.map((kind) => overlayPreviewUrl(app.getAppPath(), kind)),
+);
 
 // Safe mode drops every user-authored layer (custom CSS, stored layouts) for one
 // load, so a broken customisation cannot lock the user out of Settings. The env
@@ -244,7 +247,7 @@ function createWindow(): void {
   windowSecurity.hardenBrowserWindowNavigation(ctx.mainWindow, {
     label: "main renderer",
     allowedFilePaths: [MAIN_WINDOW_ENTRY_FILE],
-    allowedSubframeFilePaths: [path.join(app.getAppPath(), "renderer", "overlay.html")],
+    allowedSubframeFilePaths: overlayPreviewFilePaths(app.getAppPath()),
     log,
   });
 
@@ -340,7 +343,7 @@ function createWindow(): void {
         responseHeaders: {
           ...details.responseHeaders,
           "Content-Security-Policy": [
-            details.resourceType === "subFrame" && details.url === REWARD_EDITOR_FRAME_URL
+            details.resourceType === "subFrame" && OVERLAY_EDITOR_FRAME_URLS.has(details.url)
               ? MAIN_WINDOW_CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'")
               : MAIN_WINDOW_CSP,
           ],

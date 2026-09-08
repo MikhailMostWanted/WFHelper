@@ -12,6 +12,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="trade-notification.css" />
+    <link rel="stylesheet" href="overlay-layout.css" />
   </head>
   <body>
     <div id="notification" class="hidden">
@@ -23,14 +24,17 @@
           <span id="trade-label">Trade Finished</span>
           <span id="trade-badge"></span>
         </div>
-        <div id="item-name"></div>
+        <div id="item-line"><span id="item-quantity"></span><span id="item-name"></span></div>
         <div id="bottom-line">
-          <span id="plat-amount"></span>
+          <span id="plat-amount"><span id="plat-value"></span><span id="plat-unit">p</span></span>
           <span id="partner-name"></span>
         </div>
         <div id="rep-line" hidden></div>
       </div>
     </div>
+    <script src="reward-editor-bridge.js"></script>
+    <script src="reward-layout.js"></script>
+    <script src="overlay-theme.js"></script>
     <script src="overlay-i18n.js"></script>
     <script src="trade-notification.js"></script>
   </body>

@@ -4,9 +4,13 @@ import type { WebContents } from "electron";
 import { describe, expect, it, vi } from "vitest";
 
 import { OVERLAY_SETTINGS_DEFAULTS } from "../../config/runtime/overlaySettings";
-import { REWARD_EDIT_STATE } from "../../config/shared/ipcChannels";
-import { DEFAULT_REWARD_FIELD_STYLE } from "../../config/shared/rewardOverlayLayout";
-import { createRewardEditor } from "../../ipc/overlay/rewardEditor";
+import { OVERLAY_EDIT_STATE } from "../../config/shared/ipcChannels";
+import {
+  DEFAULT_OVERLAY_FIELD_STYLE as DEFAULT_REWARD_FIELD_STYLE,
+  OVERLAY_LAYOUT_KINDS,
+  getOverlayDescriptor,
+} from "../../config/shared/overlayLayout";
+import { createOverlayEditor } from "../../ipc/overlay/rewardEditor";
 
 function makeOwner() {
   const events = new EventEmitter();
@@ -17,7 +21,7 @@ function makeOwner() {
 }
 
 function makeEditor() {
-  type Options = Parameters<typeof createRewardEditor>[0];
+  type Options = Parameters<typeof createOverlayEditor>[0];
   const ctx = {
     overlaySettings: {
       ...OVERLAY_SETTINGS_DEFAULTS,
@@ -34,7 +38,7 @@ function makeEditor() {
   } as unknown as Options["ctx"];
   const persist = vi.fn(() => true);
   const applySaved = vi.fn();
-  const editor = createRewardEditor({ ctx, persist, applySaved });
+  const editor = createOverlayEditor({ ctx, persist, applySaved });
   return { ctx, persist, applySaved, editor, ...makeOwner() };
 }
 
@@ -43,10 +47,11 @@ describe("reward overlay edit sessions", () => {
     const { editor, owner, send, persist, applySaved } = makeEditor();
     const state = editor.begin(owner);
     expect(state.sessionId).toEqual(expect.any(String));
+    expect(state.kind).toBe("reward");
     expect(state.scale).toBe(1.1);
     expect(state.layout.fields.rarity?.hidden).toBe(true);
     expect(editor.begin(owner).sessionId).toBe(state.sessionId);
-    expect(send).toHaveBeenCalledExactlyOnceWith(REWARD_EDIT_STATE, state);
+    expect(send).toHaveBeenCalledExactlyOnceWith(OVERLAY_EDIT_STATE, state);
     expect(persist).not.toHaveBeenCalled();
     expect(applySaved).not.toHaveBeenCalled();
     expect(() => editor.begin(makeOwner().owner)).toThrow("already open");
@@ -215,7 +220,7 @@ describe("reward overlay edit sessions", () => {
       revisions.every((revision, index) => index === 0 || revision > revisions[index - 1]),
     ).toBe(true);
     expect(send).toHaveBeenLastCalledWith(
-      REWARD_EDIT_STATE,
+      OVERLAY_EDIT_STATE,
       expect.objectContaining({ sessionId: null }),
     );
     const next = editor.begin(owner);
@@ -233,6 +238,25 @@ describe("reward overlay edit sessions", () => {
     editor.update(sessionId, { type: "reset" }, owner);
     expect(editor.state().layout.fields).toEqual({});
     expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("restores hidden optional fields on element and layout reset", () => {
+    const { editor, owner } = makeEditor();
+    const { sessionId } = editor.begin(owner, "planner");
+    for (const field of ["reward0Name", undefined]) {
+      editor.update(
+        sessionId,
+        {
+          type: "field",
+          field: "reward0Name",
+          patch: { hidden: false },
+        },
+        owner,
+      );
+      expect(editor.state().layout.fields.reward0Name?.hidden).toBe(false);
+      editor.update(sessionId, { type: "reset", field }, owner);
+      expect(editor.state().layout.fields.reward0Name?.hidden).toBe(true);
+    }
   });
 
   it.each([
@@ -267,5 +291,148 @@ describe("reward overlay edit sessions", () => {
     expect(() =>
       editor.update(sessionId, { type: "preview", count: 2, variant: ["rewards"] }, owner),
     ).toThrow();
+  });
+});
+
+describe("shared overlay edit sessions", () => {
+  it.each(OVERLAY_LAYOUT_KINDS)("keeps %s edits transactional and owner-bound", (kind) => {
+    const { editor, ctx, owner, persist, applySaved } = makeEditor();
+    const original = structuredClone(ctx.overlaySettings);
+    const field = getOverlayDescriptor(kind).defaultSelectedField;
+    const first = editor.begin(owner, kind);
+    expect(first.kind).toBe(kind);
+    expect(() => editor.begin(makeOwner().owner, kind)).toThrow("already open");
+    expect(() => editor.update(first.sessionId, { type: "reset" }, makeOwner().owner)).toThrow(
+      "no longer active",
+    );
+    editor.update(
+      first.sessionId,
+      { type: "field", field, patch: { scale: 2, hidden: true } },
+      owner,
+    );
+    expect(ctx.overlaySettings).toEqual(original);
+    expect(editor.savedState(kind).layout.fields[field]?.hidden).not.toBe(true);
+    editor.end(first.sessionId, false, owner);
+    expect(ctx.overlaySettings).toEqual(original);
+    expect(persist).not.toHaveBeenCalled();
+    expect(applySaved).not.toHaveBeenCalled();
+
+    const second = editor.begin(owner, kind);
+    expect(second.sessionId).not.toBe(first.sessionId);
+    editor.update(second.sessionId, { type: "field", field, patch: { x: 15, scale: 2 } }, owner);
+    const saved = structuredClone(editor.state().layout);
+    editor.end(second.sessionId, true, owner);
+    expect(editor.savedState(kind)).toMatchObject({ kind, sessionId: null, layout: saved });
+    expect(persist).toHaveBeenCalledOnce();
+    expect(applySaved).toHaveBeenCalledExactlyOnceWith(editor.savedState(kind));
+    const stored =
+      kind === "reward"
+        ? ctx.overlaySettings.rewardLayout
+        : ctx.overlaySettings.overlayLayouts?.[kind];
+    expect(stored).toEqual(saved);
+    expect(ctx.overlaySettings.overlayWindowBounds).toEqual(original.overlayWindowBounds);
+  });
+
+  it.each(OVERLAY_LAYOUT_KINDS)(
+    "rejects fields belonging only to another overlay in %s",
+    (kind) => {
+      const { editor, owner } = makeEditor();
+      const { sessionId } = editor.begin(owner, kind);
+      const field = kind === "planner" ? "rarity" : "relicName";
+      const before = structuredClone(editor.state());
+      for (const command of [
+        { type: "field", field, patch: { hidden: true } },
+        { type: "select", field },
+        { type: "reset", field },
+      ]) {
+        expect(() => editor.update(sessionId, command, owner)).toThrow("Invalid overlay field");
+        expect(editor.state()).toEqual(before);
+      }
+    },
+  );
+
+  it("persists identical riven field names independently for the two panels", () => {
+    const { editor, owner, ctx } = makeEditor();
+    const left = editor.begin(owner, "rivenLeft");
+    expect(() => editor.begin(owner, "rivenRight")).toThrow("already open");
+    editor.update(
+      left.sessionId,
+      { type: "field", field: "weaponName", patch: { x: 20, color: "#aabbcc" } },
+      owner,
+    );
+    editor.update(left.sessionId, { type: "scale", scale: 1.2 }, owner);
+    editor.end(left.sessionId, true, owner);
+    const leftSaved = editor.savedState("rivenLeft");
+    const right = editor.begin(owner, "rivenRight");
+    expect(right.layout.fields.weaponName).toBeUndefined();
+    expect(right.scale).toBe(0.9);
+    editor.update(
+      right.sessionId,
+      { type: "field", field: "weaponName", patch: { x: -10, hidden: true } },
+      owner,
+    );
+    editor.end(right.sessionId, true, owner);
+    expect(editor.savedState("rivenLeft").layout).toEqual(leftSaved.layout);
+    expect(editor.savedState("rivenLeft").scale).toBe(1.2);
+    expect(editor.savedState("rivenRight").layout.fields.weaponName).toMatchObject({
+      x: -10,
+      hidden: true,
+      color: null,
+    });
+    expect(ctx.overlaySettings.rewardLayout?.fields.rarity?.hidden).toBe(true);
+    expect(ctx.overlaySettings.overlayWindowScales?.planner).toBe(1.25);
+  });
+
+  it("rolls back a failed non-reward save and retains the draft for retry", () => {
+    const { editor, owner, ctx, persist, applySaved } = makeEditor();
+    const previous = ctx.overlaySettings;
+    const { sessionId } = editor.begin(owner, "planner");
+    editor.update(sessionId, { type: "field", field: "relicName", patch: { scale: 2 } }, owner);
+    editor.update(sessionId, { type: "scale", scale: 1.4 }, owner);
+    persist.mockReturnValue(false);
+    expect(() => editor.end(sessionId, true, owner)).toThrow("Could not save");
+    expect(ctx.overlaySettings).toBe(previous);
+    expect(editor.state().sessionId).toBe(sessionId);
+    expect(applySaved).not.toHaveBeenCalled();
+    persist.mockReturnValue(true);
+    editor.end(sessionId, true, owner);
+    expect(ctx.overlaySettings.overlayLayouts?.planner?.fields.relicName?.scale).toBe(2);
+    expect(ctx.overlaySettings.overlayWindowScales?.planner).toBe(1.4);
+  });
+
+  it("keeps the trade window scale fixed while saving per-field scaling", () => {
+    const { editor, owner, ctx } = makeEditor();
+    const scales = structuredClone(ctx.overlaySettings.overlayWindowScales);
+    const { sessionId } = editor.begin(owner, "tradeNotification");
+    expect(editor.state().scale).toBe(1);
+    const before = structuredClone(editor.state());
+    expect(() => editor.update(sessionId, { type: "scale", scale: 1.5 }, owner)).toThrow(
+      "fixed window scale",
+    );
+    expect(editor.state()).toEqual(before);
+    editor.update(
+      sessionId,
+      { type: "field", field: "platinumValue", patch: { scale: 2.5 } },
+      owner,
+    );
+    editor.end(sessionId, true, owner);
+    expect(ctx.overlaySettings.overlayLayouts?.tradeNotification?.fields.platinumValue?.scale).toBe(
+      2.5,
+    );
+    expect(ctx.overlaySettings.overlayWindowScales).toEqual(scales);
+    expect(editor.savedState("tradeNotification").scale).toBe(1);
+  });
+
+  it("rejects preview choices from other overlay kinds without changing the draft", () => {
+    const { editor, owner } = makeEditor();
+    const { sessionId } = editor.begin(owner, "arbiSummary");
+    const before = structuredClone(editor.state());
+    expect(() =>
+      editor.update(sessionId, { type: "preview", count: 4, variant: "summary" }, owner),
+    ).toThrow("Invalid preview");
+    expect(() =>
+      editor.update(sessionId, { type: "preview", count: 1, variant: "rewards" }, owner),
+    ).toThrow("Invalid preview");
+    expect(editor.state()).toEqual(before);
   });
 });

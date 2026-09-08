@@ -1,14 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { test, expect, type Frame, type Locator, type Page } from "@playwright/test";
+import { test, expect as baseExpect, type Frame, type Locator, type Page } from "@playwright/test";
 
 import {
-  DEFAULT_REWARD_FIELD_STYLE,
   REWARD_OVERLAY_CANVAS,
-  type RewardOverlayEditState,
   type RewardOverlayLayout,
 } from "../config/shared/rewardOverlayLayout";
+import {
+  DEFAULT_OVERLAY_FIELD_STYLE as DEFAULT_REWARD_FIELD_STYLE,
+  normalizeOverlayLayout,
+  type OverlayEditState,
+} from "../config/shared/overlayLayout";
 import {
   closeElectronTestHarness,
   evaluateInMain,
@@ -18,13 +21,16 @@ import {
   type ElectronTestHarness,
 } from "./electronTestHarness";
 
-function readState(overlay: Page | Frame): Promise<RewardOverlayEditState> {
+// Separate Electron renderers can take longer to exchange layout state under parallel load.
+const expect = baseExpect.configure({ timeout: 15_000 });
+
+function readState(overlay: Page | Frame): Promise<OverlayEditState> {
   return overlay.evaluate(() =>
     (
       window as unknown as {
-        overlay: { getRewardLayout: () => Promise<RewardOverlayEditState> };
+        overlayLayoutApi: { getLayout: () => Promise<OverlayEditState> };
       }
-    ).overlay.getRewardLayout(),
+    ).overlayLayoutApi.getLayout(),
   );
 }
 
@@ -40,11 +46,11 @@ async function holdFirstEdit(overlay: Frame): Promise<void> {
   await overlay.evaluate(() => {
     const scope = window as unknown as {
       releaseEdit?: () => void;
-      overlay: { editRewardLayout: (token: string, command: unknown) => Promise<unknown> };
+      overlayLayoutApi: { editLayout: (token: string, command: unknown) => Promise<unknown> };
     };
-    const edit = scope.overlay.editRewardLayout;
+    const edit = scope.overlayLayoutApi.editLayout;
     let hold = true;
-    scope.overlay.editRewardLayout = async (token, command) => {
+    scope.overlayLayoutApi.editLayout = async (token, command) => {
       if (hold) {
         hold = false;
         await new Promise<void>((resolve) => {
@@ -65,11 +71,12 @@ async function clippedFields(overlay: Page | Frame): Promise<string[]> {
         if (!element.getClientRects().length || getComputedStyle(element).visibility === "hidden")
           return false;
         const rect = element.getBoundingClientRect();
+        const bounds = element.closest(".reward-slot")?.getBoundingClientRect() ?? panel;
         return (
-          rect.left < panel.left - 1 ||
-          rect.top < panel.top - 1 ||
-          rect.right > panel.right + 1 ||
-          rect.bottom > panel.bottom + 1
+          rect.left < bounds.left - 1 ||
+          rect.top < bounds.top - 1 ||
+          rect.right > bounds.right + 1 ||
+          rect.bottom > bounds.bottom + 1
         );
       })
       .map((element) => element.dataset.rewardField!);
@@ -130,6 +137,7 @@ test("reward layout editing saves from Settings and opens from setup", async () 
     let overlay = await openSettingsEditor(harness);
     const initial = await readState(overlay);
     expect(initial.sessionId).toBeTruthy();
+    expect(initial.kind).toBe("reward");
     expect(initial.layout.fields).toEqual({});
 
     await overlay.locator('[data-reward-field="rarity"]').first().click();
@@ -146,6 +154,13 @@ test("reward layout editing saves from Settings and opens from setup", async () 
       .locator("[data-reward-editor]")
       .screenshot({ path: testInfo.outputPath("reward-editor-default.png") });
     await expect.poll(() => clippedFields(overlay)).toEqual([]);
+    const lastPart = overlay.locator('[data-reward-field="part5Count"]').first();
+    await lastPart.scrollIntoViewIfNeeded();
+    await expect(lastPart).toBeInViewport();
+    await expect(overlay.locator("#best-footer")).toBeInViewport();
+    await overlay.locator("#slots-grid").evaluate((element) => {
+      element.scrollTop = 0;
+    });
 
     await overlay.locator('[data-reward-field="rarity"]').first().click();
     await page.locator("[data-reward-editor-hidden]").check();
@@ -213,6 +228,7 @@ test("reward layout editing saves from Settings and opens from setup", async () 
     const priceToMove = overlay.locator(
       '.reward-slot[data-slot="0"] [data-reward-field="platinumValue"]',
     );
+    await expect(priceToMove).toBeVisible();
     const box = await priceToMove.boundingBox();
     if (!box) throw new Error("Reward price has no bounds");
     const frameBox = await page.locator("[data-reward-editor-frame]").boundingBox();
@@ -332,11 +348,11 @@ test("reward layout editing saves from Settings and opens from setup", async () 
     await overlay.evaluate(() => {
       const api = (
         window as unknown as {
-          overlay: { editRewardLayout: (token: string, command: unknown) => Promise<unknown> };
+          overlayLayoutApi: { editLayout: (token: string, command: unknown) => Promise<unknown> };
         }
-      ).overlay;
-      const edit = api.editRewardLayout;
-      api.editRewardLayout = async (token, command) => {
+      ).overlayLayoutApi;
+      const edit = api.editLayout;
+      api.editLayout = async (token, command) => {
         const next = await edit(token, command);
         await new Promise((resolve) => setTimeout(resolve, 300));
         return next;
@@ -363,6 +379,88 @@ test("reward layout editing saves from Settings and opens from setup", async () 
     expect(savedAfterDrag.rewardLayout.fields.slotLabel?.x).toBeCloseTo(30, 0);
     expect(await rewardWindowCount(harness)).toBe(0);
     expect(errors).toEqual([]);
+  } finally {
+    await closeElectronTestHarness(harness);
+  }
+});
+
+test("preview variants and choice counts preserve a saved layout until it is edited", async () => {
+  test.setTimeout(120_000);
+  let harness: ElectronTestHarness | undefined;
+  const rewardLayout = normalizeOverlayLayout("reward", {
+    version: 1,
+    fields: { platinumValue: { x: 500, y: 0, scale: 2 } },
+  });
+  try {
+    harness = await launchElectronTestHarness("wfh-reward-editor-preview-", {
+      userDataFiles: {
+        "overlay-settings.json": { notificationSoundEnabled: false, rewardLayout },
+      },
+    });
+    const { page } = harness;
+    const overlay = await openSettingsEditor(harness);
+    expect((await readState(overlay)).layout).toEqual(rewardLayout);
+    await page.locator("[data-reward-editor-count]").selectOption("1");
+    await expect(overlay.locator(".reward-slot.has-item")).toHaveCount(1);
+    await page.locator("[data-reward-editor-preview]").selectOption("error");
+    await expect(overlay.locator("#error-banner")).toBeVisible();
+    await page.locator("[data-reward-editor-preview]").selectOption("rewards");
+    await expect(overlay.locator(".reward-slot.has-item")).toHaveCount(1);
+    expect((await readState(overlay)).layout).toEqual(rewardLayout);
+    await page.locator("[data-reward-editor-save]").click();
+    const saved = JSON.parse(
+      fs.readFileSync(path.join(harness.sandboxDir, "user-data", "overlay-settings.json"), "utf8"),
+    ) as { rewardLayout: RewardOverlayLayout };
+    expect(saved.rewardLayout).toEqual(rewardLayout);
+  } finally {
+    await closeElectronTestHarness(harness);
+  }
+});
+
+test("acknowledged drag steps keep the original preview node and pointer capture", async () => {
+  test.setTimeout(120_000);
+  let harness: ElectronTestHarness | undefined;
+  try {
+    harness = await launchElectronTestHarness("wfh-reward-editor-capture-", {
+      userDataFiles: { "overlay-settings.json": { notificationSoundEnabled: false } },
+    });
+    const { page } = harness;
+    const overlay = await openSettingsEditor(harness);
+    const target = overlay.locator('[data-reward-field="platinumValue"]').first();
+    const original = await target.elementHandle();
+    const box = await target.boundingBox();
+    const preview = await page.locator("[data-reward-editor-frame]").boundingBox();
+    if (!original || !box || !preview) throw new Error("Preview field is unavailable");
+    const scale = preview.width / REWARD_OVERLAY_CANVAS.width;
+    await overlay.evaluate(() => {
+      document.body.dataset.previewConfigurations = "0";
+      window.addEventListener("message", (event) => {
+        if (event.data?.type === "reward-preview-config")
+          document.body.dataset.previewConfigurations = String(
+            Number(document.body.dataset.previewConfigurations) + 1,
+          );
+      });
+    });
+    await page.mouse.move(box.x + 3, box.y + 3);
+    await page.mouse.down();
+    for (const offset of [10, 20, 30]) {
+      await page.mouse.move(box.x + 3 + offset * scale, box.y + 3);
+      await expect(page.locator('[data-reward-editor-position="x"]')).toHaveValue(String(offset));
+      await overlay.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
+      expect(await original.evaluate((element) => element.isConnected)).toBe(true);
+    }
+    await page.mouse.up();
+    await expect(overlay.locator("body")).toHaveAttribute("data-preview-configurations", "0");
+    await page.locator("[data-reward-editor-save]").click();
+    const saved = JSON.parse(
+      fs.readFileSync(path.join(harness.sandboxDir, "user-data", "overlay-settings.json"), "utf8"),
+    ) as { rewardLayout: RewardOverlayLayout };
+    expect(saved.rewardLayout.fields.platinumValue?.x).toBe(30);
   } finally {
     await closeElectronTestHarness(harness);
   }
@@ -409,13 +507,13 @@ test("rapid field selection and a refused drag preserve the last position on Sav
     await overlay.evaluate(() => {
       const scope = window as unknown as {
         refuseEdits: boolean;
-        overlay: {
-          editRewardLayout: (token: string, command: { type: string }) => Promise<unknown>;
+        overlayLayoutApi: {
+          editLayout: (token: string, command: { type: string }) => Promise<unknown>;
         };
       };
-      const edit = scope.overlay.editRewardLayout;
+      const edit = scope.overlayLayoutApi.editLayout;
       scope.refuseEdits = true;
-      scope.overlay.editRewardLayout = async (token, command) => {
+      scope.overlayLayoutApi.editLayout = async (token, command) => {
         if (command.type === "field" && scope.refuseEdits) {
           document.body.dataset.editRefused = "true";
           throw new Error("Injected unavailable editor command");
@@ -503,8 +601,16 @@ test("saved reward fields survive a fresh process, live prices and language chan
     });
     await harness.page.evaluate(() => window.api.toggleOverlay());
     const overlay = await overlayWindow(harness, "renderer/overlay.html", "planner");
-    await expect.poll(async () => (await readState(overlay)).layout).toEqual(layout);
+    await expect
+      .poll(async () => (await readState(overlay)).layout)
+      .toEqual(normalizeOverlayLayout("reward", layout));
     expect((await readState(overlay)).sessionId).toBeNull();
+    expect(
+      await overlay.evaluate(() =>
+        Object.keys((window as unknown as { overlayLayoutApi: object }).overlayLayoutApi).sort(),
+      ),
+    ).toEqual(["defaultFieldStyle", "getLayout", "onLayout"]);
+    await expect(overlay.locator("body")).not.toHaveClass(/reward-layout-editing/);
     await expect(overlay.locator('[data-reward-field="slotLabel"]').first()).toBeAttached();
     await evaluateInMain(harness.app, ({ BrowserWindow }) => {
       const win = BrowserWindow.getAllWindows().find((candidate) => {

@@ -1,3 +1,4 @@
+import { getOverlayDescriptor } from "../config/shared/overlayLayout";
 import ctx from "./context";
 import { assertArbiSummarySender, onAuthorized } from "./ipcSecurity";
 import { setClickThrough } from "./overlay/clickThrough";
@@ -27,8 +28,8 @@ const APP_ROOT = app.getAppPath();
 const ARBI_SUMMARY_WINDOW_FILE = path.join(APP_ROOT, "renderer", "arbi-overlay.html");
 
 const AUTO_HIDE_MS = 60_000;
-const WIN_W = 420;
-const WIN_H = 252;
+const WIN_W = getOverlayDescriptor("arbiSummary").canvas.width;
+const WIN_H = getOverlayDescriptor("arbiSummary").canvas.height;
 
 let persistOverlaySettings: (() => void) | null = null;
 const rememberOverlayWindowBounds = createOverlayWindowBoundsChangeHandler({

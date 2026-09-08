@@ -1,3 +1,4 @@
+import { installOverlayLayoutBridge } from "./ipc/overlayLayoutPreload";
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   TradeNotificationShowPayload,
@@ -11,13 +12,19 @@ import {
   TRADE_NOTIFICATION_REP_RESULT,
   OVERLAY_GET_MESSAGES,
   OVERLAY_MESSAGES,
+  OVERLAY_GET_THEME_VARS,
+  OVERLAY_THEME_VARS,
 } from "./config/shared/ipcChannels";
 
 export type { TradeNotificationShowPayload, TradeRepResultPayload };
 
 installOverlayContentVisibility(ipcRenderer);
+installOverlayLayoutBridge();
 
 contextBridge.exposeInMainWorld("tradeNotificationApi", {
+  getThemeVars: () => ipcRenderer.invoke(OVERLAY_GET_THEME_VARS),
+  onThemeVars: (callback: (vars: Record<string, string>) => void) =>
+    onIpcData(ipcRenderer, OVERLAY_THEME_VARS, callback),
   onShow: (callback: (payload: TradeNotificationShowPayload) => void) => {
     return onIpcData(ipcRenderer, TRADE_NOTIFICATION_SHOW, callback);
   },

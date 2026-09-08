@@ -473,9 +473,31 @@ function renderPlannerCards() {
 
     const title = document.createElement("div");
     title.className = "plan-title";
-    title.textContent = String(row.label || row.relicName || "-");
+    for (const [field, value] of [
+      ["relicCount", `${Number(row.count) || 0}x`],
+      ["relicName", row.relicName || row.label || "-"],
+      [
+        "refinement",
+        ["intact", "exceptional", "flawless", "radiant"].includes(row.quality)
+          ? t(
+              {
+                intact: "relics.quality.intact",
+                exceptional: "relics.quality.exceptional",
+                flawless: "relics.quality.flawless",
+                radiant: "relics.quality.radiant",
+              }[row.quality],
+            )
+          : "-",
+      ],
+    ]) {
+      const part = document.createElement("span");
+      part.dataset.rewardField = field;
+      part.textContent = value;
+      title.appendChild(part);
+    }
 
     const vaultTag = document.createElement("span");
+    vaultTag.dataset.rewardField = "vaulted";
     vaultTag.className = `plan-vault-tag ${row.vaulted ? "vaulted" : "unvaulted"}`;
     vaultTag.textContent = row.vaulted ? t("common.vaulted") : t("common.unvaulted");
     title.appendChild(vaultTag);
@@ -485,6 +507,7 @@ function renderPlannerCards() {
 
     const label = document.createElement("span");
     label.className = "plan-profit-label";
+    label.dataset.rewardField = "profitLabel";
     label.textContent = t("overlay.planner.expectedProfits");
 
     profit.appendChild(label);
@@ -505,6 +528,43 @@ function renderPlannerCards() {
 
     card.appendChild(title);
     card.appendChild(profit);
+    const rewards = document.createElement("div");
+    rewards.className = "plan-rewards";
+    for (const [index, reward] of (Array.isArray(row.rewards) ? row.rewards : [])
+      .slice(0, 6)
+      .entries()) {
+      const rewardRow = document.createElement("div");
+      rewardRow.className = "plan-reward";
+      rewardRow.dataset.rarity = String(reward.rarity || "").toLowerCase();
+      const icon = document.createElement("span");
+      icon.className = "plan-reward-icon reward-field-hidden";
+      icon.dataset.rewardField = `reward${index}Icon`;
+      if (reward.imageUrl) {
+        const image = document.createElement("img");
+        image.src = reward.imageUrl;
+        image.alt = "";
+        image.addEventListener("error", () => image.remove(), { once: true });
+        icon.appendChild(image);
+      }
+      const name = document.createElement("span");
+      name.className = "plan-reward-name reward-field-hidden";
+      name.dataset.rewardField = `reward${index}Name`;
+      name.textContent = reward.name || "-";
+      name.title = name.textContent;
+      const chance = document.createElement("span");
+      chance.className = "plan-reward-chance reward-field-hidden";
+      chance.dataset.rewardField = `reward${index}Chance`;
+      const probability = finiteMetric(reward.chance);
+      chance.textContent = probability === null ? "-" : `${probability.toFixed(1)}%`;
+      const owned = document.createElement("span");
+      owned.className = "plan-reward-owned reward-field-hidden";
+      owned.dataset.rewardField = `reward${index}Owned`;
+      const count = finiteMetric(reward.ownedCount);
+      owned.textContent = t("market.ownedCount", { count: count === null ? "?" : count });
+      rewardRow.append(icon, name, chance, owned);
+      rewards.appendChild(rewardRow);
+    }
+    card.appendChild(rewards);
     container.appendChild(card);
   }
 }
@@ -653,18 +713,76 @@ function renderDynamicText() {
   updateDragHint();
 }
 
+function tag(root, selector, field) {
+  const element = root.querySelector(selector);
+  if (element) element.dataset.rewardField = field;
+}
+
+function tagRewardFields() {
+  for (const card of document.querySelectorAll(".reward-slot")) {
+    for (const [selector, field] of Object.entries({
+      ".slot-player": "slotLabel",
+      ".slot-name": "itemName",
+      ".slot-rarity": "rarity",
+      ".slot-plat-value .currency-icon": "platinumIcon",
+      ".slot-plat-value > span:last-child": "platinumValue",
+      ".slot-ducat-value .currency-icon": "ducatIcon",
+      ".slot-ducat-value > span:last-child": "ducatValue",
+      ".slot-price-placeholder": "pricePlaceholder",
+      ".slot-meta-chip.owned": "owned",
+      ".slot-meta-chip.mastered, .slot-meta-chip.unmastered": "mastery",
+      ".slot-meta-chip.building": "foundry",
+      ".slot-meta-chip.set": "setOwned",
+      ".slot-meta-chip.set-price": "setPrice",
+    }))
+      tag(card, selector, field);
+    const parts = card.querySelectorAll(".slot-set-part");
+    parts.forEach((part, index) => {
+      tag(part, ".slot-set-part-icon", `part${index}Icon`);
+      tag(part, ".slot-set-part-count", `part${index}Count`);
+    });
+  }
+  for (const [selector, field] of Object.entries({
+    "#best-label": "bestLabel",
+    "#best-value > span:not(.footer-currency-value):not(.best-placeholder)": "bestName",
+    ".footer-plat-value .currency-icon": "bestPlatinumIcon",
+    ".footer-plat-value > span:last-child": "bestPlatinumValue",
+    ".best-placeholder": "bestPlaceholder",
+    ".scan-spinner": "scanSpinner",
+    "#scanning-text": "scanText",
+    "#error-banner": "errorText",
+    "#drag-hint": "dragHint",
+    "#btn-close": "closeButton",
+  }))
+    tag(document, selector, field);
+}
+
 function startOverlay() {
   resetSlots();
   resetPlannerRows();
-  const mode = new URLSearchParams(window.location.search).get("mode");
-  if (mode === "planner") {
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get("mode");
+  const planner = mode === "planner" || (mode === "editor" && params.get("kind") === "planner");
+  if (planner) {
     showPlannerModeScanning();
   } else {
     showRewardModeScanning();
   }
   setOverlayInteractiveMode(false);
-  if (mode !== "planner") {
-    rewardLayoutEditor = window.installRewardLayout({
+  if (planner) {
+    rewardLayoutEditor = window.installOverlayLayout({
+      ...(mode === "editor" ? { defaultFieldStyle: window.overlay.defaultFieldStyle } : {}),
+      tagFields: tagPlannerFields,
+      fitWidthFields: ["errorText"],
+      boundsFor: (element) => element.closest(".plan-card"),
+      renderPreview: renderPlannerPreview,
+      resetPreview: showPlannerModeScanning,
+    });
+  } else {
+    rewardLayoutEditor = window.installOverlayLayout({
+      tagFields: tagRewardFields,
+      fitWidthFields: ["itemName", "errorText"],
+      boundsFor: (element) => element.closest(".reward-slot"),
       ...(mode === "editor" ? { defaultFieldStyle: window.overlay.defaultFieldStyle } : {}),
       renderPreview: renderRewardPreview,
       resetPreview: () => {
@@ -672,9 +790,66 @@ function startOverlay() {
         updateDragHint();
       },
     });
-    if (mode === "editor") window.flushRewardEditor = rewardLayoutEditor.flush;
   }
   window.overlay.ready();
+}
+
+function tagPlannerFields() {
+  for (const [selector, field] of Object.entries({
+    ".plan-profit-plat .currency-icon": "platinumIcon",
+    ".plan-profit-plat > span:last-child": "platinumValue",
+    ".plan-profit-ducat .currency-icon": "ducatIcon",
+    ".plan-profit-ducat > span:last-child": "ducatValue",
+    ".scan-spinner": "scanSpinner",
+    "#scanning-text": "scanText",
+    "#error-banner": "errorText",
+    "#planner-hint": "interactionHint",
+    "#drag-hint": "dragHint",
+    "#btn-close": "closeButton",
+  })) {
+    for (const element of document.querySelectorAll(selector)) element.dataset.rewardField = field;
+  }
+}
+
+function renderPlannerPreview(state) {
+  showPlannerModeScanning();
+  setOverlayInteractiveMode(true);
+  dragHintInfo = { hotkey: "Ctrl+Space", dismissed: false };
+  updateDragHint();
+  if (state.previewVariant === "scanning") return;
+  const missing = state.previewVariant === "missing";
+  const error = state.previewVariant === "error";
+  const names = [
+    "Braton Prime Receiver",
+    "Forma Blueprint",
+    "Lex Prime Barrel",
+    "Paris Prime String",
+    "Burston Prime Stock",
+    "Orthos Prime Blade",
+  ];
+  renderPlannerRows({
+    era: missing ? "Lith" : error ? null : "Neo",
+    ocrUnavailable: error,
+    rows:
+      missing || error
+        ? []
+        : Array.from({ length: state.previewCount }, (_, index) => ({
+            relicName: ["Neo B7", "Lith M9", "Axi P8", "Meso S12"][index],
+            quality: ["radiant", "intact", "exceptional", "flawless"][index],
+            count: index + 2,
+            vaulted: index % 2 === 0,
+            platEv: 24 - index * 4,
+            ducatEv: 65 - index * 5,
+            rewards: names.map((name, reward) => ({
+              name,
+              imageUrl: reward === 1 ? "../assets/Forma.webp" : "../assets/NoBlueprintsIcon.png",
+              rarity: reward === 0 ? "Rare" : reward < 3 ? "Uncommon" : "Common",
+              chance: [10, 20, 20, 16.67, 16.67, 16.66][reward],
+              ownedCount: reward === 5 ? null : reward + index,
+            })),
+          })),
+  });
+  showPlannerHint(true);
 }
 
 function renderRewardPreview(state) {

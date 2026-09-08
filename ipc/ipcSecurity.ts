@@ -157,8 +157,7 @@ function assertOverlayRendererSender(event: IpcEventLike, _channel: string): voi
   });
 }
 
-// The trade toast reads the same message catalogue, but it has no drag, close
-// or scan surface, so it is only added to the guard for that one channel.
+// The trade toast shares localization, theme and layout reads, but no scan controls.
 function assertLocalizedOverlaySender(event: IpcEventLike, _channel: string): void {
   const candidates = overlayWindowCandidates();
   candidates.push({ win: ctx.tradeNotificationWindow, suffix: TRADE_NOTIFICATION_RENDERER_SUFFIX });

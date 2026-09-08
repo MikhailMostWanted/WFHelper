@@ -1,3 +1,4 @@
+import { installOverlayLayoutBridge } from "./ipc/overlayLayoutPreload";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { onIpc } from "./ipc/preloadListeners";
 import { installOverlayContentVisibility } from "./ipc/overlayContentVisibility";
@@ -34,6 +35,7 @@ const onRivenIpc = (
 ): (() => void) => onIpc(ipcRenderer, channel, listener);
 
 installOverlayContentVisibility(ipcRenderer);
+installOverlayLayoutBridge();
 
 contextBridge.exposeInMainWorld("rivenOverlay", {
   close: () => ipcRenderer.send(RIVEN_OVERLAY_CLOSE),

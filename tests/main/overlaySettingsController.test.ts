@@ -49,6 +49,46 @@ function buildController() {
 }
 
 describe("overlay settings controller", () => {
+  it("loads a legacy reward layout and preserves it through unrelated settings saves", () => {
+    const { controller, deps } = buildController();
+    const rewardLayout = {
+      version: 1,
+      fields: { platinumValue: { x: 35, y: -4, scale: 2, color: "#123456", hidden: false } },
+    };
+    deps.fs.existsSync.mockReturnValue(true);
+    deps.fs.readFileSync.mockReturnValue(JSON.stringify({ rewardLayout }));
+    const loaded = controller.loadOverlaySettings();
+    expect(loaded.rewardLayout).toEqual(rewardLayout);
+    expect(loaded.overlayLayouts?.planner?.fields.reward0Name?.hidden).toBe(true);
+    const saved = controller.setOverlaySettings({ notificationSoundEnabled: false });
+    expect(saved.rewardLayout).toEqual(rewardLayout);
+    expect(JSON.parse(deps.writeFileAtomic.mock.calls.at(-1)![1]).rewardLayout).toEqual(
+      rewardLayout,
+    );
+  });
+
+  it("retains editor layouts across ordinary settings saves and strips foreign fields", () => {
+    const { controller } = buildController();
+    controller.setOverlaySettings({
+      overlayLayouts: {
+        planner: {
+          version: 1,
+          fields: { relicName: { scale: 2, hidden: true }, weaponName: { scale: 3 } },
+        },
+        rivenRight: { version: 1, fields: { weaponName: { color: "#123456" } } },
+        untrusted: { version: 1, fields: { anything: { scale: 3 } } },
+      },
+    });
+    const saved = controller.setOverlaySettings({ notificationSoundEnabled: false });
+    expect(saved.overlayLayouts?.planner?.fields.relicName).toMatchObject({
+      scale: 2,
+      hidden: true,
+    });
+    expect(saved.overlayLayouts?.planner?.fields).not.toHaveProperty("weaponName");
+    expect(saved.overlayLayouts?.rivenRight?.fields.weaponName).toMatchObject({ color: "#123456" });
+    expect(saved.overlayLayouts).not.toHaveProperty("untrusted");
+  });
+
   it("normalizes hotkeys", () => {
     const { controller } = buildController();
 

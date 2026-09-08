@@ -1,3 +1,4 @@
+import { OVERLAY_LAYOUT_KINDS, normalizeOverlayLayout } from "../../config/shared/overlayLayout";
 import { normalizeNotificationVolume } from "../../config/shared/notificationSound";
 import { normalizeErrorMessage } from "../../config/shared/errors";
 import { clampNumber } from "../../config/shared/numeric";
@@ -285,6 +286,12 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
       overlayWindowScales: normalizeWindowScales(candidate.overlayWindowScales),
       overlayWindowBounds: normalizeSavedBounds(candidate.overlayWindowBounds),
       rewardLayout: normalizeRewardOverlayLayout(candidate.rewardLayout),
+      overlayLayouts: Object.fromEntries(
+        OVERLAY_LAYOUT_KINDS.filter((kind) => kind !== "reward").map((kind) => [
+          kind,
+          normalizeOverlayLayout(kind, asRecord(candidate.overlayLayouts)?.[kind]),
+        ]),
+      ),
       overlayDragHintDismissed: booleanSetting("overlayDragHintDismissed"),
     };
   }

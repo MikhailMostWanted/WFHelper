@@ -3,9 +3,11 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { BrowserWindow } from "electron";
 import { __test__, hardenBrowserWindowNavigation } from "../../services/windowSecurity";
+import { OVERLAY_LAYOUT_KINDS } from "../../config/shared/overlayLayout";
+import { overlayPreviewFilePaths, overlayPreviewUrl } from "../../services/overlayPreview";
 
 describe("window security URL guards", () => {
-  it("permits the reward preview only as an allowlisted subframe", () => {
+  it("permits each overlay preview only as an allowlisted subframe", () => {
     const callbacks = new Map<
       string,
       (event: { url: string; isMainFrame: boolean; preventDefault: () => void }) => void
@@ -28,8 +30,22 @@ describe("window security URL guards", () => {
     } as unknown as BrowserWindow;
     hardenBrowserWindowNavigation(window, {
       allowedFilePaths: [mainPath],
-      allowedSubframeFilePaths: [overlayPath],
+      allowedSubframeFilePaths: overlayPreviewFilePaths(process.cwd()),
     });
+    for (const kind of OVERLAY_LAYOUT_KINDS) {
+      const url = overlayPreviewUrl(process.cwd(), kind);
+      for (const isMainFrame of [false, true]) {
+        let blocked = false;
+        callbacks.get("will-frame-navigate")!({
+          url,
+          isMainFrame,
+          preventDefault: () => {
+            blocked = true;
+          },
+        });
+        expect(blocked, `${kind} main=${isMainFrame}`).toBe(isMainFrame);
+      }
+    }
     for (const [url, isMainFrame, allowed] of [
       [`${pathToFileURL(overlayPath).href}?mode=editor`, false, true],
       [pathToFileURL(mainPath).href, true, true],

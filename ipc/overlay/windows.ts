@@ -543,10 +543,17 @@ export function createOverlayWindowsController(options: OverlayWindowsController
     if (sizeMatches(bounds, selfRequestedSize)) return;
     if (sizeMatches(bounds, getOverlayBoundsForActiveDisplay())) return;
     const display = displayMatchingBounds(bounds) || getDisplayForOverlay(lastOverlayAnchorMeta);
-    saveCurrentWindowBounds(overlayWindow, scaleFromWindowSize(bounds, display));
+    const scale = scaleFromWindowSize(bounds, display);
+    saveCurrentWindowBounds(overlayWindow, scale);
     // Settle on the size the saved scale spells out, so a drag past either end
     // of the slider springs back instead of clipping the content until restart.
     positionOverlayWindow();
+    const settled = overlayWindow.getBounds();
+    log.info(
+      `[OverlayWindow] ${windowLabel} resized by the user to ${bounds.width}x${bounds.height}` +
+        ` -> scale ${scale}${readInteractiveMode() ? "" : " (passive, not saved)"}` +
+        `, settled at ${settled.width}x${settled.height}`,
+    );
   }
 
   function attachBoundsPersistence(overlayWindow: import("electron").BrowserWindow): void {

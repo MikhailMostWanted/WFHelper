@@ -133,8 +133,11 @@ body {
 #slots-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: max-content;
   gap: 8px;
   padding: 8px 10px 6px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* Planner scrolls; keep the close X clear of its scrollbar. */
@@ -145,8 +148,10 @@ body {
 #planner-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: max-content;
   gap: 5px;
   padding: 8px 10px 6px;
+  align-content: start;
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
@@ -154,6 +159,10 @@ body {
 
 #planner-grid::-webkit-scrollbar {
   width: 6px;
+}
+
+.planner-mode:has(#header > :not(.is-hidden)) #planner-grid {
+  padding-top: 30px;
 }
 
 #planner-grid::-webkit-scrollbar-thumb {
@@ -227,13 +236,68 @@ body {
   line-height: 1.2;
   font-weight: 600;
   color: var(--text);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+}
+
+.plan-rewards {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+.plan-rewards:not(:has([data-reward-field]:not(.reward-field-hidden))),
+.plan-reward:not(:has([data-reward-field]:not(.reward-field-hidden))) {
+  display: none;
+}
+
+.plan-reward {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 1px 4px;
+  min-height: 29px;
+  align-items: center;
+  font-size: 9px;
+}
+
+.plan-reward-icon {
+  width: 22px;
+  height: 22px;
+  grid-row: 1 / 3;
+  display: inline-block;
+}
+
+.plan-reward-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.plan-reward-name {
+  grid-column: 2 / 4;
   min-width: 0;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.plan-reward-chance {
+  color: var(--muted);
+}
+.plan-reward-owned {
+  color: var(--muted);
+  justify-self: end;
+}
+.plan-reward[data-rarity="rare"] .plan-reward-chance {
+  color: var(--rare);
+}
+.plan-reward[data-rarity="uncommon"] .plan-reward-chance {
+  color: var(--uncommon);
 }
 
 .plan-vault-tag {
@@ -271,7 +335,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
+  gap: 4px;
+  flex-wrap: wrap;
   white-space: nowrap;
   min-width: 0;
 }
@@ -306,33 +371,6 @@ body {
   width: 30px;
   height: 30px;
   flex-shrink: 0;
-}
-
-[data-reward-field] {
-  transform-origin: top left;
-  mask-size: contain;
-  mask-position: center;
-  mask-repeat: no-repeat;
-}
-
-.reward-field-hidden {
-  visibility: hidden !important;
-}
-
-.reward-layout-editing [data-reward-field] {
-  cursor: move;
-  touch-action: none;
-  user-select: none;
-}
-
-.reward-layout-editing [data-reward-field]:hover {
-  outline: 1px dashed var(--accent);
-  outline-offset: 2px;
-}
-
-.reward-layout-editing .reward-field-selected {
-  outline: 2px solid var(--accent-bright);
-  outline-offset: 2px;
 }
 
 .plan-profit-label {
@@ -524,8 +562,8 @@ body {
 }
 
 .slot-set-parts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   width: 100%;
 }
@@ -533,14 +571,14 @@ body {
 .slot-set-part {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   max-width: 108px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 5px;
-  padding: 3px 2px;
+  padding: 3px 6px;
   background: rgba(255, 255, 255, 0.045);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.2;
   font-weight: 700;
 }
@@ -566,7 +604,7 @@ body {
 }
 
 .slot-set-part-count {
-  min-width: 0;
+  min-width: 26px;
 }
 
 .slot-set-part.owned {

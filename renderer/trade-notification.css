@@ -21,8 +21,8 @@ body {
   gap: 10px;
   padding: 10px 14px;
   border-radius: 8px;
-  background: rgba(15, 20, 32, 0.92);
-  border: 1px solid rgba(212, 168, 67, 0.4);
+  background: color-mix(in srgb, var(--bg-surface, #0f1420) 92%, transparent);
+  border: 1px solid var(--border-strong, rgba(212, 168, 67, 0.4));
   backdrop-filter: blur(12px);
   opacity: 1;
   transform: translateX(0);
@@ -125,10 +125,36 @@ body {
   border: 1px solid rgba(192, 132, 252, 0.3);
 }
 
+body.layout-preview {
+  zoom: 1;
+}
+
+body.layout-preview #notification {
+  transition: none;
+}
+
+#item-line {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+}
+
+#item-quantity {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #e8e0d0);
+}
+
+#item-quantity::after {
+  content: " ";
+  white-space: pre;
+}
+
 #item-name {
   font-size: 13px;
   font-weight: 600;
-  color: #e8e0d0;
+  color: var(--text-primary, #e8e0d0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -139,6 +165,10 @@ body {
   align-items: center;
   gap: 8px;
   font-size: 11px;
+}
+
+#plat-amount:not([hidden]) {
+  display: inline-flex;
 }
 
 #plat-amount {

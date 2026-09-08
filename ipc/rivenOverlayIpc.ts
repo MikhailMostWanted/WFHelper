@@ -1,5 +1,6 @@
 import path from "node:path";
 import { BrowserWindow, app, screen, shell } from "electron";
+import { getOverlayDescriptor } from "../config/shared/overlayLayout";
 import ctx from "./context";
 import { assertRivenOverlayRendererSender, onAuthorized } from "./ipcSecurity";
 import {
@@ -67,8 +68,7 @@ const rememberOverlayWindowBounds = createOverlayWindowBoundsChangeHandler({
   },
 });
 
-const RIVEN_WIN_W = 420;
-const RIVEN_WIN_H = 640;
+const RIVEN_CANVAS = getOverlayDescriptor("rivenLeft").canvas;
 const RIVEN_TOP_OFFSET = 80;
 
 const rivenLastEvents = new Map<string, unknown[]>();
@@ -90,10 +90,10 @@ const rivenWindowBaseOptions = {
   hardenBrowserWindowNavigation,
   overlayWindowFile: RIVEN_WINDOW_FILE,
   displayMode: "primary" as const,
-  windowWidth: RIVEN_WIN_W,
-  windowHeight: RIVEN_WIN_H,
-  minWindowWidth: RIVEN_WIN_W,
-  minWindowHeight: RIVEN_WIN_H,
+  windowWidth: RIVEN_CANVAS.width,
+  windowHeight: RIVEN_CANVAS.height,
+  minWindowWidth: RIVEN_CANVAS.width,
+  minWindowHeight: RIVEN_CANVAS.height,
   topOffset: RIVEN_TOP_OFFSET,
   transparent: false,
   backgroundColor: "#060a12",

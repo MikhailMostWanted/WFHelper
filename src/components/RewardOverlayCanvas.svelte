@@ -1,10 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
-  import { REWARD_OVERLAY_CANVAS } from "../../config/shared/rewardOverlayLayout.js";
-  import type {
-    RewardOverlayEditCommand,
-    RewardOverlayEditState,
-  } from "../../config/shared/rewardOverlayLayout.js";
+  import { getOverlayDescriptor } from "../../config/shared/overlayLayout.js";
+  import type { OverlayEditCommand, OverlayEditState } from "../../config/shared/overlayLayout.js";
   import type { IpcInvokeMap } from "../types/ipc.js";
   import { invoke } from "../lib/ipc.js";
   import { locale, tr } from "../lib/i18n.js";
@@ -14,12 +11,14 @@
     onCommand,
     onCancel,
   }: {
-    state: RewardOverlayEditState;
-    onCommand: (command: RewardOverlayEditCommand) => Promise<RewardOverlayEditState | undefined>;
+    state: OverlayEditState;
+    onCommand: (command: OverlayEditCommand) => Promise<OverlayEditState | undefined>;
     onCancel: () => void;
   } = $props();
+  const kind = $derived(editState.kind);
+  const descriptor = $derived(getOverlayDescriptor(kind));
   let frame = $state<HTMLIFrameElement>();
-  let context = $state<IpcInvokeMap["getRewardOverlayPreview"]["return"]>();
+  let context = $state<IpcInvokeMap["getOverlayPreview"]["return"]>();
   let width = $state(900);
   let failed = $state(false);
   let flushId = 0;
@@ -43,14 +42,13 @@
       frame?.contentWindow?.postMessage({ type: "reward-preview-flush", id }, "*");
     });
   }
-  // Fit the whole overlay into the canvas at any reward size; it only grows past the fit
-  // when the panel is wide enough, so the preview never needs the horizontal scrollbar.
+  // Preview zoom fits the logical canvas without changing saved field offsets.
   const scale = $derived(
-    Math.max(0.25, Math.min(1, (width - 48) / (REWARD_OVERLAY_CANVAS.width * editState.scale))) *
+    Math.max(0.25, Math.min(1, (width - 48) / (descriptor.canvas.width * editState.scale))) *
       editState.scale,
   );
-  const previewWidth = $derived(REWARD_OVERLAY_CANVAS.width * scale);
-  const previewHeight = $derived(REWARD_OVERLAY_CANVAS.height * scale);
+  const previewWidth = $derived(descriptor.canvas.width * scale);
+  const previewHeight = $derived(descriptor.canvas.height * scale);
 
   function configure(): void {
     if (!frame?.contentWindow || !context) return;
@@ -66,7 +64,7 @@
   $effect(() => {
     const language = $locale;
     let disposed = false;
-    void invoke("getRewardOverlayPreview")
+    void invoke("getOverlayPreview", kind)
       .then((next) => {
         if (!disposed && language === $locale) {
           context = next;
@@ -109,7 +107,7 @@
       else if (message.type === "reward-preview-command" && Number.isSafeInteger(message.id)) {
         const destination = frame.contentWindow;
         if (!message.command || typeof message.command !== "object") return;
-        const next = await onCommand(message.command as RewardOverlayEditCommand);
+        const next = await onCommand(message.command as OverlayEditCommand);
         destination?.postMessage(
           {
             type: "reward-preview-result",
@@ -156,13 +154,13 @@
         <iframe
           bind:this={frame}
           data-reward-editor-frame
-          title={$tr("rewardEditor.title")}
+          title={$tr(editState.kind === "reward" ? "rewardEditor.title" : "overlayEditor.title")}
           src={context.url}
           sandbox="allow-scripts allow-same-origin"
           onload={configure}
           class="absolute left-0 top-0 origin-top-left border-0"
-          style:width={`${REWARD_OVERLAY_CANVAS.width}px`}
-          style:height={`${REWARD_OVERLAY_CANVAS.height}px`}
+          style:width={`${descriptor.canvas.width}px`}
+          style:height={`${descriptor.canvas.height}px`}
           style:transform={`scale(${scale})`}
         ></iframe>
       </div>

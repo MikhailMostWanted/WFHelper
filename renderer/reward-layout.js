@@ -1,5 +1,37 @@
 (function () {
-  window.installRewardLayout = function installRewardLayout(options) {
+  window.installOverlayLayout = function installOverlayLayout(options) {
+    const api = options.api || window.overlayLayoutApi;
+    const root =
+      typeof options.root === "string"
+        ? document.querySelector(options.root)
+        : options.root || document.getElementById("panel");
+    if (!root || !api)
+      return {
+        flush: () => Promise.resolve(),
+        isEditing: () => false,
+        refresh: () => {},
+        cancel: () => {},
+      };
+    const preview =
+      window.parent !== window && new URLSearchParams(location.search).get("mode") === "editor";
+    const coordinateScale = () => {
+      const zoom =
+        options.coordinateScale?.() ?? Number.parseFloat(getComputedStyle(document.body).zoom);
+      return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+    };
+    const logicalRect = (value) => {
+      const rect = value.getBoundingClientRect ? value.getBoundingClientRect() : value;
+      const zoom = coordinateScale();
+      return {
+        left: rect.left / zoom,
+        top: rect.top / zoom,
+        right: rect.right / zoom,
+        bottom: rect.bottom / zoom,
+        width: rect.width / zoom,
+        height: rect.height / zoom,
+      };
+    };
+    const originalBackgrounds = new WeakMap();
     let state = null;
     let frame = 0;
     let gesture = null;
@@ -7,53 +39,10 @@
     let inFlight = null;
     let sending = false;
     const drains = [];
+    const pendingClamps = new Set();
 
     function editing() {
-      return Boolean(state?.sessionId);
-    }
-
-    function tag(root, selector, field) {
-      const element = root.querySelector(selector);
-      if (element) element.dataset.rewardField = field;
-    }
-
-    function tagFields() {
-      for (const card of document.querySelectorAll(".reward-slot")) {
-        for (const [selector, field] of Object.entries({
-          ".slot-player": "slotLabel",
-          ".slot-name": "itemName",
-          ".slot-rarity": "rarity",
-          ".slot-plat-value .currency-icon": "platinumIcon",
-          ".slot-plat-value > span:last-child": "platinumValue",
-          ".slot-ducat-value .currency-icon": "ducatIcon",
-          ".slot-ducat-value > span:last-child": "ducatValue",
-          ".slot-price-placeholder": "pricePlaceholder",
-          ".slot-meta-chip.owned": "owned",
-          ".slot-meta-chip.mastered, .slot-meta-chip.unmastered": "mastery",
-          ".slot-meta-chip.building": "foundry",
-          ".slot-meta-chip.set": "setOwned",
-          ".slot-meta-chip.set-price": "setPrice",
-        }))
-          tag(card, selector, field);
-        const parts = card.querySelectorAll(".slot-set-part");
-        parts.forEach((part, index) => {
-          tag(part, ".slot-set-part-icon", `part${index}Icon`);
-          tag(part, ".slot-set-part-count", `part${index}Count`);
-        });
-      }
-      for (const [selector, field] of Object.entries({
-        "#best-label": "bestLabel",
-        "#best-value > span:not(.footer-currency-value):not(.best-placeholder)": "bestName",
-        ".footer-plat-value .currency-icon": "bestPlatinumIcon",
-        ".footer-plat-value > span:last-child": "bestPlatinumValue",
-        ".best-placeholder": "bestPlaceholder",
-        ".scan-spinner": "scanSpinner",
-        "#scanning-text": "scanText",
-        "#error-banner": "errorText",
-        "#drag-hint": "dragHint",
-        "#btn-close": "closeButton",
-      }))
-        tag(document, selector, field);
+      return preview && Boolean(state?.sessionId);
     }
 
     function scheduleLayout() {
@@ -63,8 +52,8 @@
     function applyLayout() {
       if (frame) cancelAnimationFrame(frame);
       frame = 0;
-      tagFields();
-      const elements = [...document.querySelectorAll("[data-reward-field]")];
+      options.tagFields?.();
+      const elements = [...root.querySelectorAll("[data-reward-field]")];
       document.body.classList.toggle("reward-layout-editing", editing());
       for (const element of elements) {
         const field = element.dataset.rewardField;
@@ -77,11 +66,17 @@
         element.style.transform = "";
         element.style.translate = "";
         element.style.scale = "";
-        if (field === "itemName" || field === "errorText") {
+        if (options.fitWidthFields?.includes(field)) {
           element.style.width = style && style.scale !== 1 ? `${100 / style.scale}%` : "";
         }
         element.style.color = style?.color || "";
-        element.style.backgroundColor = "";
+        element.style.setProperty("--overlay-field-color", style?.color || "");
+        if (!originalBackgrounds.has(element))
+          originalBackgrounds.set(element, element.style.backgroundColor);
+        element.style.backgroundColor =
+          element.dataset.layoutTint === "background" && style?.color
+            ? style.color
+            : originalBackgrounds.get(element);
         element.style.maskImage = "";
         element.style.maskMode = "luminance";
         if (field === "scanSpinner") element.style.borderTopColor = style?.color || "";
@@ -97,7 +92,7 @@
           }
         }
       }
-      const panel = document.getElementById("panel").getBoundingClientRect();
+      const panel = logicalRect(root);
       const positions = [];
       const limits = new Map();
       const resolved = new Set();
@@ -105,14 +100,23 @@
         const field = element.dataset.rewardField;
         const style = state?.layout.fields[field];
         if (!style || style.hidden || !element.getClientRects().length) continue;
-        const rect = element.getBoundingClientRect();
+        const rect = logicalRect(element);
         if (!rect.width || !rect.height) continue;
-        const card = element.closest(".reward-slot")?.getBoundingClientRect();
-        const bounds = card || panel;
-        const left = Math.max(bounds.left, panel.left) + 3;
-        const top = Math.max(bounds.top, panel.top) + 3;
-        const right = Math.min(bounds.right, panel.right) - 3;
-        const bottom = Math.min(bounds.bottom, panel.bottom) - 3;
+        const container = options.boundsFor?.(element);
+        const bounds = container ? logicalRect(container) : panel;
+        if (
+          bounds.bottom <= panel.top ||
+          bounds.top >= panel.bottom ||
+          bounds.right <= panel.left ||
+          bounds.left >= panel.right
+        )
+          continue;
+        // Scroll clipping does not change a repeated card's saved coordinate bounds.
+        const left = bounds.left + 3;
+        const top = bounds.top + 3;
+        const right = bounds.right - 3;
+        const bottom = bounds.bottom - 3;
+        if (right <= left || bottom <= top) continue;
         const scale = Math.min(
           style.scale,
           (right - left) / rect.width,
@@ -148,14 +152,14 @@
         range.maxY = Math.min(range.maxY, position.bottom - position.height * position.scale);
       }
       for (const { element, field, style, scale } of positions) {
-        // A shared offset must fit every visible reward card.
+        // A shared field offset must fit every visible repeated row.
         const range = limits.get(field);
         const x = Math.max(range.minX, Math.min(range.maxX, style.x));
         const y = Math.max(range.minY, Math.min(range.maxY, style.y));
         // Individual properties preserve the spinner's rotation animation.
         element.style.scale = String(Math.max(0.05, scale));
         element.style.translate = `${x}px ${y}px`;
-        if (editing() && !resolved.has(field)) {
+        if (editing() && pendingClamps.has(field) && !resolved.has(field)) {
           resolved.add(field);
           const patch = { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
           if (patch.x !== style.x || patch.y !== style.y) {
@@ -164,6 +168,7 @@
           }
         }
       }
+      for (const field of resolved) pendingClamps.delete(field);
     }
 
     function accept(next) {
@@ -181,36 +186,54 @@
           }
         }
         if (gesture?.field) {
-          next.layout.fields[gesture.field] = previous.layout.fields[gesture.field];
+          const style = previous.layout.fields[gesture.field];
+          if (style) next.layout.fields[gesture.field] = style;
+          else delete next.layout.fields[gesture.field];
+        }
+      }
+      const samePreview =
+        previous?.sessionId === next.sessionId &&
+        previous.previewCount === next.previewCount &&
+        previous.previewVariant === next.previewVariant;
+      if (!samePreview) pendingClamps.clear();
+      else {
+        // Only an explicit geometry edit may save a clamp; preview changes stay visual.
+        for (const [field, style] of Object.entries(next.layout.fields)) {
+          const before = previous.layout.fields[field] || options.defaultFieldStyle;
+          if (
+            before &&
+            (style.x !== before.x || style.y !== before.y || style.scale !== before.scale)
+          )
+            pendingClamps.add(field);
         }
       }
       state = next;
-      if (next.sessionId) {
+      if (editing()) {
         if (
           previous?.sessionId !== next.sessionId ||
           previous.previewCount !== next.previewCount ||
           previous.previewVariant !== next.previewVariant
         ) {
           gesture = null;
-          options.renderPreview(next);
+          options.renderPreview?.(next);
         }
       } else if (previous?.sessionId) {
         gesture = null;
         commands.length = 0;
-        options.resetPreview();
+        options.resetPreview?.();
       }
       scheduleLayout();
     }
 
     async function sendPending() {
-      if (sending || !commands.length || !state?.sessionId) return;
+      if (sending || !commands.length || !editing()) return;
       sending = true;
       const sessionId = state.sessionId;
       const command = commands.shift();
       inFlight = command;
       let failure = null;
       try {
-        const next = await window.overlay.editRewardLayout(sessionId, command);
+        const next = await api.editLayout(sessionId, command);
         inFlight = null;
         if (state?.sessionId === sessionId && !gesture) {
           accept(next);
@@ -219,7 +242,7 @@
       } catch (error) {
         failure = error;
         if (state?.sessionId === sessionId) commands.unshift(command);
-        console.warn("[Overlay] reward layout edit failed", String(error));
+        console.warn("[Overlay] overlay layout edit failed", String(error));
       } finally {
         inFlight = null;
         sending = false;
@@ -283,10 +306,11 @@
       }
       if (gesture.field) {
         const patch = {
-          x: gesture.style.x + event.clientX - gesture.x,
-          y: gesture.style.y + event.clientY - gesture.y,
+          x: gesture.style.x + (event.clientX - gesture.x) / coordinateScale(),
+          y: gesture.style.y + (event.clientY - gesture.y) / coordinateScale(),
         };
         state.layout.fields[gesture.field] = { ...gesture.style, ...patch };
+        pendingClamps.add(gesture.field);
         applyLayout();
         const positioned = state.layout.fields[gesture.field];
         send({ type: "field", field: gesture.field, patch: { x: positioned.x, y: positioned.y } });
@@ -305,21 +329,22 @@
       if (editing()) event.preventDefault();
     });
     window.addEventListener("resize", scheduleLayout);
+    document.addEventListener("scroll", scheduleLayout, true);
     void document.fonts.ready.then(scheduleLayout);
-    new MutationObserver(scheduleLayout).observe(document.getElementById("panel"), {
+    new MutationObserver(scheduleLayout).observe(root, {
       childList: true,
       subtree: true,
       characterData: true,
     });
-    window.overlay.onRewardLayout(accept);
-    void window.overlay
-      .getRewardLayout()
+    api.onLayout(accept);
+    void api
+      .getLayout()
       .then(accept)
       .catch((error) => {
-        console.warn("[Overlay] reward layout unavailable", String(error));
+        console.warn("[Overlay] overlay layout unavailable", String(error));
       });
     scheduleLayout();
-    return {
+    const editor = {
       flush: () => {
         gesture = null;
         applyLayout();
@@ -332,16 +357,23 @@
       isEditing: editing,
       refresh: scheduleLayout,
       cancel: () => {
-        if (state?.sessionId) {
+        if (editing()) {
           commands.length = 0;
-          void window.overlay
-            .endRewardLayout(state.sessionId, false)
+          void api
+            .endLayout(state.sessionId, false)
             .then(accept)
             .catch((error) => {
-              console.warn("[Overlay] reward layout cancel failed", String(error));
+              console.warn("[Overlay] overlay layout cancel failed", String(error));
             });
         }
       },
     };
+    if (preview) {
+      window.flushRewardEditor = editor.flush;
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && editing()) editor.cancel();
+      });
+    }
+    return editor;
   };
 })();
