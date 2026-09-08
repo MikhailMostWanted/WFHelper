@@ -208,7 +208,7 @@ const SCREENS = [
   {
     file: "real-full-4p-oldui90.png",
     fixture: true,
-    info: "older squad-row reward UI at ~90% pitch + lower title band - needs visual strip detection (phase 2)",
+    info: "annotated screenshot of unverified origin/version with lower title band; not evidence of another current in-game layout",
     expect: {
       0: "Rhino Prime Systems Blueprint",
       1: "Paris Prime Blueprint",
