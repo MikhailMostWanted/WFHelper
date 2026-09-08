@@ -1,9 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
+import { DB_GET_WORLD_STATE } from "../config/shared/ipcChannels";
+import type { WorldStateRaw } from "../services/types/gameData";
+import type { WorldState } from "../src/types/world";
 
 import {
   closeElectronTestHarness,
+  evaluateInMain,
   launchElectronTestHarness,
   openView,
+  setLayoutViewport,
   writeHarnessInventory,
   type ElectronTestHarness,
 } from "./electronTestHarness";
@@ -167,4 +172,73 @@ test.describe("World dailies tracker", () => {
     await expect(row).toContainText("2/5");
     await expect(row.locator("[data-task-dec]")).toBeDisabled();
   });
+});
+
+test("Nightwave objectives remove icon tokens and distinguish missing metadata", async () => {
+  test.setTimeout(180_000);
+  let harness: ElectronTestHarness | undefined;
+  try {
+    harness = await launchElectronTestHarness("wfh-nightwave-metadata-");
+    const { app, page } = harness;
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await evaluateInMain(
+      app,
+      ({ app, ipcMain }, channel) => {
+        const moduleApi = process.getBuiltinModule("module") as typeof import("node:module");
+        const load = moduleApi.createRequire(`${app.getAppPath()}/.electron-build/main.js`);
+        const parser = load("./services/worldStateParser.js") as {
+          parseRaw: (raw: WorldStateRaw) => WorldState;
+        };
+        const window = {
+          Activation: { $date: { $numberLong: String(Date.now() - 60_000) } },
+          Expiry: { $date: { $numberLong: String(Date.now() + 3_600_000) } },
+        };
+        const world = parser.parseRaw({
+          SeasonInfo: {
+            ...window,
+            ActiveChallenges: [
+              {
+                ...window,
+                _id: { $oid: "radiation" },
+                Daily: true,
+                Challenge:
+                  "/Lotus/Types/Challenges/Seasons/Daily/SeasonDailyKillEnemiesWithRadiation",
+              },
+              {
+                ...window,
+                _id: { $oid: "unknown" },
+                Challenge:
+                  "/Lotus/Types/Challenges/Seasons/WeeklyHard/SeasonWeeklyHardBattleHardened",
+              },
+            ],
+          },
+        });
+        ipcMain.removeHandler(channel);
+        ipcMain.handle(channel, () => world);
+      },
+      DB_GET_WORLD_STATE,
+    );
+    await setLayoutViewport(page, 1440, 1000);
+    await openView(page, "world");
+    await page.locator('[data-tour-tab="dailies"]').click();
+    await page.locator("[data-tracker-search]").fill("Reactor");
+    const radiation = page.locator('[data-task="nw:radiation"]').locator("xpath=ancestor::div[1]");
+    await expect(radiation).toContainText("Kill 150 Enemies with Radiation Damage.");
+    await expect(radiation).not.toContainText("<DT_");
+    await page.locator("[data-tracker-search]").fill("Battle Hardened");
+    const unknown = page.locator('[data-task="nw:unknown"]').locator("xpath=ancestor::div[1]");
+    await expect(unknown).toContainText("Objective unavailable");
+    await expect(unknown).toContainText("Unknown standing");
+    await expect(unknown).not.toContainText("0 standing");
+    await page.locator("[data-tracker-search]").fill("");
+    await unknown.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: test.info().outputPath("nightwave-metadata.png"),
+      animations: "disabled",
+    });
+    expect(errors).toEqual([]);
+  } finally {
+    await closeElectronTestHarness(harness);
+  }
 });

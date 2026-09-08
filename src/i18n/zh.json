@@ -1701,6 +1701,7 @@
   "dailies.collapse": "隐藏任务",
   "dailies.boss": "首领：{name}",
   "dailies.standing": "{amount} 声望",
+  "dailies.objectiveUnavailable": "目标信息不可用",
   "dailies.seasonEnds": "第 {season} 季将在 {time} 后结束",
   "dailies.seasonStanding": "已获得 {amount} 声望",
   "dailies.codaBatch": "第 {batch} 批",

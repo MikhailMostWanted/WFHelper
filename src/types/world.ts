@@ -136,9 +136,9 @@ export interface NightwaveChallenge {
   /** Challenge path tail; the inventory's ChallengeProgress joins on it. */
   name?: string;
   title: string;
-  /** Falls back to the title for the few acts DE ships without a description. */
+  /** Empty when challenge metadata is unavailable. */
   description: string;
-  standing: number;
+  standing: number | null;
   requiredCount: number;
   isDaily: boolean;
   isElite: boolean;

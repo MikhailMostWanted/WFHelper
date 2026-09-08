@@ -1702,6 +1702,7 @@
   "dailies.collapse": "Missionen ausblenden",
   "dailies.boss": "Boss: {name}",
   "dailies.standing": "{amount} Ansehen",
+  "dailies.objectiveUnavailable": "Aufgabe nicht verfügbar",
   "dailies.seasonEnds": "Staffel {season} endet in {time}",
   "dailies.seasonStanding": "{amount} Ansehen verdient",
   "dailies.codaBatch": "Charge {batch}",

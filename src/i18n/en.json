@@ -1719,6 +1719,7 @@
   "dailies.collapse": "Hide missions",
   "dailies.boss": "Boss: {name}",
   "dailies.standing": "{amount} standing",
+  "dailies.objectiveUnavailable": "Objective unavailable",
   "dailies.seasonEnds": "Season {season} ends in {time}",
   "dailies.seasonStanding": "{amount} standing earned",
   "dailies.codaBatch": "Batch {batch}",

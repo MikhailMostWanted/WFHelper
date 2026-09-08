@@ -786,6 +786,7 @@ function cleanChallengeText(text: string, allyName?: string, count?: number): st
     .replace(/\|COUNT\|/g, count != null ? String(count) : "X")
     .replace(/\|ALLY\|/g, allyName || "Ally")
     .replace(/\|OPEN_COLOR\|[^|]*\|CLOSE_COLOR\|\s*/g, "")
+    .replace(/<DT_[A-Z_]+>/g, "")
     .replace(/\n/g, " ")
     .trim();
   return cleaned;
@@ -1125,16 +1126,21 @@ function parseNightwaveChallenge(raw: SeasonChallengeRaw) {
   const entry = getChallengeLookup()[challengePath];
   const requiredCount = Number(entry?.requiredCount) || 0;
   const title = localizedDictValue(entry?.name) || prettifyPathSlug(challengePath) || "Unknown";
-  // The description key is the name key with its _Name tail swapped. Roughly one
-  // act in ten has no description value, and then the title stands alone.
   const description = localizedDictValue(entry?.name?.replace(/_Name$/, "_Description"));
   return {
     id: raw._id?.$oid || "",
     // Path tail, e.g. "SeasonDailyAimGlide"; joins the inventory's ChallengeProgress.
     name: challengePath.split("/").pop() || "",
     title,
-    description: description ? cleanChallengeText(description, undefined, requiredCount) : title,
-    standing: Number(entry?.standing) || 0,
+    description: description
+      ? cleanChallengeText(description, undefined, requiredCount)
+      : entry
+        ? title
+        : "",
+    standing:
+      typeof entry?.standing === "number" && Number.isFinite(entry.standing) && entry.standing >= 0
+        ? entry.standing
+        : null,
     requiredCount,
     isDaily: raw.Daily === true,
     isElite: challengePath.includes("/WeeklyHard/"),

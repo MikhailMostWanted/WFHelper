@@ -52,7 +52,7 @@ interface ParsedDailies {
       name: string;
       title: string;
       description: string;
-      standing: number;
+      standing: number | null;
       requiredCount: number;
       isDaily: boolean;
       isElite: boolean;
@@ -559,12 +559,31 @@ describe("worldStateParser sortie, archon hunt, nightwave and alerts", () => {
       isDaily: false,
       isElite: true,
     });
-    // No export entry: the slug carries the title and stands in for the description.
     expect(unknown).toMatchObject({
       title: "Season Daily Made Up Act",
-      description: "Season Daily Made Up Act",
-      standing: 0,
+      description: "",
+      standing: null,
       requiredCount: 0,
+    });
+  });
+
+  it("removes damage icon tokens while preserving the Nightwave objective", () => {
+    const parsed = parseDailies({
+      SeasonInfo: {
+        ...window,
+        ActiveChallenges: [
+          {
+            _id: { $oid: "radiation" },
+            ...window,
+            Challenge: "/Lotus/Types/Challenges/Seasons/Daily/SeasonDailyKillEnemiesWithRadiation",
+          },
+        ],
+      },
+    });
+    expect(parsed.nightwave?.challenges[0]).toMatchObject({
+      title: "Reactor",
+      description: "Kill 150 Enemies with Radiation Damage.",
+      standing: 1000,
     });
   });
 

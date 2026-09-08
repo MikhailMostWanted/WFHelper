@@ -249,8 +249,10 @@
           periodKey: expiryPeriodKey("nw", act.expiry),
         }),
         dynamic: true,
-        detail: act.description,
-        badge: t("dailies.standing", { amount: act.standing.toLocaleString() }),
+        detail: act.description || t("dailies.objectiveUnavailable"),
+        badge: t("dailies.standing", {
+          amount: act.standing == null ? t("common.unknown") : act.standing.toLocaleString(),
+        }),
         expiry: act.expiry,
       });
     }
