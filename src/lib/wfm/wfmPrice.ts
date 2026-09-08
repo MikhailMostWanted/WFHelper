@@ -6,7 +6,7 @@ import {
   shouldDirectFallback,
   type BackendRequestPriority,
 } from "./backendLite.js";
-import { extractMedianFromStatsPayload } from "../../../config/shared/wfmStats.js";
+import { extractAverageFromStatsPayload } from "../../../config/shared/wfmStats.js";
 import { normalizeRankFilter as normalizePriceRank } from "../../../config/shared/numeric.js";
 import { isWfmExcludedSlug } from "../../../config/shared/wfmExclusions.js";
 import { WFM_BACKEND_ERROR_COOLDOWN_MS } from "../../../config/runtime/cacheConfig.js";
@@ -267,7 +267,10 @@ async function fetchPriceBySlugInternal(
     };
   }
 
-  const median = extractMedianFromStatsPayload(res.json, rank != null ? { rank } : undefined);
+  const median = extractAverageFromStatsPayload(
+    res.json,
+    rank != null ? { rank } : undefined,
+  )?.average;
   if (median != null) {
     cachePrice(cacheKey, slug, median);
     bumpCounter("resultOk");
@@ -398,7 +401,7 @@ export async function fetchPriceByName(
 }
 
 export const __test__ = {
-  extractMedianFromStatsPayload,
+  extractAverageFromStatsPayload,
   enqueueForTest: enqueue,
   priceQueueFullError: PRICE_QUEUE_FULL_ERROR,
 } as const;

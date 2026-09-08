@@ -88,6 +88,21 @@ function baroPayload(options: { visitId?: string; activation?: number; expiry?: 
 }
 
 describe('daily price archive', () => {
+	it('retains each snapshot price basis without relabeling legacy rows', async () => {
+		await seedSnapshot({
+			average_item: { median: 123, priceBasis: 'closed-volume-average-48h-v1' },
+			legacy_item: { median: 80 },
+		});
+		await archiveDailyPrices(testEnv(), { now: NOW });
+		expect(await readArchive(`archive:prices:${DATE}`)).toMatchObject({
+			rows: [
+				['average_item', 123],
+				['legacy_item', 80],
+			],
+			priceBasisByKey: { average_item: 'closed-volume-average-48h-v1' },
+		});
+	});
+
 	it('writes a compact dated archive and indexes it', async () => {
 		await seedSnapshot({
 			ash_prime_set: { status: 'ok', median: 120, timestamp: NOW },

@@ -1,4 +1,5 @@
 import { importCache } from "./priceCache.js";
+import { WFM_PRICE_BASIS } from "../../../config/shared/wfmStats.js";
 import type { CachedPriceEntry } from "./priceCache.js";
 import { importOrderSummaryCache } from "./orderSummaryCache.js";
 import type { CachedOrderSummaryEntry } from "./orderSummaryCache.js";
@@ -47,7 +48,10 @@ export async function tryLoadSnapshot(): Promise<void> {
     try {
       const disk = await invoke("loadSnapshotCache");
       if (disk && isValidSnapshot(disk)) {
-        if (Date.now() - disk.generatedAt < SNAPSHOT_FRESH_MS) {
+        if (
+          Date.now() - disk.generatedAt < SNAPSHOT_FRESH_MS &&
+          Object.values(disk.prices).every((price) => price.priceBasis === WFM_PRICE_BASIS)
+        ) {
           snapshot = disk;
           log.info("[Snapshot] Using fresh disk cache");
         } else {

@@ -1,4 +1,5 @@
 import { normalizeDucats, toFiniteNumber } from "../../../config/shared/numeric.js";
+import { WFM_PRICE_BASIS } from "../../../config/shared/wfmStats.js";
 import { BACKEND_BOOTSTRAP_FAILURE_COOLDOWN_MS } from "../../../config/runtime/cacheConfig.js";
 import { BACKEND_URL } from "../../../config/shared/backendConfig.js";
 import { normalizeWfmSlug } from "../../../config/shared/wfm.js";
@@ -268,6 +269,7 @@ export async function fetchBackendPriceBySlug(
   const result = await fetchBackendJson(path);
   if (result.status !== "ok") return result;
 
+  if (result.data.priceBasis !== WFM_PRICE_BASIS) return { status: "error" };
   const median = toFiniteNumber(result.data.median);
   if (median == null || median <= 0) return { status: "not_found" };
 
@@ -280,7 +282,7 @@ export async function fetchBackendPriceBySlug(
     status: "ok",
     data: {
       slug: responseSlug || normalizedSlug,
-      median: Math.round(Math.abs(median)),
+      median: Math.round(median),
       rank: responseRank != null && responseRank >= 0 ? Math.floor(responseRank) : rank,
       timestamp: timestamp != null ? Math.floor(timestamp) : null,
     },

@@ -1,5 +1,6 @@
 import { SELF, createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { WFM_PRICE_BASIS } from '../../../config/shared/wfmStats';
 import worker from '../src/index';
 import { resetDailyBudgetTripStateForTest } from '../src/security/dailyBudget';
 import { resetRankedCatalogCacheForTest } from '../src/routes/public';
@@ -105,7 +106,10 @@ describe('backend worker', () => {
 
 	it('logs slug and cache hit metadata for read-through routes', async () => {
 		const slug = 'wf_test_logged_cache_slug';
-		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 42, rank: null, timestamp: Date.now() }));
+		await env.PRICE_CACHE.put(
+			`price:${slug}`,
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 42, rank: null, timestamp: Date.now() }),
+		);
 		const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
 		const ctx = createExecutionContext();
@@ -273,7 +277,10 @@ describe('backend worker', () => {
 
 	it('routes read-through requests for a hyphenated slug', async () => {
 		const slug = 'zid-an-asheir';
-		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 42, rank: null, timestamp: Date.now() }));
+		await env.PRICE_CACHE.put(
+			`price:${slug}`,
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 42, rank: null, timestamp: Date.now() }),
+		);
 
 		const ctx = createExecutionContext();
 		const response = await worker.fetch(new IncomingRequest(`https://example.com/v1/prices/${slug}`), env, ctx);
@@ -285,7 +292,10 @@ describe('backend worker', () => {
 
 	it('decodes a percent-encoded slug and still refuses a traversal', async () => {
 		const slug = 'höllvanian_old_town_in_fall';
-		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 7, rank: null, timestamp: Date.now() }));
+		await env.PRICE_CACHE.put(
+			`price:${slug}`,
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 7, rank: null, timestamp: Date.now() }),
+		);
 
 		const ctx = createExecutionContext();
 		const response = await worker.fetch(new IncomingRequest(`https://example.com/v1/prices/${encodeURIComponent(slug)}`), env, ctx);
@@ -749,14 +759,14 @@ describe('backend worker', () => {
 	it('auto-hydrates price endpoint on cache miss', async () => {
 		const slug = 'wf_test_price_slug';
 		await env.PRICE_CACHE.delete(`price:${slug}`);
-		await env.PRICE_CACHE.delete(`miss:price:v2:${slug}`);
+		await env.PRICE_CACHE.delete(`miss:price:v3:${slug}`);
 		await env.PRICE_CACHE.delete(`price:${slug}:r0`);
-		await env.PRICE_CACHE.delete(`miss:price:v2:${slug}:r0`);
+		await env.PRICE_CACHE.delete(`miss:price:v3:${slug}:r0`);
 
 		const statsPayload = {
 			payload: {
 				statistics_closed: {
-					'48hours': [{ order_type: 'sell', datetime: new Date().toISOString(), median: 42 }],
+					'48hours': [{ order_type: 'sell', datetime: new Date().toISOString(), wa_price: 42, volume: 10 }],
 				},
 			},
 		};
@@ -786,13 +796,13 @@ describe('backend worker', () => {
 	it('treats old market stats as no-data instead of caching stale prices', async () => {
 		const slug = 'wf_test_inactive_price_slug';
 		await env.PRICE_CACHE.delete(`price:${slug}`);
-		await env.PRICE_CACHE.delete(`miss:price:v2:${slug}`);
+		await env.PRICE_CACHE.delete(`miss:price:v3:${slug}`);
 
 		const oldDate = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
 		const statsPayload = {
 			payload: {
 				statistics_closed: {
-					'48hours': [{ order_type: 'sell', datetime: oldDate, median: 99 }],
+					'48hours': [{ order_type: 'sell', datetime: oldDate, wa_price: 99, volume: 10 }],
 				},
 			},
 		};
@@ -821,7 +831,7 @@ describe('backend worker', () => {
 		expect(second.status).toBe(404);
 		expect(mockFetch).toHaveBeenCalledTimes(1);
 		expect(await env.PRICE_CACHE.get(`price:${slug}`)).toBeNull();
-		expect(await env.PRICE_CACHE.get(`miss:price:v2:${slug}`)).toBe('1');
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBe('1');
 	});
 
 	it('supports ranked price lookups for mod and arcane stats', async () => {
@@ -829,15 +839,15 @@ describe('backend worker', () => {
 		await seedRankedCatalog(env, [{ slug, maxRank: 10 }]);
 		await env.PRICE_CACHE.delete(`price:${slug}:r0`);
 		await env.PRICE_CACHE.delete(`price:${slug}:r10`);
-		await env.PRICE_CACHE.delete(`miss:price:v2:${slug}:r0`);
-		await env.PRICE_CACHE.delete(`miss:price:v2:${slug}:r10`);
+		await env.PRICE_CACHE.delete(`miss:price:v3:${slug}:r0`);
+		await env.PRICE_CACHE.delete(`miss:price:v3:${slug}:r10`);
 
 		const statsPayload = {
 			payload: {
 				statistics_closed: {
 					'48hours': [
-						{ order_type: 'sell', datetime: new Date().toISOString(), median: 50, mod_rank: 0 },
-						{ order_type: 'sell', datetime: new Date().toISOString(), median: 175, mod_rank: 10 },
+						{ order_type: 'sell', datetime: new Date().toISOString(), wa_price: 50, volume: 10, mod_rank: 0 },
+						{ order_type: 'sell', datetime: new Date().toISOString(), wa_price: 175, volume: 10, mod_rank: 10 },
 					],
 				},
 			},
@@ -891,7 +901,7 @@ describe('backend worker', () => {
 	it('returns unavailable when live price hydration is transient', async () => {
 		const slug = 'wf_test_transient_price_slug';
 		await env.PRICE_CACHE.delete(`price:${slug}`);
-		await env.PRICE_CACHE.delete(`miss:price:v2:${slug}`);
+		await env.PRICE_CACHE.delete(`miss:price:v3:${slug}`);
 
 		const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
 			const url = String(input instanceof URL ? input : typeof input === 'string' ? input : input.url);
@@ -913,7 +923,7 @@ describe('backend worker', () => {
 		await waitOnExecutionContext(ctxB);
 		expect(second.status).toBe(503);
 		expect(fetchMock).toHaveBeenCalledTimes(2);
-		expect(await env.PRICE_CACHE.get(`miss:price:v2:${slug}`)).toBeNull();
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBeNull();
 	});
 
 	it('auto-hydrates meta endpoint on cache miss', async () => {
@@ -1040,7 +1050,10 @@ describe('backend worker', () => {
 	it('reads the ranked catalog once across back-to-back ranked requests', async () => {
 		const slug = 'wf_test_ranked_catalog_cache_slug';
 		await seedRankedCatalog(env, [{ slug, maxRank: 10 }]);
-		await env.PRICE_CACHE.put(`price:${slug}:r10`, JSON.stringify({ slug, median: 24, rank: 10, timestamp: Date.now() }));
+		await env.PRICE_CACHE.put(
+			`price:${slug}:r10`,
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 24, rank: 10, timestamp: Date.now() }),
+		);
 		const metaGet = vi.spyOn(env.ITEM_META, 'get');
 		globalThis.fetch = vi.fn(async () => {
 			throw new Error('cached ranked prices should not hit WFM');
@@ -1306,7 +1319,10 @@ describe('backend worker', () => {
 			`meta:${slug}`,
 			JSON.stringify({ slug, tradable: true, ducats: 45, setRoot: false, thumb: null, icon: null, timestamp: now }),
 		);
-		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 42, rank: null, timestamp: now }));
+		await env.PRICE_CACHE.put(
+			`price:${slug}`,
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 42, rank: null, timestamp: now }),
+		);
 		await env.PRICE_CACHE.put(
 			'snapshot:full:v1',
 			JSON.stringify({ version: 1, generatedAt: now - 1000, prices: {}, meta: {}, orderSummaries: {} }),
@@ -1328,7 +1344,7 @@ describe('backend worker', () => {
 			prices?: Record<string, { status?: string; median?: number; timestamp?: number }>;
 			meta?: Record<string, { slug?: string; timestamp?: number }>;
 		};
-		expect(snapshot.prices?.[slug]).toMatchObject({ status: 'ok', median: 42, timestamp: now });
+		expect(snapshot.prices?.[slug]).toMatchObject({ status: 'ok', priceBasis: WFM_PRICE_BASIS, median: 42, timestamp: now });
 		expect(snapshot.meta?.[slug]).toMatchObject({ slug, timestamp: now });
 	});
 
@@ -1345,7 +1361,10 @@ describe('backend worker', () => {
 				`orders-summary:${slug}:r${rank}`,
 				JSON.stringify({ slug, rank, wts: 10 + rank, wtb: 5 + rank, timestamp: now }),
 			);
-			await env.PRICE_CACHE.put(`price:${slug}:r${rank}`, JSON.stringify({ slug, rank, median: 20 + rank, timestamp: now }));
+			await env.PRICE_CACHE.put(
+				`price:${slug}:r${rank}`,
+				JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, rank, median: 20 + rank, timestamp: now }),
+			);
 		}
 
 		const fetchMock = vi.fn(async () => {
@@ -1363,8 +1382,8 @@ describe('backend worker', () => {
 			prices?: Record<string, { status?: string; median?: number }>;
 			orderSummaries?: Record<string, { status?: string; wts?: number; wtb?: number }>;
 		};
-		expect(snapshot.prices?.[`${slug}:rank-v3:r0`]).toMatchObject({ status: 'ok', median: 20 });
-		expect(snapshot.prices?.[`${slug}:rank-v3:r10`]).toMatchObject({ status: 'ok', median: 30 });
+		expect(snapshot.prices?.[`${slug}:rank-v3:r0`]).toMatchObject({ status: 'ok', priceBasis: WFM_PRICE_BASIS, median: 20 });
+		expect(snapshot.prices?.[`${slug}:rank-v3:r10`]).toMatchObject({ status: 'ok', priceBasis: WFM_PRICE_BASIS, median: 30 });
 		expect(snapshot.orderSummaries?.[`${slug}:r0`]).toMatchObject({ status: 'ok', wts: 10, wtb: 5 });
 		expect(snapshot.orderSummaries?.[`${slug}:r10`]).toMatchObject({ status: 'ok', wts: 20, wtb: 15 });
 	});
@@ -1378,7 +1397,10 @@ describe('backend worker', () => {
 			JSON.stringify({ version: 1, generatedAt: now - 1000, prices: {}, meta: {}, orderSummaries: {} }),
 		);
 		for (const rank of [0, 10]) {
-			await env.PRICE_CACHE.put(`price:${slug}:r${rank}`, JSON.stringify({ slug, rank, median: 20 + rank, timestamp: now }));
+			await env.PRICE_CACHE.put(
+				`price:${slug}:r${rank}`,
+				JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, rank, median: 20 + rank, timestamp: now }),
+			);
 		}
 
 		const ordersPayload = {
@@ -1440,8 +1462,18 @@ describe('backend worker', () => {
 			prices?: Record<string, { status?: string; median?: number; timestamp?: number }>;
 			orderSummaries?: Record<string, { status?: string; wts?: number; wtb?: number }>;
 		};
-		expect(snapshot.prices?.[`${slug}:rank-v3:r0`]).toMatchObject({ status: 'ok', median: 20, timestamp: now });
-		expect(snapshot.prices?.[`${slug}:rank-v3:r10`]).toMatchObject({ status: 'ok', median: 30, timestamp: now });
+		expect(snapshot.prices?.[`${slug}:rank-v3:r0`]).toMatchObject({
+			status: 'ok',
+			priceBasis: WFM_PRICE_BASIS,
+			median: 20,
+			timestamp: now,
+		});
+		expect(snapshot.prices?.[`${slug}:rank-v3:r10`]).toMatchObject({
+			status: 'ok',
+			priceBasis: WFM_PRICE_BASIS,
+			median: 30,
+			timestamp: now,
+		});
 		expect(snapshot.orderSummaries?.[`${slug}:r0`]).toMatchObject({ status: 'ok', wts: 40, wtb: 30 });
 		expect(snapshot.orderSummaries?.[`${slug}:r10`]).toMatchObject({ status: 'ok', wts: 90, wtb: 70 });
 	});
@@ -1680,7 +1712,7 @@ describe('backend worker', () => {
 		const snapshot = {
 			version: 1,
 			generatedAt,
-			prices: { ash_prime: { status: 'ok', median: 45, timestamp: staleEntryTimestamp } },
+			prices: { ash_prime: { status: 'ok', priceBasis: WFM_PRICE_BASIS, median: 45, timestamp: staleEntryTimestamp } },
 			meta: { ash_prime: { slug: 'ash_prime', ducats: 45, setRoot: true, thumb: null, icon: null, timestamp: staleEntryTimestamp } },
 			orderSummaries: { 'ordersummary-v1:ash_prime:r0': { status: 'ok', wts: 10, wtb: 8, timestamp: staleEntryTimestamp } },
 		};
@@ -1707,7 +1739,12 @@ describe('backend worker', () => {
 
 			const body = (await response.json()) as typeof snapshot;
 			expect(body.version).toBe(1);
-			expect(body.prices['ash_prime']).toMatchObject({ status: 'ok', median: 45, timestamp: staleEntryTimestamp });
+			expect(body.prices['ash_prime']).toMatchObject({
+				status: 'ok',
+				priceBasis: WFM_PRICE_BASIS,
+				median: 45,
+				timestamp: staleEntryTimestamp,
+			});
 			expect(body.meta['ash_prime']).toMatchObject({ slug: 'ash_prime', timestamp: staleEntryTimestamp });
 			expect(body.orderSummaries['ordersummary-v1:ash_prime:r0']).toMatchObject({
 				status: 'ok',
@@ -1796,6 +1833,7 @@ describe('backend worker', () => {
 			prices: {
 				inactive_scene: {
 					status: 'ok',
+					priceBasis: WFM_PRICE_BASIS,
 					median: 12,
 					timestamp: generatedAt - 31 * 24 * 60 * 60 * 1000,
 				},
@@ -1816,6 +1854,7 @@ describe('backend worker', () => {
 			const body = (await response.json()) as typeof snapshot;
 			expect(body.prices.inactive_scene).toEqual({
 				status: 'no_data',
+				priceBasis: WFM_PRICE_BASIS,
 				median: null,
 				timestamp: generatedAt,
 			});
@@ -1919,13 +1958,13 @@ describe('backend worker', () => {
 	it('caches negative miss for absent price data', async () => {
 		const slug = 'wf_test_negative_slug';
 		await env.PRICE_CACHE.delete(`price:${slug}`);
-		await env.PRICE_CACHE.delete(`miss:price:v2:${slug}`);
-		await env.PRICE_CACHE.delete(`miss:price:v2:${slug}:r0`);
+		await env.PRICE_CACHE.delete(`miss:price:v3:${slug}`);
+		await env.PRICE_CACHE.delete(`miss:price:v3:${slug}:r0`);
 
 		const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
 			const url = String(input instanceof URL ? input : typeof input === 'string' ? input : input.url);
 			if (url === `https://api.warframe.market/v1/items/${slug}/statistics`) {
-				return new Response('{}', {
+				return new Response(JSON.stringify({ payload: { statistics_closed: { '48hours': [] } } }), {
 					status: 200,
 					headers: { 'content-type': 'application/json' },
 				});
@@ -1944,8 +1983,8 @@ describe('backend worker', () => {
 		expect(first.status).toBe(404);
 		expect(second.status).toBe(404);
 		expect(mockFetch).toHaveBeenCalledTimes(1);
-		const missBase = await env.PRICE_CACHE.get(`miss:price:v2:${slug}`);
-		const missRank0 = await env.PRICE_CACHE.get(`miss:price:v2:${slug}:r0`);
+		const missBase = await env.PRICE_CACHE.get(`miss:price:v3:${slug}`);
+		const missRank0 = await env.PRICE_CACHE.get(`miss:price:v3:${slug}:r0`);
 		expect(missBase || missRank0).toBe('1');
 	});
 
@@ -2549,7 +2588,7 @@ describe('daily cron staging', () => {
 			JSON.stringify({
 				version: 1,
 				generatedAt: Date.now(),
-				prices: { ash_prime_set: { status: 'ok', median: 120 } },
+				prices: { ash_prime_set: { status: 'ok', priceBasis: WFM_PRICE_BASIS, median: 120 } },
 				meta: {},
 				orderSummaries: {},
 			}),

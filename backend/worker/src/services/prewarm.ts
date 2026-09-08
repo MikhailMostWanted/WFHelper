@@ -14,7 +14,7 @@ import type { Env, MetaPayload, OrdersPayload, OrderSummaryHotsetEntry, OrderSum
 import { getWorkerConfig } from '../config';
 import { isRecord } from '../utils';
 import { clamp, getJsonFromKv } from '../utils';
-import { extractLatestMedianFromStatsPayload } from '../../../../config/shared/wfmStats';
+import { extractAverageFromStatsPayload, WFM_PRICE_BASIS } from '../../../../config/shared/wfmStats';
 import { normalizeDucats, normalizeRankFilter } from '../../../../config/shared/numeric';
 import { formatWfmAssetUrl, WFM_HEADERS } from '../../../../config/shared/wfm';
 import {
@@ -50,13 +50,13 @@ interface FetchResult<T> {
 	data: T | null;
 	/** true when the failure is transient (429/5xx) - do NOT negatively cache. */
 	transient: boolean;
-	inactive?: boolean;
 	/** Price only: upstream answered, but its stats window held no sale for the asked rank. */
 	noSales?: boolean;
 }
 
 function inactivePriceSnapshotEntry(timestamp = Date.now()): Record<string, unknown> {
 	return {
+		priceBasis: WFM_PRICE_BASIS,
 		status: 'no_data',
 		median: null,
 		timestamp,
@@ -76,12 +76,14 @@ function snapshotOrderSummaryEntryFromPayload(payload: Record<string, unknown>):
 }
 
 function snapshotPriceEntryFromPayload(payload: Record<string, unknown>): Record<string, unknown> | null {
+	if (payload.priceBasis !== WFM_PRICE_BASIS) return null;
 	const median = typeof payload.median === 'number' && Number.isFinite(payload.median) ? payload.median : null;
 	if (median == null) return null;
 	const timestamp = snapshotEntryTimestamp(payload) ?? Date.now();
 	return {
 		status: 'ok',
 		median,
+		priceBasis: WFM_PRICE_BASIS,
 		timestamp,
 	};
 }
@@ -108,6 +110,7 @@ function sanitizeSnapshotEntries(
 ): Record<string, unknown> {
 	const sanitized: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(entries)) {
+		if (options?.prices && (!isRecord(value) || value.priceBasis !== WFM_PRICE_BASIS)) continue;
 		if (!isRecord(value)) {
 			sanitized[key] = value;
 			continue;
@@ -169,13 +172,22 @@ export async function fetchPricePayload(
 	}
 	if (!response.ok) return { data: null, transient: false };
 
-	const payload = await response.json();
-	const latest = extractLatestMedianFromStatsPayload(payload, targetRank != null ? { rank: targetRank } : undefined);
+	let payload: unknown;
+	try {
+		payload = await response.json();
+	} catch {
+		return { data: null, transient: true };
+	}
+	const body = isRecord(payload) && isRecord(payload.payload) ? payload.payload : null;
+	const closed = body && isRecord(body.statistics_closed) ? body.statistics_closed : null;
+	if (!closed || !Array.isArray(closed['48hours'] ?? closed['48_hours'])) {
+		return { data: null, transient: true };
+	}
+	const latest = extractAverageFromStatsPayload(payload, targetRank != null ? { rank: targetRank } : undefined);
 	if (!latest) return { data: null, transient: false, noSales: true };
-	if (isSnapshotEntryTooOld(latest.timestamp)) return { data: null, transient: false, inactive: true };
 
 	return {
-		data: { median: latest.median, timestamp: Date.now() },
+		data: { median: latest.average, timestamp: Date.now() },
 		transient: false,
 	};
 }
@@ -287,6 +299,8 @@ export async function putPricePayload(
 	const normalizedRank = normalizeRankFilter(rank);
 	const data = {
 		slug,
+		// Keep the numeric wire key for existing clients; the basis identifies its metric.
+		priceBasis: WFM_PRICE_BASIS,
 		median: payload.median,
 		timestamp: payload.timestamp,
 		rank: normalizedRank,
@@ -301,11 +315,15 @@ export async function putPricePayload(
 	return data;
 }
 
-export async function markPriceNoData(env: Env, slug: string, rank?: number | null): Promise<void> {
+export async function markPriceNoData(env: Env, slug: string, rank?: number | null, options?: { snapshot?: boolean }): Promise<void> {
 	const normalizedRank = normalizeRankFilter(rank);
 	const cacheKey = workerPriceCacheKey(slug, normalizedRank);
 	const missKey = workerMissCacheKey(MISS_PRICE_PREFIX, slug, normalizedRank);
 	await Promise.all([env.PRICE_CACHE.delete(cacheKey), env.PRICE_CACHE.put(missKey, '1', { expirationTtl: cacheTtlSec(env) })]);
+	if (options?.snapshot) {
+		const snapshotKey = snapshotCacheKeyFromWorkerKey(cacheKey);
+		if (snapshotKey) await patchSnapshot(env, { prices: { [snapshotKey]: inactivePriceSnapshotEntry() } });
+	}
 }
 
 export async function putMetaPayload(env: Env, payload: MetaPayload): Promise<Record<string, unknown>> {
@@ -520,7 +538,7 @@ export async function prewarmOrderSummaryCatalog(
 					getJsonFromKv(env.PRICE_CACHE, priceKey),
 				]);
 				shouldRefreshOrderSummary = isDueForRefresh(cachedOrderSummary, config.orderSummaryStaleRefreshSec);
-				shouldRefreshPrice = isDueForRefresh(cachedPrice, config.staleRefreshSec);
+				shouldRefreshPrice = cachedPrice?.priceBasis !== WFM_PRICE_BASIS || isDueForRefresh(cachedPrice, config.staleRefreshSec);
 				if (!shouldRefreshOrderSummary && cachedOrderSummary) {
 					const snapshotOrderSummaryKey = snapshotCacheKeyFromWorkerKey(orderSummaryKey);
 					if (snapshotOrderSummaryKey) {
@@ -598,10 +616,11 @@ export async function prewarmOrderSummaryCatalog(
 						await putPricePayload(env, entry.slug, priceResult.data, rank);
 						snapshotPrices[snapshotPriceKey] = {
 							status: 'ok',
+							priceBasis: WFM_PRICE_BASIS,
 							median: priceResult.data.median,
 							timestamp: priceResult.data.timestamp,
 						};
-					} else if (priceResult.inactive) {
+					} else if (priceResult.noSales) {
 						await markPriceNoData(env, entry.slug, rank);
 						snapshotPrices[snapshotPriceKey] = inactivePriceSnapshotEntry();
 					}
@@ -702,7 +721,7 @@ export async function prewarmBatch(
 					getJsonFromKv(env.PRICE_CACHE, workerPriceCacheKey(slug, null)),
 				]);
 				shouldRefreshMeta = isDueForRefresh(cachedMeta, config.staleRefreshSec);
-				shouldRefreshPrice = isDueForRefresh(cachedPrice, config.staleRefreshSec);
+				shouldRefreshPrice = cachedPrice?.priceBasis !== WFM_PRICE_BASIS || isDueForRefresh(cachedPrice, config.staleRefreshSec);
 				if (!shouldRefreshMeta && cachedMeta) {
 					snapshotMeta[slug] = cachedMeta;
 				}
@@ -742,8 +761,13 @@ export async function prewarmBatch(
 				if (priceResult.data) {
 					await putPricePayload(env, slug, priceResult.data);
 					result.priceUpdated += 1;
-					snapshotPrices[slug] = { status: 'ok', median: priceResult.data.median, timestamp: priceResult.data.timestamp };
-				} else if (priceResult.inactive || (priceRank != null && priceResult.noSales)) {
+					snapshotPrices[slug] = {
+						status: 'ok',
+						priceBasis: WFM_PRICE_BASIS,
+						median: priceResult.data.median,
+						timestamp: priceResult.data.timestamp,
+					};
+				} else if (priceResult.noSales) {
 					// Only an answered request may drop the cached price. A failed one says nothing
 					// about the data, so a 403/404 or an outage keeps the last good median.
 					await markPriceNoData(env, slug);

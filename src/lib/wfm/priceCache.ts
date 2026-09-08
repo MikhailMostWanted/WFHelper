@@ -1,4 +1,5 @@
 import { isCacheEntryFresh } from "../../../config/shared/numeric.js";
+import { WFM_PRICE_BASIS } from "../../../config/shared/wfmStats.js";
 
 // worker entries can be ~42h old (21h staleness + prewarm walk); matches ORDER_SUMMARY_STALE_TTL_MS
 const PRICE_TTL_MS = 48 * 60 * 60 * 1000;
@@ -10,6 +11,7 @@ export interface CachedPriceEntry {
   status: CachedPriceStatus;
   median: number | null;
   timestamp: number;
+  priceBasis?: string;
 }
 
 const _prices = new Map<string, CachedPriceEntry>();
@@ -29,11 +31,16 @@ export function getCachedPriceState(slug: string): CachedPriceEntry | null {
 }
 
 export function setCachedPrice(slug: string, median: number): void {
-  _prices.set(slug, { status: "ok", median, timestamp: Date.now() });
+  _prices.set(slug, { status: "ok", median, timestamp: Date.now(), priceBasis: WFM_PRICE_BASIS });
 }
 
 export function setCachedNoData(slug: string): void {
-  _prices.set(slug, { status: "no_data", median: null, timestamp: Date.now() });
+  _prices.set(slug, {
+    status: "no_data",
+    median: null,
+    timestamp: Date.now(),
+    priceBasis: WFM_PRICE_BASIS,
+  });
 }
 
 function clearPriceCache(): void {
@@ -46,6 +53,7 @@ export function importCache(data: Record<string, CachedPriceEntry>): number {
   for (const [slug, entry] of Object.entries(data)) {
     if (
       entry &&
+      entry.priceBasis === WFM_PRICE_BASIS &&
       typeof entry.timestamp === "number" &&
       typeof entry.status === "string" &&
       isFresh(entry)

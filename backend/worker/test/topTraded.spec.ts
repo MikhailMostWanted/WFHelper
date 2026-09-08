@@ -105,6 +105,35 @@ function mockStatistics(stats: Record<string, unknown | Response>): ReturnType<t
 }
 
 describe('top traded volume sweep', () => {
+	it('retains archived averages but publishes the matching daily median and rejects negative prices', async () => {
+		await seedCatalog(['average_item', 'negative']);
+		await seedRankedCatalog([]);
+		await seedDay(dateFor(1), [['average_item', 123]], {
+			priceBasisByKey: { average_item: 'closed-volume-average-48h-v1' },
+		});
+		mockStatistics({
+			average_item: statsPayload([{ daysAgo: 1, median: 90, volume: 4 }]),
+			negative: statsPayload([{ daysAgo: 1, median: -50, volume: 9 }]),
+		});
+		await sweepTopTraded(testEnv(), { now: NOW });
+		expect(await readJson(`archive:prices:${dateFor(1)}`)).toMatchObject({
+			rows: [['average_item', 123, 4]],
+			priceBasisByKey: { average_item: 'closed-volume-average-48h-v1' },
+			dailyMedians: { average_item: 90 },
+		});
+		expect((await readJson(DOC_KEY))?.items).toEqual([
+			expect.objectContaining({ slug: 'average_item', median: 90, volume: 4, value: 360 }),
+		]);
+	});
+
+	it('does not publish an average as a median when its daily median has not been fetched', async () => {
+		await seedDay(dateFor(1), [['average_item', 123, 4]], {
+			priceBasisByKey: { average_item: 'closed-volume-average-48h-v1' },
+		});
+		expect(await buildTopTraded(testEnv(), { now: NOW, force: true })).toBe('no_data');
+		expect(await readJson(DOC_KEY)).toBeNull();
+	});
+
 	it('walks the catalog in batches and wraps the cursor at the end of a pass', async () => {
 		await seedCatalog(['alpha', 'beta', 'gamma']);
 		await seedRankedCatalog([]);

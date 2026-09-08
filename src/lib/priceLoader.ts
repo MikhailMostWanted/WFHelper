@@ -15,7 +15,7 @@ export async function loadItemPriceBySlug(slug: string): Promise<PriceState | nu
     const result = await fetchPriceBySlug(slug, { priority: "high" });
     if (result?.median != null) {
       return {
-        messageKey: "market.priceMedian48h",
+        messageKey: "market.priceAverage48h",
         messageParams: { plat: result.median },
         slug: result.slug,
       };
@@ -42,7 +42,7 @@ export async function loadItemPrice(
     const result = await fetchPriceByName(name, wfmItems, { priority: "high" });
     if (result?.median != null) {
       return {
-        messageKey: "market.priceMedian48h",
+        messageKey: "market.priceAverage48h",
         messageParams: { plat: result.median },
         slug: result.slug,
       };

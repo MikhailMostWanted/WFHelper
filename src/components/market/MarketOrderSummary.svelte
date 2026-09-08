@@ -21,7 +21,7 @@
     </span>
   {:else}
     <span class="market-summary-line">
-      <small>{$tr("common.median")}</small>
+      <small>{$tr("market.averageSale48h")}</small>
       <strong>{medianLabel}</strong>
     </span>
   {/if}

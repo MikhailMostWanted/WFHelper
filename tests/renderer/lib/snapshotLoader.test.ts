@@ -15,6 +15,7 @@ vi.mock("../../../src/lib/log.js", () => ({
 }));
 
 import { tryLoadSnapshot } from "../../../src/lib/wfm/snapshotLoader.js";
+import { getCachedPriceState } from "../../../src/lib/wfm/priceCache.js";
 import {
   importSetCatalogFromSnapshotMeta,
   resolveSnapshotSetSlug,
@@ -46,6 +47,24 @@ afterEach(() => {
 });
 
 describe("snapshot set-catalog fallback", () => {
+  it("refreshes legacy prices even on fresh disk snapshots and keeps their catalog", async () => {
+    const now = Date.now();
+    const meta = completeSetMeta(now);
+    mocks.invoke.mockResolvedValue({
+      version: 1,
+      generatedAt: now,
+      prices: { legacy_item: { status: "ok", median: 999, timestamp: now } },
+      meta,
+      orderSummaries: {},
+    });
+    mocks.fetchBackendRaw.mockResolvedValue(null);
+
+    await tryLoadSnapshot();
+
+    expect(mocks.fetchBackendRaw).toHaveBeenCalledOnce();
+    expect(getCachedPriceState("legacy_item")).toBeNull();
+    expect(resolveSnapshotSetSlug([Object.keys(meta)[0]])).toBe(Object.keys(meta)[0]);
+  });
   it("restores a stale last-good catalog when the backend is unavailable", async () => {
     const now = Date.now();
     const meta = completeSetMeta(now);

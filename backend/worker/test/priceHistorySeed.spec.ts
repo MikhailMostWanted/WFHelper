@@ -99,6 +99,34 @@ function statisticsCalls(fetchMock: ReturnType<typeof vi.fn>): number {
 }
 
 describe('price history seed sweep', () => {
+	it('preserves existing price metadata while adding daily medians and rejecting negative prices', async () => {
+		await seedCatalog(['alpha', 'negative']);
+		await seedRankedCatalog([]);
+		const key = `archive:prices:${dateFor(1)}`;
+		await env.ITEM_META.put(
+			key,
+			JSON.stringify({
+				v: 1,
+				rows: [['average_item', 123, 4]],
+				priceBasisByKey: { average_item: 'closed-volume-average-48h-v1' },
+				dailyMedians: { average_item: 90 },
+			}),
+		);
+		mockStatistics({
+			alpha: statsPayload([{ daysAgo: 1, median: 40, volume: 2 }]),
+			negative: statsPayload([{ daysAgo: 1, median: -50, volume: 9 }]),
+		});
+		await seedPriceHistory(testEnv(), { now: NOW });
+		expect(await readArchive(key)).toMatchObject({
+			rows: [
+				['average_item', 123, 4],
+				['alpha', 40, 2],
+			],
+			priceBasisByKey: { average_item: 'closed-volume-average-48h-v1', alpha: 'closed-daily-median-v1' },
+			dailyMedians: { average_item: 90 },
+		});
+	});
+
 	it('walks the pinned slug list in batches and latches itself off', async () => {
 		await seedCatalog(['alpha', 'beta', 'gamma']);
 		await seedRankedCatalog([]);

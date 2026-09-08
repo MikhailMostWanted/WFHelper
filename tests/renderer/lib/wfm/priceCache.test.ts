@@ -1,3 +1,4 @@
+import { WFM_PRICE_BASIS } from "../../../../config/shared/wfmStats.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -21,11 +22,17 @@ describe("priceCache", () => {
     vi.useRealTimers();
   });
 
+  it("rejects legacy price entries without the new basis", () => {
+    expect(importCache({ old: { status: "ok", median: 99, timestamp: Date.now() } })).toBe(0);
+    expect(getCachedPriceState("old")).toBeNull();
+  });
+
   it("keeps snapshot prices within the worker refresh window", () => {
     // Worker entries can be ~42h old (21h staleness + ranked prewarm walk).
     const imported = importCache({
       ash_prime_set: {
         status: "ok",
+        priceBasis: WFM_PRICE_BASIS,
         median: 55,
         timestamp: Date.now() - 42 * 60 * 60 * 1000,
       },
@@ -42,6 +49,7 @@ describe("priceCache", () => {
     const imported = importCache({
       ash_prime_set: {
         status: "ok",
+        priceBasis: WFM_PRICE_BASIS,
         median: 55,
         timestamp: Date.now() - 49 * 60 * 60 * 1000,
       },
@@ -58,6 +66,7 @@ describe("priceCache", () => {
     const imported = importCache({
       ash_prime_set: {
         status: "ok",
+        priceBasis: WFM_PRICE_BASIS,
         median: 55,
         timestamp: Date.now(),
       },

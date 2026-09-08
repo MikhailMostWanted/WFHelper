@@ -1,5 +1,5 @@
 import { withScope } from "./logger";
-import { extractMedianFromStatsPayload } from "../config/shared/wfmStats";
+import { extractAverageFromStatsPayload } from "../config/shared/wfmStats";
 import * as wfmClient from "./wfmClient";
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { normalizeWfmSlug } from "../config/shared/wfm";
@@ -60,7 +60,7 @@ export async function fetchPriceBySlug(slugInput: unknown): Promise<number | nul
     try {
       // Share wfmClient's rate-limit queue to avoid 429 bans.
       const payload = await wfmClient.request("GET", `/items/${slug}/statistics`);
-      const median = extractMedianFromStatsPayload(payload);
+      const median = extractAverageFromStatsPayload(payload)?.average;
       if (median == null) return null;
 
       setCachedPrice(slug, median);

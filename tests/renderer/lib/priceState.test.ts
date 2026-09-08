@@ -38,7 +38,7 @@ describe("createPriceLoader", () => {
     loadItemPriceMock
       .mockResolvedValueOnce({ messageKey: "market.noListingFound", slug: null })
       .mockResolvedValueOnce({
-        messageKey: "market.priceMedian48h",
+        messageKey: "market.priceAverage48h",
         slug: "trinity_prime_chassis",
       });
 
@@ -58,7 +58,7 @@ describe("createPriceLoader", () => {
     );
     expect(loadItemPriceMock).toHaveBeenNthCalledWith(2, "Trinity Prime Chassis", {}, true);
     expect(states[states.length - 1]).toEqual({
-      messageKey: "market.priceMedian48h",
+      messageKey: "market.priceAverage48h",
       slug: "trinity_prime_chassis",
     });
   });

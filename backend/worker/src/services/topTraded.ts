@@ -1,7 +1,7 @@
 import { byteLength } from '../utils';
 import { ARCHIVE_PRICES_PREFIX, TOP_TRADED_DOC_KEY, TOP_TRADED_SWEEP_KEY } from '../constants';
 import { getWorkerConfig } from '../config';
-import { MAX_PRICE_ROWS, mergeVolumes, type VolumeSample } from './history';
+import { DAILY_MEDIAN_BASIS, MAX_PRICE_ROWS, mergeVolumes, storedPriceMetadata, type VolumeSample } from './history';
 import { logEvent } from './logging';
 import { barePriceFetchRank, fetchCatalogSlugs, readClientCatalogFromKv, readRankedSlugsFromKv } from './prewarmCatalog';
 import { isRecord, utcDate } from '../utils';
@@ -77,8 +77,6 @@ function parseSweepState(value: Record<string, unknown> | null): SweepState {
 
 // Complete days only: today's volume is still growing and a merged row is never
 // replaced, so a partial value would freeze and read as a complete day tomorrow.
-// The rank rule mirrors the seed and the live bare price, so the volume belongs
-// to the same sales the stored median came from.
 function volumeRowsFromStats(payload: unknown, rank: number | null, oldest: string, today: string): Map<string, VolumeSample> | null {
 	const entries = statsDayEntries(payload, rank);
 	if (!entries) return null;
@@ -89,8 +87,8 @@ function volumeRowsFromStats(payload: unknown, rank: number | null, oldest: stri
 		const volume = toFiniteNumber(entry.volume);
 		if (volume == null || volume < 0) continue;
 		const rawMedian = toFiniteNumber(entry.median);
-		if (rawMedian == null) continue;
-		const median = Math.round(Math.abs(rawMedian));
+		if (rawMedian == null || rawMedian <= 0) continue;
+		const median = Math.round(rawMedian);
 		if (median <= 0) continue;
 		rows.set(date, { median, volume: Math.round(volume) });
 	}
@@ -135,12 +133,14 @@ export async function buildTopTraded(env: Env, options: { now?: number; force?: 
 		const date = utcDayBefore(now, back);
 		const day = await getJsonFromKv(env.ITEM_META, `${ARCHIVE_PRICES_PREFIX}${date}`);
 		if (!Array.isArray(day?.rows)) continue;
+		const metadata = storedPriceMetadata(day);
 
 		for (const row of day.rows.slice(0, MAX_PRICE_ROWS)) {
 			if (!Array.isArray(row) || row.length < 3) continue;
 			const key = typeof row[0] === 'string' ? row[0] : '';
 			if (!isWfmSlug(key)) continue;
-			const median = toFiniteNumber(row[1]);
+			const basis = metadata.priceBasisByKey[key];
+			const median = toFiniteNumber(basis && basis !== DAILY_MEDIAN_BASIS ? metadata.dailyMedians[key] : row[1]);
 			const volume = toFiniteNumber(row[2]);
 			if (median == null || median <= 0 || volume == null || volume <= 0) continue;
 			const current = totals.get(key);

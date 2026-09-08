@@ -25,6 +25,7 @@ const MAX_INDEX_ENTRIES = 4096;
 // Pruning drops one entry a day in steady state and the TTL reclaims the rest.
 const MAX_INDEX_DELETES_PER_RUN = 8;
 export const MAX_PRICE_ROWS = 50000;
+export const DAILY_MEDIAN_BASIS = 'closed-daily-median-v1';
 const MAX_RIVEN_WEAPONS = 1000;
 const MAX_RIVEN_AUCTIONS = 1000;
 const MAX_BARO_ROWS = 500;
@@ -161,7 +162,7 @@ function priceRowsFromSnapshot(snapshot: Record<string, unknown> | null): PriceR
 }
 
 /**
- * Writes one dated median archive from the snapshot the worker already holds.
+ * Keeps the snapshot's price basis; legacy untagged rows remain untagged.
  * First write of a UTC day wins, so a retried cron never rewrites the day.
  */
 export async function archiveDailyPrices(env: Env, options: { now?: number } = {}): Promise<PriceArchiveResult> {
@@ -178,19 +179,28 @@ export async function archiveDailyPrices(env: Env, options: { now?: number } = {
 			return { ...base, status: 'exists', bytes: byteLength(existing) };
 		}
 
-		const rows = priceRowsFromSnapshot(await getJsonFromKv(env.PRICE_CACHE, SNAPSHOT_KEY));
+		const snapshot = await getJsonFromKv(env.PRICE_CACHE, SNAPSHOT_KEY);
+		const rows = priceRowsFromSnapshot(snapshot);
 		if (rows.length === 0) {
 			// An empty or unreadable snapshot says nothing about the day's prices.
 			logEvent({ type: 'cron', route: 'archive:prices', status: 204, error: 'snapshot_unavailable' });
 			return { ...base, status: 'no_source' };
 		}
 
+		const priceBasisByKey: Record<string, string> = Object.create(null);
+		const prices = isRecord(snapshot?.prices) ? snapshot.prices : {};
+		for (const [key] of rows) {
+			const price = prices[key];
+			if (isRecord(price) && typeof price.priceBasis === 'string' && price.priceBasis.length <= 128 && price.priceBasis)
+				priceBasisByKey[key] = price.priceBasis;
+		}
 		const body = JSON.stringify({
 			v: 1,
 			date,
 			generatedAt: now,
 			source: 'snapshot',
 			columns: ['key', 'median', 'volume'],
+			priceBasisByKey,
 			rows,
 		});
 		const bytes = byteLength(body);
@@ -245,6 +255,24 @@ export function storedPriceRows(value: Record<string, unknown> | null): PriceRow
 	return rows;
 }
 
+export function storedPriceMetadata(value: Record<string, unknown> | null): {
+	priceBasisByKey: Record<string, string>;
+	dailyMedians: Record<string, number>;
+} {
+	const priceBasisByKey: Record<string, string> = Object.create(null);
+	const dailyMedians: Record<string, number> = Object.create(null);
+	const bases = isRecord(value?.priceBasisByKey) ? value.priceBasisByKey : {};
+	const medians = isRecord(value?.dailyMedians) ? value.dailyMedians : {};
+	for (const [key, basis] of Object.entries(bases).slice(0, MAX_PRICE_ROWS)) {
+		if (key && key.length <= 256 && typeof basis === 'string' && basis && basis.length <= 128) priceBasisByKey[key] = basis;
+	}
+	for (const [key, value] of Object.entries(medians).slice(0, MAX_PRICE_ROWS)) {
+		const median = positive(value);
+		if (key && key.length <= 256 && median !== null) dailyMedians[key] = median;
+	}
+	return { priceBasisByKey, dailyMedians };
+}
+
 // A backfilled day expires on the retention window measured from its own date, so
 // touching an old day cannot extend it past the bound the live archive keeps.
 export function dayRetentionTtlSec(date: string, now: number, retentionDays: number): number {
@@ -276,6 +304,7 @@ export async function mergeVolumes(
 
 		const existing = parseJsonRecord(existingRaw);
 		const rows = storedPriceRows(existing);
+		const metadata = storedPriceMetadata(existing);
 		const rowIndex = new Map<string, number>();
 		rows.forEach((row, index) => {
 			if (!rowIndex.has(row[0])) rowIndex.set(row[0], index);
@@ -283,21 +312,29 @@ export async function mergeVolumes(
 
 		let filled = 0;
 		let added = 0;
+		let priced = 0;
 		for (const [slug, sample] of samples) {
 			const at = rowIndex.get(slug);
 			if (at == null) {
 				if (rows.length >= MAX_PRICE_ROWS) continue;
 				rowIndex.set(slug, rows.length);
 				rows.push([slug, sample.median, sample.volume]);
+				metadata.priceBasisByKey[slug] = DAILY_MEDIAN_BASIS;
 				added += 1;
 				continue;
 			}
 			const row = rows[at];
+			const basis = metadata.priceBasisByKey[slug];
+			// A rolling average cannot stand in for the completed day's median.
+			if (basis && basis !== DAILY_MEDIAN_BASIS && metadata.dailyMedians[slug] === undefined) {
+				metadata.dailyMedians[slug] = sample.median;
+				priced += 1;
+			}
 			if (row.length > 2) continue;
 			rows[at] = [row[0], row[1], sample.volume];
 			filled += 1;
 		}
-		if (filled === 0 && added === 0) continue;
+		if (filled === 0 && added === 0 && priced === 0) continue;
 
 		const body = JSON.stringify({
 			v: 1,
@@ -305,6 +342,7 @@ export async function mergeVolumes(
 			generatedAt: numeric(existing?.generatedAt) ?? now,
 			source: typeof existing?.source === 'string' ? existing.source : 'wfm-statistics-volume',
 			columns: ['key', 'median', 'volume'],
+			...metadata,
 			rows,
 		});
 		const bytes = byteLength(body);

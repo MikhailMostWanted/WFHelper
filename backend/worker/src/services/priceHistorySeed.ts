@@ -1,6 +1,14 @@
 import { MAX_ARCHIVE_BYTES, ARCHIVE_PRICES_PREFIX, PRICE_SEED_SLUGS_KEY, PRICE_SEED_STATE_KEY } from '../constants';
 import { getWorkerConfig } from '../config';
-import { dayRetentionTtlSec, MAX_PRICE_ROWS, type PriceRow, recordArchiveEntries, storedPriceRows } from './history';
+import {
+	DAILY_MEDIAN_BASIS,
+	dayRetentionTtlSec,
+	MAX_PRICE_ROWS,
+	type PriceRow,
+	recordArchiveEntries,
+	storedPriceRows,
+	storedPriceMetadata,
+} from './history';
 import { logEvent } from './logging';
 import { barePriceFetchRank, fetchCatalogSlugs, readRankedSlugsFromKv } from './prewarmCatalog';
 import { byteLength, utcDate } from '../utils';
@@ -107,17 +115,16 @@ async function loadSeedSlugs(env: Env, now: number): Promise<string[]> {
 	return slugs;
 }
 
-// Same rounding the live median takes, so a seeded day and a live day are one series.
 function seedMedian(value: unknown): number | null {
 	const parsed = toFiniteNumber(value);
-	if (parsed == null) return null;
-	const median = Math.round(Math.abs(parsed));
+	if (parsed == null || parsed <= 0) return null;
+	const median = Math.round(parsed);
 	return median > 0 ? median : null;
 }
 
 /**
  * One day row per date: ranked slugs price from mod_rank 0 like the live bare key, unranked
- * ones from the rankless entries, and the last entry of a date wins as it does live.
+ * ones from the rankless entries, and the last entry of a date wins.
  */
 function seedRowsFromStats(payload: unknown, slug: string, rank: number | null, dateWindow: SeedWindow): Map<string, PriceRow> | null {
 	const entries = statsDayEntries(payload, rank);
@@ -145,6 +152,7 @@ async function flushSeedDates(env: Env, buffered: Map<string, PriceRow[]>, now: 
 		const key = `${ARCHIVE_PRICES_PREFIX}${date}`;
 		const existing = await getJsonFromKv(env.ITEM_META, key);
 		const rows = storedPriceRows(existing);
+		const metadata = storedPriceMetadata(existing);
 		const known = new Set(rows.map((row) => row[0]));
 
 		let added = 0;
@@ -152,6 +160,7 @@ async function flushSeedDates(env: Env, buffered: Map<string, PriceRow[]>, now: 
 			if (known.has(row[0]) || rows.length >= MAX_PRICE_ROWS) continue;
 			known.add(row[0]);
 			rows.push(row);
+			metadata.priceBasisByKey[row[0]] = DAILY_MEDIAN_BASIS;
 			added += 1;
 		}
 		if (added === 0) continue;
@@ -163,6 +172,7 @@ async function flushSeedDates(env: Env, buffered: Map<string, PriceRow[]>, now: 
 			// A day the live archive already wrote keeps its source and only gains rows.
 			source: typeof existing?.source === 'string' ? existing.source : 'wfm-statistics-seed',
 			columns: ['key', 'median', 'volume'],
+			...metadata,
 			rows,
 		});
 		const bytes = byteLength(body);

@@ -1,6 +1,6 @@
 const SNAPSHOT_VERSION = 1;
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
-export const WFM_SNAPSHOT_CLIENT_CACHE_VERSION = "inactive-v2";
+export const WFM_SNAPSHOT_CLIENT_CACHE_VERSION = "closed-average-v3";
 export const WFM_SNAPSHOT_MAX_ENTRY_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 interface ValidSnapshotBlob {

@@ -85,6 +85,13 @@ scan and could replace a complete snapshot with partial data.
 Snapshot key translation must stay compatible with the desktop importers. Ranked worker keys such
 as `price:{slug}:r{n}` become `{slug}:rank-v3:r{n}` in the snapshot.
 
+Price entries carry `priceBasis: "closed-volume-average-48h-v1"`. The retained `median` field
+contains the volume-weighted average of closed-trade `wa_price` buckets from the last 48 hours.
+The Worker and desktop reject price cache entries with an older or missing basis; snapshot
+patching removes those entries while prewarm and read-through refill them. Deploy the Worker
+before releasing the desktop change, and check that its snapshot contains prices with the new
+basis. A partially refreshed snapshot can contain fewer prices until the catalog sweep advances.
+
 ## WFM item catalog
 
 `GET /v1/wfm-items` serves the desktop-safe projection of the Warframe Market item catalog from
@@ -156,25 +163,22 @@ Confirmed misses use `miss:price:*`, `miss:meta:*`, `miss:orders:*`, and
 `miss:orders-summary:*`. Transient upstream errors must not create negative markers.
 `skip:untradable:*` prevents repeated metadata requests for excluded items.
 
-The bare `price:{slug}` key is rank-pinned. A rank-agnostic stats window mixes rank 0 and
-max-rank sales, so a slug listed in the ranked order-summary catalog prices from its rank 0
-sales. Prewarm and the `/v1/prices/{slug}` read-through share `barePriceFetchRank()`, so a live
-read cannot overwrite a rank 0 median with a mixed-rank one while the catalog is readable.
+The bare `price:{slug}` key is rank-pinned. Prewarm and the `/v1/prices/{slug}` read-through
+share `barePriceFetchRank()`: a slug listed in the ranked order-summary catalog prices from
+rank 0 sales. Explicit rank requests use that rank only. Without an explicit rank, the shared
+average parser accepts rankless and rank 0 rows and excludes higher ranks.
 `readRankedSlugsFromKv()` resolves `order-summary:catalog:v1` from `ITEM_META` through the same
 five-minute isolate cache as rank validation. Only an available catalog is cached, so a KV blip
 cannot pin hydration on the fallback below for the whole window, and a catalog refresh reaches
 an isolate at most five minutes late.
 
-An unavailable ranked catalog (`null`, as opposed to an authoritative empty one) fails open, and
-the two sides fail open differently. Prewarm skips the price half of the sweep and leaves the
-stored median alone. The read-through still hydrates: it fetches rank-agnostically and writes
-that mixed-rank median to `price:{slug}`, so a rank 0 value can be replaced while the catalog is
-unavailable. Both cases store `rank: null`, so the overwrite is invisible in the stored value;
-the next sweep after the catalog returns re-pins the slug. Serving a mixed-rank median beats
-serving no price, which is why the read-through does not skip the write.
+When the ranked catalog is unavailable (`null`, rather than an authoritative empty one),
+prewarm skips the price half of the sweep and leaves the stored price alone. Read-through still
+hydrates using the parser's rankless/rank 0 rule. The next sweep after the catalog returns
+restores explicit rank 0 selection for ranked slugs.
 
 Only an answered upstream request may drop a cached price; a transient failure or an HTTP error
-leaves the last good median. Prices and their negative markers live in `PRICE_CACHE`; both
+leaves the last good price with the current basis. Prices and their negative markers live in `PRICE_CACHE`; both
 catalogs live in `ITEM_META`. Successful price, meta, and order-summary responses carry
 `public, max-age=60`, so a PoP can serve a hydrated value for up to a minute after KV changes.
 
@@ -204,9 +208,10 @@ one seed a gap in an archive stays a gap.
 
 Keys live in `ITEM_META`:
 
-- `archive:prices:{YYYY-MM-DD}` holds the daily medians copied from `snapshot:full:v1` on the
-  `0 4 * * *` tick. Rows are `[key, median]`; the top-traded sweep merges `[key, median, volume]`
-  into past days later. Snapshot keys are kept verbatim, so ranked entries stay
+- `archive:prices:{YYYY-MM-DD}` copies snapshot prices on the `0 4 * * *` tick. Existing row
+  tuples and column names remain `[key, median, volume?]`, but `priceBasisByKey` records each
+  tagged snapshot entry's basis. New snapshot prices are 48-hour averages, not daily medians;
+  legacy untagged rows remain untagged. Snapshot keys are kept verbatim, so ranked entries stay
   `{slug}:rank-v3:r{n}`. This family makes no upstream request; it copies data the worker already
   holds. The first write of a UTC day wins, so a retried cron never rewrites the day.
 - `archive:rivens:{YYYY-MM-DD}` holds weapon-level riven auction aggregates as
@@ -250,14 +255,15 @@ each. About 4,000 slugs take roughly 200 ticks, so a full seed runs about two da
 
 Day rows come from `statistics_closed["90days"]`. Rank semantics mirror the live bare price: a slug
 in the ranked order-summary catalog takes the `mod_rank` 0 entries, any other slug takes the entries
-carrying no rank, and the last entry of a date wins. The median is rounded the way the live median
-is, so a seeded day and a live day are one series. Rivens and Baro have no statistics endpoint and
-are never seeded.
+carrying no rank, and the last entry of a date wins. The seed rounds positive daily medians and
+tags new rows in `priceBasisByKey` as `closed-daily-median-v1`; it does not reconstruct the
+snapshot's rolling 48-hour average. Negative and zero prices are rejected. Rivens and Baro have
+no statistics endpoint and are never seeded.
 
 Each batch buffers its rows in memory and then read-modify-writes only the days it touched, up to
 90 day keys and therefore around 180 KV operations on top of the batch's requests. An existing row
-is never replaced: a day the live archive wrote keeps its own medians, `generatedAt` and `source`
-and only gains the keys it lacks, while a day the seed creates carries
+is never replaced: a day the live archive wrote keeps its prices, `generatedAt`, `source` and
+price metadata and only gains the keys it lacks, while a day the seed creates carries
 `source: "wfm-statistics-seed"`. Days on or after `startedDate` are never touched because the live
 daily archive owns them. A seeded day expires on the retention window measured from its own date,
 and every touched day joins `archive:index:prices:v1` once through the shared index helper, which
@@ -349,25 +355,27 @@ lands the route answers `404 {"ok":false,"error":"top_traded_not_ready"}` and is
 the first published doc shows up immediately. `readTopTradedDoc()` revalidates the stored doc at
 the boundary; a malformed one reads as absent rather than being served.
 
-The archive holds no volume on its own. The daily price archive copies the snapshot, which
-carries medians only, and the one-time seed writes volume only for the 90 days before it started.
+The daily price archive copies snapshot prices without volume, and the one-time seed writes
+volume only for the 90 days before it started.
 `services/topTraded.ts` fills the gap: on the 15-minute tick it walks the same slug catalog the
 prewarm sweep and the price seed walk, requesting `GET /v1/items/{slug}/statistics` for
 `TOP_TRADED_BATCH_SIZE` slugs (150) with one serialized request each. It requests the last eight
 calendar days of `statistics_closed["90days"]`, drops the current UTC day (its volume is still
 growing and a merged volume is never replaced, so a partial value would freeze), and merges the
 seven complete days as `(date, median, volume)` into `archive:prices:{date}` through
-`mergeVolumes()` in `history.ts`. Rank semantics mirror the seed and the live bare price: a slug in the ranked
+`mergeVolumes()` in `history.ts`. Rank semantics mirror the seed: a slug in the ranked
 order-summary catalog takes the `mod_rank` 0 rows, any other slug takes the rankless rows, so the
-merged volume belongs to the same sales as the stored median. An unavailable slug or ranked
+daily volume and daily median describe the same sales. Negative prices are rejected. An unavailable slug or ranked
 catalog leaves the cursor where it is and retries on the next tick.
 
-`mergeVolumes()` never replaces a median or a volume another writer stored. An existing row that
+`mergeVolumes()` never replaces a price or a volume another writer stored. An existing row that
 lacks a volume gains one, a slug the day does not hold is appended, and a day whose key does not
 exist is created only when the date is already past: the daily archive owns the first write of the
 current UTC day and would skip it if this created the key. Days created here join
 `archive:index:prices:v1`, and every write carries the retention TTL measured from the day's own
-date.
+date. New rows carry `closed-daily-median-v1`; rows with an average or another tagged basis keep
+their price and gain the fetched daily median in `dailyMedians`. Both merge paths preserve
+`priceBasisByKey` and `dailyMedians` without migrating old archives.
 
 Sweep state is `top-traded:sweep:v1` (`{cursor, slugsHash, lastCompletedAt, failures}`). The
 cursor wraps continuously rather than latching, so a slug whose request failed is simply asked
@@ -379,7 +387,9 @@ the aggregate, as does `HISTORY_ARCHIVE_ENABLED=0`.
 
 The aggregate rebuilds at the end of every pass and at most hourly otherwise. It reads the last
 seven complete UTC days (never the current one), sums volume per bare slug and keeps the newest
-day's median. Only bare-slug rows count: the snapshot copy's `{slug}:rank-v3:r{n}` keys never
+day's daily median. For tagged non-median rows it reads `dailyMedians` and skips the row until
+that value exists; it never publishes the archived average as a median. Untagged legacy rows
+retain their previous interpretation. Only bare-slug rows count: the snapshot copy's `{slug}:rank-v3:r{n}` keys never
 carry a volume. Names and thumbnails come from the client catalog the worker already serves for
 `/v1/wfm-items`; the thumbnail stays the raw catalog path and the desktop app resolves it through
 its icon mirror. The doc is capped at 100 items and refused past 512KB, and it is written with a
@@ -398,7 +408,7 @@ rate together.
 
 Hydration gap: volume only ever exists for days a pass reached while they were inside its
 eight-day window, plus whatever the one-time seed wrote for the 90 days before it ran. Days
-between the seed's start and this sweep's first pass keep medians without volume for good, and
+between the seed's start and this sweep's first pass keep prices without volume for good, and
 those days simply contribute nothing once they fall out of the seven-day window. `/v1/top-traded`
 therefore 404s for the first pass after deploy and reports a short window until seven swept days
 have accumulated.

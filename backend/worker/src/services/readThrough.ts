@@ -1,5 +1,6 @@
 import { MISS_META_PREFIX, MISS_ORDER_SUMMARY_PREFIX, MISS_PRICE_PREFIX, SKIP_UNTRADABLE_PREFIX } from '../constants';
 import type { Env } from '../types';
+import { WFM_PRICE_BASIS } from '../../../../config/shared/wfmStats';
 import { getWorkerConfig } from '../config';
 import { getJsonFromKv } from '../utils';
 import {
@@ -32,6 +33,7 @@ interface HydrateResult {
 type AutoStatsKey = keyof typeof autoStats;
 
 interface ReadThroughDescriptor {
+	usable?: (data: Record<string, unknown>) => boolean;
 	namespace: KVNamespace;
 	cacheKey: string;
 	missKey: string;
@@ -178,14 +180,11 @@ async function hydratePrice(env: Env, slug: string, markNoData: boolean, rank: n
 		const fetchRank = rank ?? barePinnedRank;
 		const result = await fetchPricePayload(slug, fetchRank != null ? { rank: fetchRank } : undefined);
 		if (!result.data) {
-			// Only negatively cache confirmed "no data" - never cache transient errors (429/5xx).
-			// A pinned slug with no rank 0 sale drops its mixed-rank entry, as the sweep does.
-			if (markNoData && !result.transient) {
-				if (result.inactive || (barePinnedRank != null && result.noSales)) {
-					await markPriceNoData(env, slug, rank);
-				} else {
-					await setNegativeMarker(env.PRICE_CACHE, missKey, env);
-				}
+			// A confirmed empty sales window invalidates stale data even during background refresh.
+			if (result.noSales) {
+				await markPriceNoData(env, slug, rank, { snapshot: true });
+			} else if (markNoData && !result.transient) {
+				await setNegativeMarker(env.PRICE_CACHE, missKey, env);
 			}
 			return { data: null, transient: result.transient };
 		}
@@ -304,7 +303,7 @@ async function hydrateOrderSummary(
 
 async function withReadThrough(env: Env, ctx: ExecutionContext | undefined, descriptor: ReadThroughDescriptor): Promise<AutoReadResult> {
 	const cached = await getJsonFromKv(descriptor.namespace, descriptor.cacheKey);
-	if (cached) {
+	if (cached && (!descriptor.usable || descriptor.usable(cached))) {
 		autoStats[descriptor.stats.cacheHit] += 1;
 		const canQueueRefresh = descriptor.canQueueRefresh ? descriptor.canQueueRefresh() : true;
 		if (ctx && canQueueRefresh && descriptor.isStale(cached, env)) {
@@ -355,6 +354,7 @@ export async function getOrHydratePrice(
 		cacheKey,
 		missKey,
 		isStale,
+		usable: (data) => data.priceBasis === WFM_PRICE_BASIS,
 		hydrate: (markNoData) => hydratePrice(env, slug, markNoData, rank),
 		stats: {
 			cacheHit: 'priceCacheHits',

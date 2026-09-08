@@ -1,7 +1,8 @@
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { WFM_PRICE_BASIS } from '../../../config/shared/wfmStats';
 import type { Env } from '../src/types';
-import { prewarmBatch } from '../src/services/prewarm';
+import { prewarmBatch, prewarmOrderSummaryCatalog } from '../src/services/prewarm';
 import { fetchCatalogSlugs, resetRankedSlugCacheForTest } from '../src/services/prewarmCatalog';
 import { getOrHydratePrice } from '../src/services/readThrough';
 
@@ -12,6 +13,7 @@ const originalFetch = globalThis.fetch;
 interface StatsRow {
 	rank?: number;
 	median: number;
+	volume?: number;
 	minutesAgo: number;
 }
 
@@ -44,7 +46,8 @@ function statsPayload(rows: StatsRow[]): unknown {
 				'48hours': rows.map((row) => ({
 					datetime: new Date(Date.now() - row.minutesAgo * 60 * 1000).toISOString(),
 					order_type: 'sell',
-					median: row.median,
+					wa_price: row.median,
+					volume: row.volume ?? 1,
 					...(row.rank == null ? {} : { mod_rank: row.rank }),
 				})),
 			},
@@ -86,7 +89,77 @@ async function readSnapshotPrice(slug: string): Promise<Record<string, unknown> 
 }
 
 describe('unranked prewarm sweep rank pinning', () => {
-	it('stores the rank 0 median for a slug the ranked catalog knows', async () => {
+	it.each([{}, { payload: {} }, { payload: { statistics_closed: { '48hours': {} } } }])(
+		'keeps a cached price after malformed statistics %j',
+		async (payload) => {
+			const slug = 'wf_test_sweep_malformed_stats';
+			await seedCatalog(slug);
+			await seedRankedCatalog([{ slug, maxRank: 10 }]);
+			await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 42, priceBasis: WFM_PRICE_BASIS, timestamp: Date.now() }));
+			mockWfm(slug, () => payload);
+
+			await prewarmBatch(env as Env, { reason: 'manual', batchSize: 1, resetCursor: true });
+
+			expect(await readPrice(slug)).toMatchObject({ median: 42 });
+			expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBeNull();
+		},
+	);
+
+	it('clears an unranked cached price and snapshot when closed sales are empty', async () => {
+		const slug = 'wf_test_sweep_empty_unranked';
+		await seedCatalog(slug);
+		await seedRankedCatalog([]);
+		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 42, priceBasis: WFM_PRICE_BASIS, timestamp: Date.now() }));
+		mockWfm(slug, () => statsPayload([]));
+
+		await prewarmBatch(env as Env, { reason: 'manual', batchSize: 1, resetCursor: true });
+
+		expect(await readPrice(slug)).toBeNull();
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBe('1');
+		expect(await readSnapshotPrice(slug)).toMatchObject({ status: 'no_data', median: null, priceBasis: WFM_PRICE_BASIS });
+	});
+
+	it('clears both ranked prices when the ranked sweep confirms an empty sales window', async () => {
+		const slug = 'wf_test_sweep_empty_ranks';
+		await seedRankedCatalog([{ slug, maxRank: 10 }]);
+		for (const rank of [0, 10]) {
+			await env.PRICE_CACHE.put(
+				`price:${slug}:r${rank}`,
+				JSON.stringify({ slug, rank, median: 42, priceBasis: WFM_PRICE_BASIS, timestamp: 1 }),
+			);
+			await env.PRICE_CACHE.put(`orders-summary:${slug}:r${rank}`, JSON.stringify({ slug, rank, wts: 42, wtb: 40, timestamp: Date.now() }));
+		}
+		mockWfm(slug, () => statsPayload([]));
+
+		await prewarmOrderSummaryCatalog(env as Env, { reason: 'cron', batchSize: 1, resetCursor: true });
+
+		for (const rank of [0, 10]) {
+			expect(await env.PRICE_CACHE.get(`price:${slug}:r${rank}`)).toBeNull();
+			expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}:r${rank}`)).toBe('1');
+			expect(await readSnapshotPrice(`${slug}:rank-v3:r${rank}`)).toMatchObject({ status: 'no_data', median: null });
+		}
+	});
+
+	it('recomputes a fresh legacy price during the cron sweep', async () => {
+		const slug = 'wf_test_sweep_legacy_price';
+		await seedCatalog(slug);
+		await seedRankedCatalog([]);
+		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 999, rank: null, timestamp: Date.now() }));
+		mockWfm(slug, () =>
+			statsPayload([
+				{ median: 20, volume: 1, minutesAgo: 120 },
+				{ median: 40, volume: 3, minutesAgo: 60 },
+			]),
+		);
+
+		const result = await prewarmBatch(env as Env, { reason: 'cron', batchSize: 1, resetCursor: true });
+
+		expect(result.priceUpdated).toBe(1);
+		expect(await readPrice(slug)).toMatchObject({ median: 35, priceBasis: WFM_PRICE_BASIS });
+		expect(await readSnapshotPrice(slug)).toMatchObject({ median: 35, priceBasis: WFM_PRICE_BASIS });
+	});
+
+	it('stores the rank 0 average for a slug the ranked catalog knows', async () => {
 		const slug = 'wf_test_sweep_ranked_slug';
 		await seedCatalog(slug);
 		await seedRankedCatalog([{ slug, maxRank: 10 }]);
@@ -104,24 +177,24 @@ describe('unranked prewarm sweep rank pinning', () => {
 		expect(await readSnapshotPrice(slug)).toMatchObject({ status: 'ok', median: 50 });
 	});
 
-	it('leaves an unranked slug on the rank-agnostic latest median', async () => {
+	it('volume-weights the closed sales of an unranked slug', async () => {
 		const slug = 'wf_test_sweep_unranked_slug';
 		await seedCatalog(slug);
 		await seedRankedCatalog([{ slug: 'wf_test_sweep_other_ranked_slug', maxRank: 5 }]);
 		mockWfm(slug, () =>
 			statsPayload([
 				{ median: 11, minutesAgo: 120 },
-				{ median: 17, minutesAgo: 10 },
+				{ median: 17, volume: 3, minutesAgo: 10 },
 			]),
 		);
 
 		const result = await prewarmBatch(env as Env, { reason: 'manual', batchSize: 1, resetCursor: true });
 
 		expect(result.priceUpdated).toBe(1);
-		expect(await readPrice(slug)).toMatchObject({ slug, median: 17, rank: null });
+		expect(await readPrice(slug)).toMatchObject({ slug, median: 16, rank: null });
 	});
 
-	it('treats an empty stored ranked catalog as authoritative and prices rank-agnostically', async () => {
+	it('averages unranked sales when the stored ranked catalog is empty', async () => {
 		const slug = 'wf_test_sweep_empty_catalog_slug';
 		await seedCatalog(slug);
 		await seedRankedCatalog([]);
@@ -136,14 +209,17 @@ describe('unranked prewarm sweep rank pinning', () => {
 
 		expect(result.failures).toBe(0);
 		expect(result.priceUpdated).toBe(1);
-		expect(await readPrice(slug)).toMatchObject({ slug, median: 123, rank: null });
+		expect(await readPrice(slug)).toMatchObject({ slug, median: 87, rank: null });
 	});
 
 	it('preserves the cached bare price when the ranked catalog is missing', async () => {
 		const slug = 'wf_test_sweep_no_catalog_slug';
 		await seedCatalog(slug);
 		await seedRankedCatalog(null);
-		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 50, rank: null, timestamp: Date.now() }));
+		await env.PRICE_CACHE.put(
+			`price:${slug}`,
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 50, rank: null, timestamp: Date.now() }),
+		);
 		mockWfm(slug, () =>
 			statsPayload([
 				{ rank: 0, median: 50, minutesAgo: 120 },
@@ -158,14 +234,17 @@ describe('unranked prewarm sweep rank pinning', () => {
 		// Meta keeps sweeping; only the rank-sensitive half is held back.
 		expect(result.metaUpdated).toBe(1);
 		expect(await readPrice(slug)).toMatchObject({ slug, median: 50, rank: null });
-		expect(await env.PRICE_CACHE.get(`miss:price:v2:${slug}`)).toBeNull();
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBeNull();
 	});
 
 	it('preserves the cached bare price when the ranked catalog read throws', async () => {
 		const slug = 'wf_test_sweep_catalog_throws_slug';
 		await seedCatalog(slug);
 		await seedRankedCatalog([{ slug, maxRank: 10 }]);
-		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 50, rank: null, timestamp: Date.now() }));
+		await env.PRICE_CACHE.put(
+			`price:${slug}`,
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 50, rank: null, timestamp: Date.now() }),
+		);
 		mockWfm(slug, () => statsPayload([{ rank: 10, median: 123, minutesAgo: 10 }]));
 
 		const brokenEnv = {
@@ -186,21 +265,24 @@ describe('unranked prewarm sweep rank pinning', () => {
 		expect(result.failures).toBe(0);
 		expect(result.priceUpdated).toBe(0);
 		expect(await readPrice(slug)).toMatchObject({ slug, median: 50, rank: null });
-		expect(await env.PRICE_CACHE.get(`miss:price:v2:${slug}`)).toBeNull();
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBeNull();
 	});
 
 	it('drops the stale bare price when a ranked slug has no rank 0 sale', async () => {
 		const slug = 'wf_test_sweep_no_rank0_slug';
 		await seedCatalog(slug);
 		await seedRankedCatalog([{ slug, maxRank: 10 }]);
-		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 999, rank: null, timestamp: Date.now() }));
+		await env.PRICE_CACHE.put(
+			`price:${slug}`,
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 999, rank: null, timestamp: Date.now() }),
+		);
 		mockWfm(slug, () => statsPayload([{ rank: 10, median: 123, minutesAgo: 10 }]));
 
 		const result = await prewarmBatch(env as Env, { reason: 'manual', batchSize: 1, resetCursor: true });
 
 		expect(result.priceUpdated).toBe(0);
 		expect(await readPrice(slug)).toBeNull();
-		expect(await env.PRICE_CACHE.get(`miss:price:v2:${slug}`)).toBe('1');
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBe('1');
 		expect(await readSnapshotPrice(slug)).toMatchObject({ status: 'no_data', median: null });
 	});
 
@@ -222,26 +304,32 @@ describe('unranked prewarm sweep rank pinning', () => {
 		const slug = 'wf_test_sweep_transient_slug';
 		await seedCatalog(slug);
 		await seedRankedCatalog([{ slug, maxRank: 10 }]);
-		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 42, rank: null, timestamp: Date.now() }));
+		await env.PRICE_CACHE.put(
+			`price:${slug}`,
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 42, rank: null, timestamp: Date.now() }),
+		);
 		mockWfm(slug, () => new Response('boom', { status: 503 }));
 
 		await prewarmBatch(env as Env, { reason: 'manual', batchSize: 1, resetCursor: true });
 
 		expect(await readPrice(slug)).toMatchObject({ slug, median: 42 });
-		expect(await env.PRICE_CACHE.get(`miss:price:v2:${slug}`)).toBeNull();
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBeNull();
 	});
 
 	it('keeps the cached bare price when a ranked stats fetch fails permanently', async () => {
 		const slug = 'wf_test_sweep_permanent_slug';
 		await seedCatalog(slug);
 		await seedRankedCatalog([{ slug, maxRank: 10 }]);
-		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 42, rank: null, timestamp: Date.now() }));
+		await env.PRICE_CACHE.put(
+			`price:${slug}`,
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 42, rank: null, timestamp: Date.now() }),
+		);
 		mockWfm(slug, () => new Response('nope', { status: 404 }));
 
 		await prewarmBatch(env as Env, { reason: 'manual', batchSize: 1, resetCursor: true });
 
 		expect(await readPrice(slug)).toMatchObject({ slug, median: 42 });
-		expect(await env.PRICE_CACHE.get(`miss:price:v2:${slug}`)).toBeNull();
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBeNull();
 	});
 });
 
@@ -253,12 +341,82 @@ describe('read-through price rank pinning', () => {
 		return result;
 	}
 
-	it('keeps the rank 0 median when a stale ranked price refreshes on a live read', async () => {
+	it.each([null, 0, 10])('clears confirmed empty sales for rank %s after a background refresh', async (rank) => {
+		const slug = `wf_test_background_empty_${rank ?? 'bare'}`;
+		const suffix = rank == null ? '' : `:r${rank}`;
+		const snapshotKey = rank == null ? slug : `${slug}:rank-v3:r${rank}`;
+		await seedRankedCatalog([]);
+		await env.PRICE_CACHE.put(
+			`price:${slug}${suffix}`,
+			JSON.stringify({ slug, rank, median: 42, priceBasis: WFM_PRICE_BASIS, timestamp: 1 }),
+		);
+		await env.PRICE_CACHE.put(
+			'snapshot:full:v1',
+			JSON.stringify({
+				version: 1,
+				generatedAt: Date.now(),
+				prices: { [snapshotKey]: { status: 'ok', median: 42, priceBasis: WFM_PRICE_BASIS, timestamp: Date.now() } },
+				meta: {},
+				orderSummaries: {},
+			}),
+		);
+		const upstream = mockWfm(slug, () => statsPayload([]));
+		const ctx = createExecutionContext();
+
+		expect((await getOrHydratePrice(env as Env, slug, ctx, rank)).status).toBe('ok');
+		await waitOnExecutionContext(ctx);
+
+		expect(await env.PRICE_CACHE.get(`price:${slug}${suffix}`)).toBeNull();
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}${suffix}`)).toBe('1');
+		expect(await readSnapshotPrice(snapshotKey)).toMatchObject({ status: 'no_data', median: null, priceBasis: WFM_PRICE_BASIS });
+		expect((await getOrHydratePrice(env as Env, slug, undefined, rank)).status).toBe('not_found');
+		expect(upstream).toHaveBeenCalledOnce();
+	});
+
+	it.each([
+		['missing', () => ({ payload: {} })],
+		['not_array', () => ({ payload: { statistics_closed: { '48hours': {} } } })],
+		['invalid_json', () => new Response('{', { status: 200 })],
+		['not_found', () => new Response('missing', { status: 404 })],
+		['outage', () => new Response('down', { status: 503 })],
+	] as const)('preserves the old price after a %s background response', async (label, response) => {
+		const slug = `wf_test_background_bad_${label}`;
+		await seedRankedCatalog([{ slug, maxRank: 10 }]);
+		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 42, priceBasis: WFM_PRICE_BASIS, timestamp: 1 }));
+		mockWfm(slug, response);
+
+		await hydrate(slug);
+
+		expect(await readPrice(slug)).toMatchObject({ median: 42 });
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBeNull();
+	});
+
+	it.each([undefined, 'legacy-median'])('rejects a fresh cache with legacy basis %s and recomputes it', async (priceBasis) => {
+		const slug = `wf_test_read_legacy_${priceBasis ? 'tagged' : 'missing'}`;
+		await seedRankedCatalog([]);
+		await env.PRICE_CACHE.put(`price:${slug}`, JSON.stringify({ slug, median: 999, rank: null, timestamp: Date.now(), priceBasis }));
+		await env.PRICE_CACHE.put(`miss:price:v2:${slug}`, '1');
+		const upstream = mockWfm(slug, () =>
+			statsPayload([
+				{ median: 20, volume: 1, minutesAgo: 120 },
+				{ median: 40, volume: 3, minutesAgo: 60 },
+			]),
+		);
+
+		const result = await hydrate(slug);
+
+		expect(result.cacheHit).toBe(false);
+		expect(result.data).toMatchObject({ median: 35, priceBasis: WFM_PRICE_BASIS });
+		expect(await readPrice(slug)).toMatchObject({ median: 35, priceBasis: WFM_PRICE_BASIS });
+		expect(upstream).toHaveBeenCalledOnce();
+	});
+
+	it('keeps the rank 0 average when a stale ranked price refreshes on a live read', async () => {
 		const slug = 'wf_test_read_stale_ranked_slug';
 		await seedRankedCatalog([{ slug, maxRank: 10 }]);
 		await env.PRICE_CACHE.put(
 			`price:${slug}`,
-			JSON.stringify({ slug, median: 50, rank: null, timestamp: Date.now() - 30 * 60 * 60 * 1000 }),
+			JSON.stringify({ priceBasis: WFM_PRICE_BASIS, slug, median: 50, rank: null, timestamp: Date.now() - 30 * 60 * 60 * 1000 }),
 		);
 		mockWfm(slug, () =>
 			statsPayload([
@@ -289,7 +447,7 @@ describe('read-through price rank pinning', () => {
 		expect(await readPrice(slug)).toMatchObject({ slug, median: 50, rank: null });
 	});
 
-	it('prices rank-agnostically when the ranked catalog is unavailable', async () => {
+	it('uses only unranked or rank 0 sales when the ranked catalog is unavailable', async () => {
 		const slug = 'wf_test_read_no_catalog_slug';
 		await seedRankedCatalog(null);
 		mockWfm(slug, () =>
@@ -301,7 +459,7 @@ describe('read-through price rank pinning', () => {
 
 		const result = await hydrate(slug);
 
-		expect(result.data).toMatchObject({ median: 123 });
+		expect(result.data).toMatchObject({ median: 50 });
 	});
 
 	it('marks no data when a ranked slug has no rank 0 sale', async () => {
@@ -313,7 +471,7 @@ describe('read-through price rank pinning', () => {
 
 		expect(result.status).toBe('not_found');
 		expect(await readPrice(slug)).toBeNull();
-		expect(await env.PRICE_CACHE.get(`miss:price:v2:${slug}`)).toBe('1');
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBe('1');
 	});
 
 	it('leaves no negative marker when a ranked read fails transiently', async () => {
@@ -324,7 +482,7 @@ describe('read-through price rank pinning', () => {
 		const result = await hydrate(slug);
 
 		expect(result.status).toBe('unavailable');
-		expect(await env.PRICE_CACHE.get(`miss:price:v2:${slug}`)).toBeNull();
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBeNull();
 	});
 
 	it('reads the ranked catalog once across back-to-back bare price hydrations', async () => {
@@ -368,8 +526,8 @@ describe('read-through price rank pinning', () => {
 			]),
 		);
 
-		// Authoritative empty catalog: the slug is unranked, so the latest median wins.
-		expect((await hydrate(slug)).data).toMatchObject({ median: 123 });
+		// Missing rank metadata must not mix upgraded mod prices into the base price.
+		expect((await hydrate(slug)).data).toMatchObject({ median: 50 });
 
 		await seedRankedCatalog([{ slug, maxRank: 10 }]);
 		await env.PRICE_CACHE.delete(`price:${slug}`);
@@ -386,6 +544,6 @@ describe('read-through price rank pinning', () => {
 		const result = await hydrate(slug);
 
 		expect(result.status).toBe('not_found');
-		expect(await env.PRICE_CACHE.get(`miss:price:v2:${slug}`)).toBe('1');
+		expect(await env.PRICE_CACHE.get(`miss:price:v3:${slug}`)).toBe('1');
 	});
 });

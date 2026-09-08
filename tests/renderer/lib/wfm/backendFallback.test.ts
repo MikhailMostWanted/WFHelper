@@ -1,3 +1,4 @@
+import { WFM_PRICE_BASIS } from "../../../../config/shared/wfmStats.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const BACKEND_URL = "https://backend.test";
@@ -25,8 +26,9 @@ function statsPayload(median: number): Record<string, unknown> {
         "48hours": [
           {
             order_type: "sell",
-            datetime: "2026-01-01T00:00:00.000Z",
-            median,
+            datetime: new Date().toISOString(),
+            wa_price: median,
+            volume: 1,
           },
         ],
       },
@@ -41,14 +43,16 @@ function rankedStatsPayload(rank0Median: number, rankMaxMedian: number): Record<
         "48hours": [
           {
             order_type: "sell",
-            datetime: "2026-01-01T00:00:00.000Z",
-            median: rank0Median,
+            datetime: new Date().toISOString(),
+            wa_price: rank0Median,
+            volume: 1,
             mod_rank: 0,
           },
           {
             order_type: "sell",
-            datetime: "2026-01-01T01:00:00.000Z",
-            median: rankMaxMedian,
+            datetime: new Date().toISOString(),
+            wa_price: rankMaxMedian,
+            volume: 1,
             mod_rank: 10,
           },
         ],
@@ -82,6 +86,7 @@ describe("WFM backend fallback integration", () => {
             slug: "ash_prime_blueprint",
             median: 77,
             timestamp: 123456789,
+            priceBasis: WFM_PRICE_BASIS,
           },
         });
       }
@@ -141,6 +146,7 @@ describe("WFM backend fallback integration", () => {
             slug: "quickdraw",
             median: 4,
             timestamp: 223355,
+            priceBasis: WFM_PRICE_BASIS,
           },
         });
       }
@@ -240,6 +246,7 @@ describe("WFM backend fallback integration", () => {
             rank: 10,
             median: 150,
             timestamp: 223344,
+            priceBasis: WFM_PRICE_BASIS,
           },
         });
       }
@@ -267,6 +274,7 @@ describe("WFM backend fallback integration", () => {
             rank: 10,
             median: 150,
             timestamp: 223344,
+            priceBasis: WFM_PRICE_BASIS,
           },
         });
       }
@@ -378,6 +386,7 @@ describe("WFM backend fallback integration", () => {
             wts: 150,
             wtb: 120,
             timestamp: 112233,
+            priceBasis: WFM_PRICE_BASIS,
           },
         });
       }
@@ -420,6 +429,7 @@ describe("WFM backend fallback integration", () => {
             thumb: "icons/ash-thumb.png",
             icon: "icons/ash-icon.png",
             timestamp: 111,
+            priceBasis: WFM_PRICE_BASIS,
           },
         });
       }
