@@ -197,6 +197,10 @@ import type {
 } from "../../config/shared/rewardOverlayLayout.js";
 
 export interface IpcInvokeMap {
+  getPersonalProfile: {
+    args: [refresh?: boolean];
+    return: import("../../config/shared/personalProfile.js").PersonalProfileResult;
+  };
   getNotificationSound: {
     args: [];
     return: import("../../config/shared/notificationSound.js").NotificationSoundAsset | null;

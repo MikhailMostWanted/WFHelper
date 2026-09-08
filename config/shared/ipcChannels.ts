@@ -16,6 +16,7 @@ export const WORLD_STATE_FETCH_ERROR = "world-state-fetch-error";
 export const DB_GET_RELIC_DATABASE = "get-relic-database";
 export const DB_GET_WFM_ITEMS = "get-wfm-items";
 export const DB_GET_MASTERY = "get-mastery-progress";
+export const PERSONAL_PROFILE_GET = "personal-profile:get";
 export const DB_GET_CODEX_SCANS = "get-codex-scans";
 export const DROP_SEARCH = "drop-search";
 export const REWARD_EDIT_BEGIN = "reward-overlay-edit:begin";

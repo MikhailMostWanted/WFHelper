@@ -20,6 +20,7 @@ import {
   DB_GET_WFM_ITEMS,
   DB_GET_MASTERY,
   DB_GET_CODEX_SCANS,
+  PERSONAL_PROFILE_GET,
   DB_GET_RELIC_DATABASE,
   DROP_SEARCH,
   APP_UPDATE_CHECK,
@@ -83,6 +84,10 @@ function register(): void {
     });
     return masteryHelper.computeMasteryProgress(data as Record<string, unknown>);
   });
+
+  handleAuthorized(PERSONAL_PROFILE_GET, assertMainRendererSender, (_event, refresh: unknown) =>
+    codexProfile.getPersonalProfile(refresh === true),
+  );
 
   handleAuthorized(DB_GET_CODEX_SCANS, assertMainRendererSender, (_event, force: unknown) =>
     codexProfile.getCodexScans(force === true),

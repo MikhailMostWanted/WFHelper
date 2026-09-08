@@ -1,5 +1,13 @@
 import fs from "node:fs";
 import https from "node:https";
+import type { PersonalProfile, PersonalProfileResult } from "../config/shared/personalProfile";
+import {
+  enrichPersonalProfileNames,
+  parsePersonalProfile,
+  revivePersonalProfile,
+} from "./personalProfileParser";
+import { createJsonCache } from "./jsonCache";
+import { loadRegionTranslation, localizedDictValue, nodeLabel } from "./regionNames";
 import { withScope } from "./logger";
 import { userDataPath } from "./userDataPath";
 import { writeFileAtomicSync } from "./atomicFile";
@@ -129,12 +137,9 @@ export async function getCodexScans(refresh = false): Promise<CodexScansResult> 
 
   _inFlight = (async (): Promise<CodexScansResult> => {
     try {
-      const body = await _httpsGetString(
-        `https://api.warframe.com/cdn/getProfileViewingData.php?playerId=${accountId}`,
-      );
-      const scans = parseProfileScans(JSON.parse(body));
+      const { scans, fetchedAt } = await fetchProfileSnapshot(accountId);
       if (!scans) throw new Error("no scans array in profile payload");
-      _cache = { fetchedAt: Date.now(), scans };
+      _cache = { fetchedAt, scans };
       try {
         writeFileAtomicSync(_cachePath(), JSON.stringify(_cache));
       } catch {
@@ -150,4 +155,172 @@ export async function getCodexScans(refresh = false): Promise<CodexScansResult> 
     }
   })();
   return _inFlight;
+}
+
+interface PersonalCache {
+  accountId: string;
+  fetchedAt: number;
+  profile: PersonalProfile;
+}
+
+const personalDiskCache = createJsonCache<PersonalCache>("personal-profile.json", (value) => {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (
+    typeof raw.accountId !== "string" ||
+    !/^[a-f0-9]{24}$/.test(raw.accountId) ||
+    typeof raw.fetchedAt !== "number" ||
+    !Number.isFinite(raw.fetchedAt) ||
+    raw.fetchedAt <= 0 ||
+    raw.fetchedAt > Date.now() + 300000
+  )
+    return null;
+  const profile = revivePersonalProfile(raw.profile);
+  return profile ? { accountId: raw.accountId, fetchedAt: raw.fetchedAt, profile } : null;
+});
+let personalCache: PersonalCache | null = null;
+let personalCacheAccount: string | null = null;
+let personalAttempt: { accountId: string; at: number; failed: boolean } | null = null;
+let personalRequest: { accountId: string; promise: Promise<PersonalProfileResult> } | null = null;
+
+type ProfileSnapshot = {
+  profile: PersonalProfile | null;
+  scans: CodexScanEntry[] | null;
+  fetchedAt: number;
+};
+let lastSnapshot: { accountId: string; value: ProfileSnapshot } | null = null;
+const profileRequests = new Map<string, Promise<ProfileSnapshot>>();
+
+async function fetchProfileSnapshot(accountId: string): Promise<ProfileSnapshot> {
+  if (
+    lastSnapshot?.accountId === accountId &&
+    Date.now() - lastSnapshot.value.fetchedAt < REFRESH_MIN_INTERVAL_MS
+  )
+    return lastSnapshot.value;
+  const pending = profileRequests.get(accountId);
+  if (pending) return pending;
+  const request = (async () => {
+    const body = await _httpsGetString(
+      `https://api.warframe.com/cdn/getProfileViewingData.php?playerId=${accountId}`,
+    );
+    const raw: unknown = JSON.parse(body);
+    const value = {
+      profile: parsePersonalProfile(raw),
+      scans: parseProfileScans(raw),
+      fetchedAt: Date.now(),
+    };
+    // Share the response between manual Codex and profile refreshes, not between accounts.
+    if (_loadAccountId() === accountId) {
+      lastSnapshot = { accountId, value };
+      if (value.profile) {
+        personalCacheAccount = accountId;
+        personalCache = { accountId, fetchedAt: value.fetchedAt, profile: value.profile };
+        personalDiskCache.write(personalCache);
+      }
+    }
+    return value;
+  })();
+  profileRequests.set(accountId, request);
+  try {
+    return await request;
+  } finally {
+    if (profileRequests.get(accountId) === request) profileRequests.delete(accountId);
+  }
+}
+
+function profileWithNames(profile: PersonalProfile): PersonalProfile {
+  try {
+    const pep = require("warframe-public-export-plus") as {
+      ExportAbilities?: unknown;
+      ExportWarframes?: unknown;
+    };
+    const translation = loadRegionTranslation();
+    return enrichPersonalProfileNames(profile, {
+      abilities: pep.ExportAbilities,
+      warframes: pep.ExportWarframes,
+      resolveName: localizedDictValue,
+      missionName: (type) => {
+        const region = translation.regions[type];
+        if (!region) return null;
+        return nodeLabel(
+          {
+            regions: {
+              [type]: {
+                ...region,
+                name: localizedDictValue(region.name) ?? region.name,
+                systemName: localizedDictValue(region.systemName) ?? region.systemName,
+              },
+            },
+            dict: translation.dict,
+          },
+          type,
+        );
+      },
+    });
+  } catch {
+    return profile;
+  }
+}
+
+export async function getPersonalProfile(refresh = false): Promise<PersonalProfileResult> {
+  const accountId = _loadAccountId();
+  if (!accountId) return { profile: null, fetchedAt: null, status: "no-account", nextRefreshAt: 0 };
+  if (personalCacheAccount !== accountId) {
+    const stored = personalDiskCache.read();
+    personalCache = stored?.accountId === accountId ? stored : null;
+    personalCacheAccount = accountId;
+  }
+  const result = (status: PersonalProfileResult["status"]): PersonalProfileResult => ({
+    profile:
+      personalCache?.accountId === accountId ? profileWithNames(personalCache.profile) : null,
+    fetchedAt: personalCache?.accountId === accountId ? personalCache.fetchedAt : null,
+    status,
+    nextRefreshAt: Math.max(
+      personalCache?.accountId === accountId
+        ? personalCache.fetchedAt + REFRESH_MIN_INTERVAL_MS
+        : 0,
+      personalAttempt?.accountId === accountId ? personalAttempt.at + REFRESH_MIN_INTERVAL_MS : 0,
+    ),
+  });
+  const cachedStatus =
+    personalAttempt?.accountId === accountId &&
+    personalAttempt.failed &&
+    (!personalCache || personalAttempt.at >= personalCache.fetchedAt)
+      ? "fetch-failed"
+      : personalCache
+        ? "ready"
+        : "no-data";
+  if (!refresh) return result(cachedStatus);
+  if (personalRequest?.accountId === accountId) return personalRequest.promise;
+  if (Date.now() < result(cachedStatus).nextRefreshAt) return result(cachedStatus);
+  const attempt = { accountId, at: Date.now(), failed: false };
+  personalAttempt = attempt;
+  const promise = (async (): Promise<PersonalProfileResult> => {
+    try {
+      const snapshot = await fetchProfileSnapshot(accountId);
+      if (_loadAccountId() !== accountId)
+        return { profile: null, fetchedAt: null, status: "account-changed", nextRefreshAt: 0 };
+      if (!snapshot.profile) throw new Error("Profile data unavailable");
+      if (
+        personalCache?.accountId !== accountId ||
+        personalCache.fetchedAt !== snapshot.fetchedAt
+      ) {
+        personalCache = { accountId, fetchedAt: snapshot.fetchedAt, profile: snapshot.profile };
+        personalCacheAccount = accountId;
+        personalDiskCache.write(personalCache);
+      }
+      return result("ready");
+    } catch {
+      attempt.failed = true;
+      if (_loadAccountId() !== accountId)
+        return { profile: null, fetchedAt: null, status: "account-changed", nextRefreshAt: 0 };
+      return result("fetch-failed");
+    }
+  })();
+  personalRequest = { accountId, promise };
+  try {
+    return await promise;
+  } finally {
+    if (personalRequest?.promise === promise) personalRequest = null;
+  }
 }

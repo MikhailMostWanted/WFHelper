@@ -45,6 +45,8 @@
   import ThemedSelect from "../components/ThemedSelect.svelte";
   import SummaryStrip, { type SummaryStripItem } from "../components/SummaryStrip.svelte";
   import StatsTradePanel from "../components/stats/StatsTradePanel.svelte";
+  import HeaderTabs from "../components/HeaderTabs.svelte";
+  import PersonalStatsPanel from "../components/stats/PersonalStatsPanel.svelte";
   import StatResourcePicker from "../components/stats/StatResourcePicker.svelte";
   import { buildStatIconMap } from "../lib/assetUrls.js";
   import { itemDb } from "../stores/data.js";
@@ -70,6 +72,12 @@
     barsForKey,
     labelStep,
   } from "../lib/stats/chartData.js";
+
+  let statsTab = "tracking";
+  $: statsTabs = [
+    { key: "tracking", label: $tr("profile.tracking") },
+    { key: "personal", label: $tr("profile.personal") },
+  ];
 
   let session: SessionStats | null = null;
   let history: DailyStatEntry[] = [];
@@ -654,47 +662,61 @@
 <section class="view active">
   <div class="view-header">
     <h2>{$tr("common.stats")}</h2>
-    <div class="ml-auto flex flex-wrap items-center gap-2">
-      <ThemedButton
-        active={showValue}
-        onClick={() => {
-          showValue = !showValue;
-        }}
-        title={$tr("stats.toggleValueTitle")}>{$tr("stats.valueLabel")}</ThemedButton
-      >
-      <ThemedButton
-        active={showChange}
-        onClick={() => {
-          showChange = !showChange;
-        }}
-        title={$tr("stats.toggleChangeTitle")}>{$tr("common.change")}</ThemedButton
-      >
-      <ThemedButton
-        onClick={() => {
-          showResourcePicker = true;
-        }}
-        title={$tr("stats.chartResourcesHint")}>{$tr("stats.chartResources")}</ThemedButton
-      >
-      <label class="flex items-center gap-1.5 whitespace-nowrap text-xs text-text-muted">
-        {$tr("stats.timeframe")}:
-        <ThemedSelect bind:value={chartDays}>
-          {#each TIMEFRAME_OPTIONS as days}
-            <option value={days}>{days}d</option>
-          {/each}
-        </ThemedSelect>
-      </label>
-      <ThemedButton onClick={handleSaveStats} title={$tr("stats.saveJsonTitle")}>
-        {$tr("stats.saveJsonButton")}
-      </ThemedButton>
-      <ThemedButton as="label" title={$tr("stats.importAlecaTitle")}>
-        {$tr("stats.importAlecaButton")}
-        <input type="file" accept=".json" class="hidden" on:change={handleImportFile} />
-      </ThemedButton>
-      <EditLayoutBar view="stats" />
-    </div>
+    <HeaderTabs
+      options={statsTabs}
+      activeKey={statsTab}
+      onSelect={(key) => {
+        statsTab = key;
+        expandedKey = null;
+        tooltip = null;
+        showResourcePicker = false;
+      }}
+    />
+    {#if statsTab === "tracking"}
+      <div class="ml-auto flex flex-wrap items-center gap-2">
+        <ThemedButton
+          active={showValue}
+          onClick={() => {
+            showValue = !showValue;
+          }}
+          title={$tr("stats.toggleValueTitle")}>{$tr("stats.valueLabel")}</ThemedButton
+        >
+        <ThemedButton
+          active={showChange}
+          onClick={() => {
+            showChange = !showChange;
+          }}
+          title={$tr("stats.toggleChangeTitle")}>{$tr("common.change")}</ThemedButton
+        >
+        <ThemedButton
+          onClick={() => {
+            showResourcePicker = true;
+          }}
+          title={$tr("stats.chartResourcesHint")}>{$tr("stats.chartResources")}</ThemedButton
+        >
+        <label class="flex items-center gap-1.5 whitespace-nowrap text-xs text-text-muted">
+          {$tr("stats.timeframe")}:
+          <ThemedSelect bind:value={chartDays}>
+            {#each TIMEFRAME_OPTIONS as days}
+              <option value={days}>{days}d</option>
+            {/each}
+          </ThemedSelect>
+        </label>
+        <ThemedButton onClick={handleSaveStats} title={$tr("stats.saveJsonTitle")}>
+          {$tr("stats.saveJsonButton")}
+        </ThemedButton>
+        <ThemedButton as="label" title={$tr("stats.importAlecaTitle")}>
+          {$tr("stats.importAlecaButton")}
+          <input type="file" accept=".json" class="hidden" on:change={handleImportFile} />
+        </ThemedButton>
+        <EditLayoutBar view="stats" />
+      </div>
+    {/if}
   </div>
 
-  {#if loading}
+  {#if statsTab === "personal"}
+    <PersonalStatsPanel />
+  {:else if loading}
     <div class="empty-state"><p>{$tr("common.loading")}</p></div>
   {:else}
     <div class="flex flex-1 min-h-0 overflow-hidden">
