@@ -24,6 +24,8 @@ export const REWARD_EDIT_UPDATE = "reward-overlay-edit:update";
 export const REWARD_EDIT_END = "reward-overlay-edit:end";
 export const REWARD_EDIT_STATE = "reward-overlay-edit-state";
 export const REWARD_LAYOUT_GET = "reward-overlay-layout:get";
+export const FEEDBACK_CONTEXT = "feedback:context";
+export const FEEDBACK_SUBMIT = "feedback:submit";
 
 export const WFM_SIGNIN = "wfm:signin";
 export const WFM_SIGNOUT = "wfm:signout";

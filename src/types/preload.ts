@@ -7,6 +7,10 @@ import type {
 import type { WfmStatus } from "./market.js";
 
 export interface PreloadAPI {
+  getFeedbackContext: () => Promise<IpcInvokeMap["getFeedbackContext"]["return"]>;
+  submitFeedback: (
+    ...args: IpcInvokeMap["submitFeedback"]["args"]
+  ) => Promise<IpcInvokeMap["submitFeedback"]["return"]>;
   getRewardOverlayPreview: () => Promise<IpcInvokeMap["getRewardOverlayPreview"]["return"]>;
   beginRewardOverlayEdit: () => Promise<IpcInvokeMap["beginRewardOverlayEdit"]["return"]>;
   updateRewardOverlayEdit: (

@@ -9,6 +9,7 @@ covers runtime ownership and invariants. See `README.md` for setup and operator 
 - `src/routes/public.ts` owns health, bootstrap, snapshot, item-catalog, top-traded,
   adversary-vendor, price, meta, and order routes.
 - `src/routes/admin.ts` owns authenticated prewarm, catalog, hotset, and status routes.
+- `src/routes/feedback.ts` validates opt-in reports and forwards them to a private Discord webhook.
 - `src/services/readThrough.ts` owns cache-first reads, stale refresh, negative markers, and
   in-flight deduplication.
 - `src/services/prewarm.ts` owns catalog walks, upstream refreshes, snapshot patches, and the
@@ -49,6 +50,16 @@ Rate Limiting binding defaults in `wrangler.jsonc` are per IP:
 
 Public limiter failures fail open to preserve app reads. Admin limiter failures fail closed with
 `503 rate_limit_unavailable`. Zone-level WAF rules remain the first line of defense.
+
+`POST /v1/feedback` runs after the shared CORS and daily-budget checks. It is anonymous and
+does not require bootstrap. Its separate `FEEDBACK_RATE_LIMITER` allows 2 requests per minute
+per connecting IP, then `FEEDBACK_GLOBAL_LIMITER` caps all senders together at 10 per minute; both
+always fail closed, including when public read limiters are disabled.
+Missing limiter or `FEEDBACK_DISCORD_WEBHOOK_URL` secret returns 503. The route validates the
+shared desktop report schema after a bounded streamed JSON read. Delivery uses a fixed Discord
+webhook URL allowlist, disabled redirects, disabled mentions and a 15-second full-body deadline.
+Only a successful `wait=true` message receipt counts as delivery. Feedback has no automatic retry,
+KV persistence, or content logging. See README for private channel setup and retention details.
 
 ## Snapshot
 

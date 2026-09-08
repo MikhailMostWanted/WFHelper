@@ -197,6 +197,18 @@ import type {
 } from "../../config/shared/rewardOverlayLayout.js";
 
 export interface IpcInvokeMap {
+  getFeedbackContext: {
+    args: [];
+    return: {
+      appVersion: string;
+      platform: string;
+      diagnostics: { osVersion: string; arch: string };
+    };
+  };
+  submitFeedback: {
+    args: [report: import("../../config/shared/feedback.js").FeedbackReport];
+    return: import("../../config/shared/feedback.js").FeedbackResult;
+  };
   getRewardOverlayPreview: {
     args: [];
     return: {

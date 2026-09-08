@@ -14,6 +14,7 @@ Public:
 - `GET /v1/meta/:slug`
 - `GET /v1/order-summary/:slug`, with `?subtype=` for relic refinements
 - `GET /v1/supporters`
+- `POST /v1/feedback`, anonymous bug reports and feature requests
 - `GET /v1/orders/:slug`, disabled by default
 
 Admin routes require `Authorization: Bearer <ADMIN_API_KEY>`:
@@ -67,6 +68,40 @@ Rate Limiting bindings:
 - `PUBLIC_API_RATE_LIMITER`
 - `PUBLIC_SNAPSHOT_RATE_LIMITER`
 - `ADMIN_RATE_LIMITER`
+- `FEEDBACK_RATE_LIMITER`, required for feedback, 2 requests per minute per IP
+- `FEEDBACK_GLOBAL_LIMITER`, required for feedback, 10 requests per minute across all senders
+
+## Private Discord feedback
+
+Create a dedicated private feedback channel and a webhook for that channel in Discord.
+Keep its URL out of the desktop app, source files, build variables, and chat messages.
+Set it as the Worker secret `FEEDBACK_DISCORD_WEBHOOK_URL` using the Cloudflare dashboard
+or `npx wrangler secret put FEEDBACK_DISCORD_WEBHOOK_URL` from this directory. Use the
+unmodified `https://discord.com/api/webhooks/<id>/<token>` URL without query parameters.
+Deploy the Worker with the `FEEDBACK_RATE_LIMITER` and `FEEDBACK_GLOBAL_LIMITER` bindings before
+releasing the desktop UI.
+For a forum channel keep the var `FEEDBACK_DISCORD_FORUM` at `1` in `wrangler.jsonc`: each report
+then opens its own thread named after its kind and title. Remove the var for a text channel,
+where Discord rejects thread names.
+No Discord bot or user login is required. The endpoint returns unavailable until both the
+secret and limiter are configured. Rotate the webhook in Discord and replace the secret if
+it leaks. Tests mock delivery and never send feedback to the channel.
+
+Reports include the user-entered category, title, description, optional contact, app version
+and platform. Diagnostics and one screenshot are opt-in and reviewed in the desktop modal.
+Diagnostics contain OS version, architecture, language, current view, UI scale and the last
+256 KB of `main.log`, which holds file paths under the user's profile and technical events.
+The desktop re-encodes screenshot pixels to discard the original file's embedded metadata.
+No account token, inventory or machine identifier is collected.
+Screenshots and free text can contain personal information; restrict channel membership and
+delete reports when they are no longer needed. Discord retains the messages until deleted;
+the Worker does not store feedback in KV or print report content in its request logs.
+
+The endpoint enforces a streamed 2,000,000-byte JSON limit, a 256 KiB log tail and a 1 MiB PNG/JPEG/WebP attachment
+limit. It keeps the webhook server-side, disables mentions, and sends once with Discord's
+`wait=true` acknowledgement. A timeout can mean delivery succeeded without an acknowledgement;
+there is no automatic retry. The independent feedback limiter fails closed even when public
+market-data rate limiting is disabled. Shared daily-budget and CORS checks still apply.
 
 Important variables:
 

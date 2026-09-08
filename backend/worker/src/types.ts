@@ -8,6 +8,11 @@ export interface Env {
 	PUBLIC_API_RATE_LIMITER: RateLimit;
 	PUBLIC_SNAPSHOT_RATE_LIMITER: RateLimit;
 	ADMIN_RATE_LIMITER: RateLimit;
+	FEEDBACK_RATE_LIMITER?: RateLimit;
+	FEEDBACK_GLOBAL_LIMITER?: RateLimit;
+	FEEDBACK_DISCORD_WEBHOOK_URL?: string;
+	/** "1" when the feedback webhook targets a forum channel, which needs a thread per post. */
+	FEEDBACK_DISCORD_FORUM?: string;
 	ADMIN_API_KEY?: string;
 	/** Omit to disable activity counting. */
 	STATS_SALT?: string;

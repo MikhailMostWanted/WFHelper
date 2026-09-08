@@ -1,4 +1,5 @@
 import { handleAdminRoutes } from './routes/admin';
+import { handleFeedbackRoute } from './routes/feedback';
 import { handlePublicRoutes } from './routes/public';
 import { jsonResponse, originIsAllowed } from './security/cors';
 import { checkDailyBudget, isDailyBudgetExceeded } from './security/dailyBudget';
@@ -49,6 +50,7 @@ function routeMetadata(req: Request): RouteMetadata {
 	if (req.method === 'OPTIONS') return { type: 'request', route: 'options' };
 	if (pathname === '/healthz') return { type: 'request', route: '/healthz' };
 	if (pathname === '/v1/bootstrap') return { type: 'request', route: '/v1/bootstrap' };
+	if (pathname === '/v1/feedback') return { type: 'request', route: '/v1/feedback' };
 	if (pathname === '/v1/snapshot') return { type: 'request', route: '/v1/snapshot' };
 	if (pathname === '/v1/wfm-items') return { type: 'request', route: '/v1/wfm-items' };
 	if (pathname === '/v1/supporters') return { type: 'request', route: '/v1/supporters' };
@@ -113,6 +115,7 @@ async function handleFetch(req: Request, env: Env, ctx: ExecutionContext): Promi
 
 	const budgetResponse = await checkDailyBudget(req, env);
 	if (budgetResponse) return budgetResponse;
+	if (req.method === 'POST' && url.pathname === '/v1/feedback') return handleFeedbackRoute(req, env);
 
 	const publicRouteResponse = await handlePublicRoutes(req, url, env, ctx);
 	if (publicRouteResponse) return publicRouteResponse;
