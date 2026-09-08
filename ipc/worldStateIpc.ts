@@ -1,3 +1,5 @@
+import { normalizeNotificationVolume } from "../config/shared/notificationSound";
+import { getNotificationSound } from "../services/notificationSound";
 import ctx from "./context";
 import { assertAuthorizedSender, assertMainRendererSender } from "./ipcSecurity";
 import { asRecord } from "./ipcValidators";
@@ -262,7 +264,7 @@ const TOAST_SILENT_AUDIO = '<audio silent="true"/>';
 const TOAST_SYSTEM_AUDIO = '<audio src="ms-winsoundevent:Notification.Default"/>';
 
 function notificationSoundUsesSystem(): boolean {
-  return ctx.overlaySettings.notificationSoundUsesSystem === true;
+  return process.platform === "win32" && ctx.overlaySettings.notificationSoundUsesSystem === true;
 }
 
 function toastAudio(): string {
@@ -278,7 +280,10 @@ function playNotificationSound(): void {
   if (now - _lastSoundAt < SOUND_MIN_GAP_MS) return;
   _lastSoundAt = now;
   try {
-    window.webContents.send(NOTIFICATION_SOUND_PLAY);
+    window.webContents.send(NOTIFICATION_SOUND_PLAY, {
+      volume: normalizeNotificationVolume(ctx.overlaySettings.notificationSoundVolume),
+      revision: getNotificationSound()?.revision ?? null,
+    });
   } catch (err) {
     log.warn("[WorldState] notification sound push failed:", normalizeErrorMessage(err));
   }
@@ -434,7 +439,7 @@ export function sendDesktopNotificationRaw(
     const notification = new ElectronNotification({
       title,
       body,
-      silent: !notificationSoundEnabled(),
+      silent: true,
     });
     _activeNotifications.add(notification);
     const release = () => {
@@ -449,6 +454,7 @@ export function sendDesktopNotificationRaw(
     });
     setTimeout(release, 30_000);
     notification.show();
+    playNotificationSound();
   } catch (err) {
     log.warn("[WorldState] notification error:", normalizeErrorMessage(err));
   }

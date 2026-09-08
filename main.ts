@@ -89,6 +89,7 @@ import * as arbiOverlayIpc from "./ipc/arbiOverlayIpc";
 import * as worldStateIpc from "./ipc/worldStateIpc";
 import * as messageNotificationIpc from "./ipc/messageNotificationIpc";
 import * as systemIpc from "./ipc/systemIpc";
+import * as notificationSoundIpc from "./ipc/notificationSoundIpc";
 import * as feedbackIpc from "./ipc/feedbackIpc";
 import * as snapshotCacheIpc from "./ipc/snapshotCacheIpc";
 import * as rankedHotsetIpc from "./ipc/rankedHotsetIpc";
@@ -460,6 +461,7 @@ function registerIpcHandlers(profileStage: ProfileStage): void {
   worldStateIpc.register();
   systemIpc.register();
   feedbackIpc.register();
+  notificationSoundIpc.register();
   snapshotCacheIpc.register();
   rankedHotsetIpc.register();
   statsIpc.register();

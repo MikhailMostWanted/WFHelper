@@ -197,6 +197,15 @@ import type {
 } from "../../config/shared/rewardOverlayLayout.js";
 
 export interface IpcInvokeMap {
+  getNotificationSound: {
+    args: [];
+    return: import("../../config/shared/notificationSound.js").NotificationSoundAsset | null;
+  };
+  saveNotificationSound: {
+    args: [sound: import("../../config/shared/notificationSound.js").NotificationSoundUpload];
+    return: import("../../config/shared/notificationSound.js").NotificationSoundAsset;
+  };
+  resetNotificationSound: { args: []; return: null };
   getFeedbackContext: {
     args: [];
     return: {
@@ -840,7 +849,7 @@ export interface IpcEventMap {
   "pt-run-saved": PtRunRecord;
   "warframe-ui-scale-updated": number | null;
   "notification-history-added": NotificationEntry;
-  "notification-sound-play": undefined;
+  "notification-sound-play": import("../../config/shared/notificationSound.js").NotificationSoundPlayback;
   "market-alerts:changed": undefined;
   "workbench-state": WorkbenchState;
   "popout-state-changed": PopoutWindowInfo[];

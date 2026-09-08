@@ -18,6 +18,7 @@
   import ProtonLaunchOption from "../components/ProtonLaunchOption.svelte";
   import LinuxDisplayBackend from "../components/LinuxDisplayBackend.svelte";
   import SegmentedControl from "../components/SegmentedControl.svelte";
+  import NotificationSoundSettings from "../components/NotificationSoundSettings.svelte";
   import RewardOverlayEditor from "../components/RewardOverlayEditor.svelte";
   import { invoke, send, getPlatform } from "../lib/ipc.js";
   import { onInventoryLoaded } from "../lib/actions.js";
@@ -189,6 +190,7 @@
     "autoTriggerEnabled",
     "notificationSoundEnabled",
     "notificationSoundUsesSystem",
+    "notificationSoundVolume",
     "wfmNotificationsEnabled",
     "messageNotificationsEnabled",
     "messageNotificationsWhileFocused",
@@ -570,6 +572,16 @@
                   />
                 </SettingsRow>
               {/if}
+
+              <NotificationSoundSettings
+                enabled={form.notificationSoundEnabled}
+                system={isWindows && form.notificationSoundUsesSystem}
+                volume={form.notificationSoundVolume}
+                onVolumeChange={(value) => {
+                  form.notificationSoundVolume = value;
+                  autoSave();
+                }}
+              />
 
               <SettingsRow
                 label={$tr("settings.windowsNotificationSeconds")}

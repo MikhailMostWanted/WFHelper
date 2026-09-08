@@ -329,6 +329,7 @@ describe("world state desktop notifications", () => {
 describe("windows toast audio and lifetime", () => {
   let written: Array<{ path: string; data: string }> = [];
   let soundSends: string[] = [];
+  let soundPayloads: unknown[] = [];
 
   function attachMainWindow(destroyed = false): void {
     ctx.mainWindow = {
@@ -336,8 +337,11 @@ describe("windows toast audio and lifetime", () => {
       webContents: {
         id: 101,
         // The same window also receives history pushes; only the sound matters here.
-        send: (channel: string) => {
-          if (channel === NOTIFICATION_SOUND_PLAY) soundSends.push(channel);
+        send: (channel: string, payload: unknown) => {
+          if (channel === NOTIFICATION_SOUND_PLAY) {
+            soundSends.push(channel);
+            soundPayloads.push(payload);
+          }
         },
       },
     } as unknown as BrowserWindow;
@@ -377,6 +381,7 @@ describe("windows toast audio and lifetime", () => {
     setPlatform("win32");
     written = [];
     soundSends = [];
+    soundPayloads = [];
     attachMainWindow();
     ctx.overlaySettings = { ...OVERLAY_SETTINGS_DEFAULTS } as OverlaySettings;
     // register() arms a 3s startup seed; advancing timers here must not hit the network.
@@ -428,6 +433,41 @@ describe("windows toast audio and lifetime", () => {
     expect(xml).not.toContain("ms-winsoundevent");
     expect(soundSends).toEqual([NOTIFICATION_SOUND_PLAY]);
     expect(execFileArgs().some((args) => args.join(" ").includes("SoundPlayer"))).toBe(false);
+  });
+
+  it("preserves fullscreen toast delivery with custom volume, including zero", () => {
+    ctx.overlaySettings.notificationSoundVolume = 0.35;
+    registerWithQuitHook();
+    worldStateIpc.sendDesktopNotificationRaw("WFHelper", "Quiet sound");
+    expect(soundPayloads[0]).toEqual({ volume: 0.35, revision: null });
+    expect(toastXml()).toContain('scenario="incomingCall"');
+    expect(toastXml()).toContain('<audio silent="true"/>');
+    vi.advanceTimersByTime(3000);
+    ctx.overlaySettings.notificationSoundVolume = 0;
+    worldStateIpc.sendDesktopNotificationRaw("WFHelper", "Muted sound");
+    expect(soundPayloads[1]).toEqual({ volume: 0, revision: null });
+    expect(toastXml(1)).toContain('scenario="incomingCall"');
+  });
+
+  it("uses app audio on Linux without a second native sound", () => {
+    setPlatform("linux");
+    const options: unknown[] = [];
+    class NativeNotification {
+      static isSupported() {
+        return true;
+      }
+      constructor(value: unknown) {
+        options.push(value);
+      }
+      on() {}
+      show() {}
+    }
+    worldStateIpc.register({ ipcMain: { handle: () => {} }, Notification: NativeNotification });
+    ctx.overlaySettings.notificationSoundUsesSystem = true;
+    ctx.overlaySettings.notificationSoundVolume = 0.2;
+    worldStateIpc.sendDesktopNotificationRaw("WFHelper", "Linux sound");
+    expect(options).toEqual([{ title: "WFHelper", body: "Linux sound", silent: true }]);
+    expect(soundPayloads).toEqual([{ volume: 0.2, revision: null }]);
   });
 
   it("hands the sound to Windows when the system sound is chosen", () => {

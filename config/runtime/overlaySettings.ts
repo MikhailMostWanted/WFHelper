@@ -39,6 +39,7 @@ export interface OverlaySettings {
   cycleAlertMinutesBefore: number;
   fissureAlerts: FissureAlert[];
   notificationSoundEnabled: boolean;
+  notificationSoundVolume: number;
   /** Play the Windows notification sound instead of the app's own clip. The
    *  system sound obeys the System Sounds volume; the clip obeys WFHelper's. */
   notificationSoundUsesSystem: boolean;
@@ -121,6 +122,7 @@ export const OVERLAY_SETTINGS_DEFAULTS = Object.freeze({
   cycleAlertMinutesBefore: 3,
   fissureAlerts: Object.freeze([] as FissureAlert[]),
   notificationSoundEnabled: true,
+  notificationSoundVolume: 1,
   notificationSoundUsesSystem: false,
   wfmNotificationsEnabled: false,
   messageNotificationsEnabled: true,

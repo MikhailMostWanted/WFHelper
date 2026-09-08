@@ -1,8 +1,7 @@
 import { get } from "svelte/store";
 
-import { NOTIFICATION_SOUND_URL } from "./assetUrls.js";
-import { invoke, on } from "./ipc.js";
-import { log } from "./log.js";
+import { playNotificationSound, updateNotificationSoundSettings } from "./notificationSound.js";
+import { getPlatform, invoke, on } from "./ipc.js";
 import { onInventoryLoaded } from "./actions.js";
 import { tr } from "./i18n.js";
 import { handleWfmNotification } from "./wfmNotifications.js";
@@ -14,27 +13,9 @@ import { inventoryModifiedAt, itemDb, parsedItems } from "../stores/data.js";
 import { masteryData } from "../stores/mastery.js";
 import { applyClosedWfmListing } from "../stores/market.js";
 import { addNotificationEntry, loadNotificationHistory } from "../stores/notifications.js";
-import { detectedWarframeUiScale } from "../stores/overlaySettings.js";
+import { detectedWarframeUiScale, overlaySettings } from "../stores/overlaySettings.js";
 import { addToast } from "../stores/toasts.js";
 import { applyUpdateState } from "../stores/updates.js";
-
-// Reused so a burst decodes the clip once; rewinding also cuts an overlapping replay.
-let notificationAudio: HTMLAudioElement | null = null;
-
-/** Main gates on the setting and the burst window, so reaching here means play. */
-function playNotificationSound(): void {
-  try {
-    if (!notificationAudio) notificationAudio = new Audio(NOTIFICATION_SOUND_URL);
-    notificationAudio.currentTime = 0;
-    // play() rejects when autoplay is refused or the clip cannot be decoded; a
-    // missed sound must never break the notification that triggered it.
-    void notificationAudio.play().catch((err) => {
-      log.warn("[Notify] notification sound blocked:", String(err));
-    });
-  } catch (err) {
-    log.warn("[Notify] notification sound failed:", String(err));
-  }
-}
 
 async function refreshInventoryModifiedAt(): Promise<void> {
   try {
@@ -50,6 +31,13 @@ async function refreshInventoryModifiedAt(): Promise<void> {
  * App.svelte only calls this and disposes it; none of it is layout. */
 export function initRendererEvents(): () => void {
   const unsubscribes = [
+    overlaySettings.subscribe((settings) => {
+      updateNotificationSoundSettings(
+        settings.notificationSoundVolume,
+        settings.notificationSoundEnabled &&
+          !(getPlatform() === "win32" && settings.notificationSoundUsesSystem),
+      );
+    }),
     subscribeArbiRunSaved(),
     subscribePtRunSaved(),
 
@@ -99,7 +87,7 @@ export function initRendererEvents(): () => void {
 
     // The toast itself is silent; playing the clip in-app keeps it on the
     // WFHelper mixer slider instead of the system master volume.
-    on("notification-sound-play", () => playNotificationSound()),
+    on("notification-sound-play", (payload) => void playNotificationSound(payload)),
 
     // Post-run overlay "Detailed Stats" button: open the arbi tab on that run.
     on("arbi-open-run", (runId) => {

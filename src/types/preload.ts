@@ -7,6 +7,11 @@ import type {
 import type { WfmStatus } from "./market.js";
 
 export interface PreloadAPI {
+  getNotificationSound: () => Promise<IpcInvokeMap["getNotificationSound"]["return"]>;
+  saveNotificationSound: (
+    ...args: IpcInvokeMap["saveNotificationSound"]["args"]
+  ) => Promise<IpcInvokeMap["saveNotificationSound"]["return"]>;
+  resetNotificationSound: () => Promise<null>;
   getFeedbackContext: () => Promise<IpcInvokeMap["getFeedbackContext"]["return"]>;
   submitFeedback: (
     ...args: IpcInvokeMap["submitFeedback"]["args"]

@@ -183,6 +183,25 @@ describe("overlay settings controller", () => {
     ).toBe(false);
   });
 
+  it("defaults and bounds notification volume without losing mute", () => {
+    const { controller } = buildController();
+    for (const [input, expected] of [
+      [undefined, 1],
+      [0, 0],
+      [0.37, 0.37],
+      [2, 1],
+      [-1, 0],
+      [NaN, 1],
+      [Infinity, 1],
+      ["0.4", 1],
+    ]) {
+      expect(
+        controller.normalizeOverlaySettings({ notificationSoundVolume: input })
+          .notificationSoundVolume,
+      ).toBe(expected);
+    }
+  });
+
   it("normalizes notification sound and overlay availability settings", () => {
     const { controller } = buildController();
 

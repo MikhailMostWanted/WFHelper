@@ -1,3 +1,4 @@
+import { normalizeNotificationVolume } from "../../config/shared/notificationSound";
 import { normalizeErrorMessage } from "../../config/shared/errors";
 import { clampNumber } from "../../config/shared/numeric";
 import { normalizeRewardOverlayLayout } from "../../config/shared/rewardOverlayLayout";
@@ -231,6 +232,9 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
       ),
       fissureAlerts: normalizeFissureAlerts(candidate.fissureAlerts, defaults.fissureAlerts),
       notificationSoundEnabled: booleanSetting("notificationSoundEnabled"),
+      notificationSoundVolume: normalizeNotificationVolume(
+        candidate.notificationSoundVolume ?? defaults.notificationSoundVolume,
+      ),
       notificationSoundUsesSystem: booleanSetting("notificationSoundUsesSystem"),
       wfmNotificationsEnabled: booleanSetting("wfmNotificationsEnabled"),
       messageNotificationsEnabled: booleanSetting("messageNotificationsEnabled"),
