@@ -4,6 +4,15 @@
 !macro customHeader
 !macroend
 
+!macro customUnInstall
+  ${IfNot} ${isUpdated}
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WFHelperWarframeWatcher"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "WFHelperWarframeWatcher"
+    Delete "$APPDATA\WFHelper\warframe-watcher.json"
+    Delete "$APPDATA\WFHelper\warframe-watcher.ps1"
+  ${EndIf}
+!macroend
+
 !ifndef BUILD_UNINSTALLER
 Var HelperAutoInstall
 Var HelperAutoInstallCheckbox

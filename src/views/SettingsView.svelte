@@ -216,6 +216,7 @@
     "ocrDebugImagesEnabled",
     "blockThirdPartyInjection",
     "keepRunningOnClose",
+    "warframeLifecycleEnabled",
     "warframeUiScale",
     "warframeUiScaleAuto",
     "hotkeyEnabled",
@@ -842,6 +843,19 @@
                   on:change={autoSave}
                 />
               </SettingsRow>
+              {#if isWindows}
+                <SettingsRow
+                  label={$tr("settings.warframeLifecycle")}
+                  hint={$tr("settings.warframeLifecycleHint")}
+                  dataSetting="warframe-lifecycle"
+                >
+                  <input
+                    type="checkbox"
+                    bind:checked={form.warframeLifecycleEnabled}
+                    on:change={autoSave}
+                  />
+                </SettingsRow>
+              {/if}
             </div>
           </SettingsSection>
 

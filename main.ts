@@ -80,6 +80,11 @@ import * as rewardOcrOnnx from "./services/rewardOcrOnnx";
 import * as autoUpdater from "./services/autoUpdater";
 import * as rivenBestAttributes from "./services/rivenBestAttributes";
 import * as warframeStatus from "./services/warframeStatus";
+import {
+  configureWarframeLifecycle,
+  startWarframeLifecycle,
+  stopWarframeLifecycle,
+} from "./services/warframeLifecycle";
 import * as marketAlerts from "./services/marketAlerts";
 
 import ctx from "./ipc/context";
@@ -189,7 +194,9 @@ if (!hasSingleInstanceLock) {
   app.quit();
 } else {
   // A second launch means "bring the app up", so a destroyed window is recreated.
-  app.on("second-instance", () => revealMainWindow());
+  app.on("second-instance", (_event, argv) => {
+    if (!argv.includes("--warframe-auto-launch")) revealMainWindow();
+  });
 }
 
 const MAIN_WINDOW_MIN_SIZE = { width: 900, height: 600 };
@@ -431,6 +438,10 @@ function initTrackersAndSettings(profileStage: ProfileStage): void {
   const settingsStart = Date.now();
   overlayIpc.loadOverlaySettings();
   profileStage("overlay-settings:load", settingsStart);
+  startWarframeLifecycle(() => app.quit());
+  void configureWarframeLifecycle(ctx.overlaySettings.warframeLifecycleEnabled === true).catch(
+    (error: unknown) => log.warn("[WarframeLifecycle] startup failed:", error),
+  );
 
   const statsLoadStart = Date.now();
   statsTracker.loadHistory();
@@ -814,6 +825,7 @@ app.on("before-quit", (event) => {
   eeLogMonitor.stopWatching();
   marketAlerts.stopMarketAlerts();
   stopOverlayHotkeyGate();
+  stopWarframeLifecycle();
   overlayIpc.unregisterOverlayHotkey();
   overlayIpc.disposeOverlayHotkeys();
   arbiScheduleIpc.shutdown();

@@ -2413,6 +2413,8 @@
   "mastery.breakdownBars": "Balken",
   "mastery.breakdownRings": "Ringe",
   "wiki.questReward": "Belohnung für Questabschluss",
+  "settings.warframeLifecycle": "Mit Warframe starten und schließen",
+  "settings.warframeLifecycleHint": "Ein Windows-Hintergrundprozess startet bei der Anmeldung und öffnet WFHelper mit Warframe. WFHelper schließt kurz nach dem Spiel. Du kannst die App weiterhin manuell öffnen.",
   "orderModal.chooseVariant": "Variante auswählen",
   "orderModal.editDetailsFailed": "Artikeldetails sind nicht verfügbar. Du kannst diesen Auftrag trotzdem speichern.",
   "browse.orderSelectionChanged": "Die Auswahl hat sich geändert. Erstelle den Auftrag erneut.",

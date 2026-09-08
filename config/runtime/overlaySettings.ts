@@ -84,6 +84,7 @@ export interface OverlaySettings {
   /** Closing the window hides it to the system tray instead of quitting, so
    *  alerts, notifications and EE.log watching keep running. */
   keepRunningOnClose: boolean;
+  warframeLifecycleEnabled: boolean;
   /** Warframe's in-game interface scale, used to align reward OCR crops. */
   warframeUiScale: number;
   /** Prefer the EE.cfg-detected scale; off makes the manual slider authoritative. */
@@ -156,6 +157,7 @@ export const OVERLAY_SETTINGS_DEFAULTS = Object.freeze({
   // Off by default: closing the window has always quit, and an app that stays
   // alive in the tray unannounced reads as one that failed to exit.
   keepRunningOnClose: false,
+  warframeLifecycleEnabled: false,
   warframeUiScale: REFERENCE_WARFRAME_UI_SCALE,
   warframeUiScaleAuto: true,
   uiScale: 1,

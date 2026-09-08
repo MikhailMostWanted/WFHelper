@@ -276,6 +276,7 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
       ocrDebugImagesEnabled: booleanSetting("ocrDebugImagesEnabled"),
       blockThirdPartyInjection: booleanSetting("blockThirdPartyInjection"),
       keepRunningOnClose: booleanSetting("keepRunningOnClose"),
+      warframeLifecycleEnabled: booleanSetting("warframeLifecycleEnabled"),
       warframeUiScale: normalizeWarframeUiScale(
         candidate.warframeUiScale,
         defaults.warframeUiScale,

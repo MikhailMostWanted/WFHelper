@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { withScope } from "./logger";
-import { enumProcessIds, queryExePath } from "./win32Process";
+import { enumProcessNames, getProcessSessionId, queryExePath } from "./win32Process";
 import { findWindowBoundsByTitle, isWindowFocusedByTitle } from "./x11WindowQuery";
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { WARFRAME_STATUS_CACHE_TTL_MS } from "../config/runtime/cacheConfig";
@@ -112,13 +112,40 @@ function isWarframeProcessName(processName: string | null): boolean {
     .includes("warframe");
 }
 
-async function isWarframeProcessRunning(): Promise<boolean> {
+let lastProcessSample: { running: boolean | null; at: number } | null = null;
+
+/** Exact game in this Windows session; unknown never confirms an exit. */
+export function getWarframeProcessState(force = false): boolean | null {
+  if (process.platform !== "win32") return null;
+  const now = Date.now();
+  if (!force && lastProcessSample && now - lastProcessSample.at < WARFRAME_STATUS_CACHE_TTL_MS) {
+    return lastProcessSample.running;
+  }
+  let running: boolean | null = null;
   try {
-    return enumProcessIds().some((pid) => isWarframeProcessName(getProcessName(pid)));
+    const session = getProcessSessionId(process.pid);
+    if (session != null) {
+      const processes = enumProcessNames();
+      let unknown = processes == null;
+      let found = false;
+      for (const { pid, name } of processes ?? []) {
+        if (name.toLowerCase() !== "warframe.x64.exe") continue;
+        const processSession = getProcessSessionId(pid);
+        if (processSession == null) {
+          unknown = true;
+          continue;
+        }
+        if (processSession !== session) continue;
+        found = true;
+        break;
+      }
+      running = found ? true : unknown ? null : false;
+    }
   } catch (err) {
     log.warn("[WarframeStatus] process scan failed:", normalizeErrorMessage(err));
-    return false;
   }
+  lastProcessSample = { running, at: now };
+  return running;
 }
 
 async function getForegroundWindowInfo(): Promise<{
@@ -334,11 +361,11 @@ async function collectStatusLinux(needBounds: boolean): Promise<WarframeStatus> 
   };
 }
 
-async function collectStatus(needBounds: boolean): Promise<WarframeStatus> {
+async function collectStatus(needBounds: boolean, force: boolean): Promise<WarframeStatus> {
   if (process.platform === "linux") return collectStatusLinux(needBounds);
 
   const [processRunning, foregroundWindow] = await Promise.all([
-    isWarframeProcessRunning(),
+    getWarframeProcessState(force) === true,
     getForegroundWindowInfo(),
   ]);
 
@@ -378,7 +405,7 @@ export async function getStatus(
   const joinable = inFlightWithBounds ?? (needBounds ? null : inFlightWithoutBounds);
   if (joinable) return joinable;
 
-  const collected = collectStatus(needBounds).catch((err) => {
+  const collected = collectStatus(needBounds, force).catch((err) => {
     log.warn("[WarframeStatus] status collection failed:", normalizeErrorMessage(err));
     return {
       isOpen: false,

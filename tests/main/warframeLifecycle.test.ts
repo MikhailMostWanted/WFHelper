@@ -1,0 +1,377 @@
+import { EventEmitter } from "node:events";
+import path from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const h = vi.hoisted(() => ({
+  files: new Map<string, string>(),
+  write: vi.fn(),
+  login: vi.fn(),
+  spawn: vi.fn(),
+  unref: vi.fn(),
+  pids: vi.fn(),
+  session: vi.fn((_pid: number): number | null => 1),
+  exe: vi.fn(),
+  packaged: false,
+  spawnError: false,
+  failWrite: false,
+}));
+
+vi.mock("node:child_process", () => ({ spawn: h.spawn }));
+vi.mock("node:fs", () => ({
+  default: {
+    existsSync: (file: string) => h.files.has(file),
+    readFileSync: (file: string) => {
+      if (file.endsWith(".ps1")) return "watcher-script";
+      if (!h.files.has(file)) throw new Error("missing file");
+      return h.files.get(file);
+    },
+    rmSync: (file: string) => h.files.delete(file),
+  },
+}));
+vi.mock("electron", () => ({
+  app: {
+    get isPackaged() {
+      return h.packaged;
+    },
+    getAppPath: () => "C:\\WF Helper",
+    setLoginItemSettings: h.login,
+  },
+}));
+vi.mock("../../services/atomicFile", () => ({ writeFileAtomicSync: h.write }));
+vi.mock("../../services/userDataPath", () => ({
+  userDataPath: (name: string) => path.join("C:\\App Data\\WFHelper", name),
+}));
+vi.mock("../../services/logger", () => ({
+  withScope: () => ({ info: vi.fn(), warn: vi.fn() }),
+}));
+vi.mock("../../services/win32Process", () => ({
+  enumProcessNames: h.pids,
+  getProcessSessionId: h.session,
+  queryExePath: h.exe,
+  isWarframeExePath: (file: string) => file.toLowerCase().endsWith("\\warframe.x64.exe"),
+}));
+
+type Lifecycle = typeof import("../../services/warframeLifecycle");
+let lifecycle: Lifecycle;
+const configPath = path.join("C:\\App Data\\WFHelper", "warframe-watcher.json");
+const quit = vi.fn();
+const realPlatform = process.platform;
+
+function gameRunning(running: boolean): void {
+  h.session.mockReturnValue(1);
+  h.pids.mockReturnValue([
+    { pid: running ? 10 : 20, name: running ? "Warframe.x64.exe" : "explorer.exe" },
+  ]);
+  h.exe.mockReturnValue({
+    status: "ok",
+    path: running ? "C:\\Warframe\\Warframe.x64.exe" : "C:\\Windows\\explorer.exe",
+  });
+}
+
+beforeEach(async () => {
+  Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+  vi.resetModules();
+  vi.clearAllMocks();
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-09-08T12:00:00Z"));
+  vi.stubEnv("WFHELPER_USER_DATA", "");
+  h.files.clear();
+  h.packaged = false;
+  h.spawnError = false;
+  h.failWrite = false;
+  h.write.mockImplementation((file: string, text: string) => {
+    if (h.failWrite) {
+      h.failWrite = false;
+      throw new Error("disk full");
+    }
+    h.files.set(file, text);
+  });
+  h.spawn.mockImplementation(() => {
+    const child = Object.assign(new EventEmitter(), { unref: h.unref });
+    void Promise.resolve().then(() => {
+      if (h.spawnError) child.emit("error", new Error("spawn denied"));
+      else child.emit("spawn");
+    });
+    return child;
+  });
+  gameRunning(false);
+  lifecycle = await import("../../services/warframeLifecycle");
+});
+
+afterEach(() => {
+  lifecycle.stopWarframeLifecycle();
+  vi.useRealTimers();
+  vi.unstubAllEnvs();
+  Object.defineProperty(process, "platform", { value: realPlatform, configurable: true });
+});
+
+describe("Warframe lifecycle", () => {
+  it("leaves startup registration and the watcher untouched by default", async () => {
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(false);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.write).not.toHaveBeenCalled();
+    expect(h.spawn).not.toHaveBeenCalled();
+    expect(h.login).not.toHaveBeenCalled();
+    expect(h.pids).not.toHaveBeenCalled();
+    expect(quit).not.toHaveBeenCalled();
+  });
+
+  it("enables an app-owned hidden watcher and registers sign-in startup", async () => {
+    await lifecycle.configureWarframeLifecycle(true);
+    expect(JSON.parse(h.files.get(configPath)!)).toMatchObject({
+      enabled: true,
+      revision: expect.any(String),
+      executable: process.execPath,
+      arguments: ['"C:\\WF Helper"', "--warframe-auto-launch"],
+      appPid: process.pid,
+      exitGraceMs: 10_000,
+    });
+    expect(h.spawn).toHaveBeenCalledWith(
+      expect.stringContaining("powershell.exe"),
+      expect.arrayContaining(["-WindowStyle", "Hidden", "-ConfigPath", configPath]),
+      { windowsHide: true, detached: true, stdio: "ignore" },
+    );
+    expect(h.login).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "WFHelperWarframeWatcher",
+        openAtLogin: true,
+        args: expect.arrayContaining([`"${configPath}"`]),
+      }),
+    );
+    expect(h.unref).toHaveBeenCalledOnce();
+    await lifecycle.configureWarframeLifecycle(true);
+    expect(h.spawn).toHaveBeenCalledOnce();
+  });
+
+  it("never registers a sandbox launch at Windows sign-in", async () => {
+    vi.stubEnv("WFHELPER_USER_DATA", "C:\\sandbox");
+    await lifecycle.configureWarframeLifecycle(true);
+    expect(h.login).not.toHaveBeenCalled();
+  });
+
+  it("shares the process snapshot with status callers without opening processes", async () => {
+    gameRunning(true);
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(true);
+    const status = await import("../../services/warframeStatus");
+    expect(status.getWarframeProcessState()).toBe(true);
+    expect(h.pids).toHaveBeenCalledTimes(1);
+    expect(h.exe).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(status.getWarframeProcessState()).toBe(true);
+    expect(h.pids).toHaveBeenCalledTimes(2);
+    expect(h.exe).not.toHaveBeenCalled();
+  });
+
+  it("refreshes the process sample when status is forced inside the cache TTL", async () => {
+    const status = await import("../../services/warframeStatus");
+    expect((await status.getStatus()).processRunning).toBe(false);
+    gameRunning(true);
+    expect((await status.getStatus()).processRunning).toBe(false);
+    expect(h.pids).toHaveBeenCalledTimes(1);
+    expect((await status.getStatus({ force: true })).processRunning).toBe(true);
+    expect(h.pids).toHaveBeenCalledTimes(2);
+    expect(status.getWarframeProcessState()).toBe(true);
+    expect(h.pids).toHaveBeenCalledTimes(2);
+    gameRunning(false);
+    expect((await status.getStatus({ force: true })).processRunning).toBe(false);
+    expect(h.pids).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(["WarframeLauncher.exe", "WarframeHelper.exe", "Warframe.x64.exe.backup"])(
+    "does not match %s as the game process",
+    async (name) => {
+      h.pids.mockReturnValue([{ pid: 10, name }]);
+      const status = await import("../../services/warframeStatus");
+      expect(status.getWarframeProcessState()).toBe(false);
+    },
+  );
+
+  it("reports a failed process enumeration as unknown", async () => {
+    h.pids.mockImplementationOnce(() => {
+      throw new Error("enumeration unavailable");
+    });
+    const status = await import("../../services/warframeStatus");
+    expect(status.getWarframeProcessState()).toBeNull();
+  });
+
+  it("keeps a manually launched app open when no game was observed", async () => {
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(true);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(quit).not.toHaveBeenCalled();
+  });
+
+  it("quits once after an observed game stays absent for ten seconds", async () => {
+    gameRunning(true);
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(true);
+    gameRunning(false);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(quit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(quit).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(quit).toHaveBeenCalledOnce();
+  });
+
+  it.each(["present", "unavailable"])("resets the exit grace after a %s scan", async (scan) => {
+    gameRunning(true);
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(true);
+    gameRunning(false);
+    await vi.advanceTimersByTimeAsync(8000);
+    if (scan === "present") gameRunning(true);
+    else h.pids.mockReturnValue(null);
+    await vi.advanceTimersByTimeAsync(2000);
+    gameRunning(false);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(quit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(quit).toHaveBeenCalledOnce();
+  });
+
+  it("disables watcher startup and prevents an outstanding exit grace from quitting", async () => {
+    gameRunning(true);
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(true);
+    gameRunning(false);
+    await vi.advanceTimersByTimeAsync(8000);
+    await lifecycle.configureWarframeLifecycle(false);
+    expect(h.files.has(configPath)).toBe(false);
+    expect(h.files.has(path.join("C:\\App Data\\WFHelper", "warframe-watcher.ps1"))).toBe(false);
+    expect(h.login).toHaveBeenLastCalledWith(expect.objectContaining({ openAtLogin: false }));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(quit).not.toHaveBeenCalled();
+    expect(h.spawn).toHaveBeenCalledOnce();
+  });
+
+  it("can disable after its configuration file was removed", async () => {
+    gameRunning(true);
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(true);
+    h.files.delete(configPath);
+    await lifecycle.configureWarframeLifecycle(false);
+    expect(h.login).toHaveBeenLastCalledWith(expect.objectContaining({ openAtLogin: false }));
+    gameRunning(false);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(quit).not.toHaveBeenCalled();
+  });
+
+  it("does not require opening the game process to identify it", async () => {
+    gameRunning(true);
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(true);
+    h.exe.mockReturnValue({ status: "unknown" });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(quit).not.toHaveBeenCalled();
+    expect(h.exe).not.toHaveBeenCalled();
+  });
+
+  it("does not let unrelated protected processes block a confirmed game exit", async () => {
+    gameRunning(true);
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(true);
+    h.pids.mockReturnValue([
+      { pid: 4, name: "System" },
+      { pid: 11, name: "protected.exe" },
+    ]);
+    h.session.mockImplementation((pid: number) => (pid === process.pid ? 1 : null));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(quit).toHaveBeenCalledOnce();
+    expect(h.session).not.toHaveBeenCalledWith(4);
+    expect(h.session).not.toHaveBeenCalledWith(11);
+  });
+
+  it("keeps an exact game candidate with an unreadable session unknown", async () => {
+    gameRunning(true);
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(true);
+    h.session.mockImplementation((pid: number) => (pid === process.pid ? 1 : null));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(quit).not.toHaveBeenCalled();
+  });
+
+  it("keeps the watcher revision across ordinary app restarts", async () => {
+    await lifecycle.configureWarframeLifecycle(true);
+    const first = JSON.parse(h.files.get(configPath)!) as { revision: string };
+    vi.resetModules();
+    lifecycle = await import("../../services/warframeLifecycle");
+    await lifecycle.configureWarframeLifecycle(true);
+    expect(JSON.parse(h.files.get(configPath)!)).toMatchObject({
+      revision: first.revision,
+      appPid: process.pid,
+    });
+  });
+
+  it("repairs an outdated executable path before launching the watcher", async () => {
+    h.files.set(
+      configPath,
+      JSON.stringify({
+        enabled: true,
+        executable: "C:\\old\\wfhelper.exe",
+        revision: "old",
+        appPid: 999,
+      }),
+    );
+    await lifecycle.configureWarframeLifecycle(true);
+    expect(JSON.parse(h.files.get(configPath)!)).toMatchObject({
+      executable: process.execPath,
+      appPid: process.pid,
+    });
+    expect(h.spawn.mock.calls[0][1]).toEqual(
+      expect.arrayContaining(["-ExpectedExecutable", process.execPath]),
+    );
+  });
+
+  it("removes an orphaned watcher script while disabled", async () => {
+    const script = path.join("C:\\App Data\\WFHelper", "warframe-watcher.ps1");
+    h.files.set(script, "old script");
+    await lifecycle.configureWarframeLifecycle(false);
+    expect(h.files.has(script)).toBe(false);
+    expect(h.files.has(configPath)).toBe(false);
+    expect(h.login).toHaveBeenLastCalledWith(expect.objectContaining({ openAtLogin: false }));
+  });
+
+  it.each(["write", "spawn"])("rolls back a %s failure and permits retry", async (failure) => {
+    h.files.set(configPath, '{"enabled":false,"revision":"old"}');
+    if (failure === "write") h.failWrite = true;
+    else h.spawnError = true;
+    await expect(lifecycle.configureWarframeLifecycle(true)).rejects.toThrow(
+      failure === "write" ? "disk full" : "spawn denied",
+    );
+    expect(h.files.get(configPath)).toBe('{"enabled":false,"revision":"old"}');
+    expect(h.login).toHaveBeenLastCalledWith(expect.objectContaining({ openAtLogin: false }));
+    h.spawnError = false;
+    await lifecycle.configureWarframeLifecycle(true);
+    expect(JSON.parse(h.files.get(configPath)!)).toMatchObject({ enabled: true });
+  });
+
+  it("ignores games running in another Windows session", async () => {
+    gameRunning(true);
+    h.session.mockImplementation((pid: number) => (pid === process.pid ? 1 : 2));
+    lifecycle.startWarframeLifecycle(quit);
+    await lifecycle.configureWarframeLifecycle(true);
+    await vi.advanceTimersByTimeAsync(4000);
+    gameRunning(false);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(quit).not.toHaveBeenCalled();
+  });
+
+  it("stops polling and releases the quit callback", async () => {
+    gameRunning(true);
+    lifecycle.startWarframeLifecycle(quit);
+    lifecycle.startWarframeLifecycle(quit);
+    expect(vi.getTimerCount()).toBe(1);
+    await lifecycle.configureWarframeLifecycle(true);
+    lifecycle.stopWarframeLifecycle();
+    expect(vi.getTimerCount()).toBe(0);
+    const samples = h.pids.mock.calls.length;
+    gameRunning(false);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.pids).toHaveBeenCalledTimes(samples);
+    expect(quit).not.toHaveBeenCalled();
+  });
+});

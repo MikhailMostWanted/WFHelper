@@ -176,6 +176,10 @@
     ],
     "extraResources": [
       {
+        "from": "scripts/warframe-watcher.ps1",
+        "to": "scripts/warframe-watcher.ps1"
+      },
+      {
         "from": "resources/riven-ocr",
         "to": "riven-ocr"
       },

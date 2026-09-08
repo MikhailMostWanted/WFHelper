@@ -19,6 +19,7 @@ import { asRecord } from "./ipcValidators";
 import { withScope } from "../services/logger";
 import { resolveWarframeUiScale } from "../services/eeLogPath";
 import * as warframeStatus from "../services/warframeStatus";
+import { configureWarframeLifecycle } from "../services/warframeLifecycle";
 import * as rivenOverlayIpc from "./rivenOverlayIpc";
 import * as rewardOverlayIpc from "./rewardOverlayIpc";
 import * as arbiOverlayIpc from "./arbiOverlayIpc";
@@ -412,6 +413,9 @@ function register(): void {
       const scaleChanged =
         Number.isFinite(nextScale) && nextScale !== ctx.overlaySettings.overlayScale;
       const previousSettings = ctx.overlaySettings;
+      if (typeof incoming?.warframeLifecycleEnabled === "boolean") {
+        await configureWarframeLifecycle(incoming.warframeLifecycleEnabled);
+      }
       const settings = settingsController.setOverlaySettings(
         scaleChanged ? { ...(incoming ?? {}), overlayWindowScales: {} } : nextSettings,
       );

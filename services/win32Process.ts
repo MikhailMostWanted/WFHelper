@@ -5,6 +5,8 @@
 const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 const MAX_PATH = 260;
 const PROCESS_SCAN_BUFFER_BYTES = 16_384;
+const TH32CS_SNAPPROCESS = 0x2;
+const ERROR_NO_MORE_FILES = 18;
 
 const WARFRAME_EXE_SUFFIX = "\\warframe.x64.exe";
 
@@ -24,8 +26,14 @@ let _api: {
   CloseHandle: NativeFn;
   QueryFullProcessImageNameW: NativeFn;
   EnumProcesses: NativeFn;
+  ProcessIdToSessionId: NativeFn;
+  CreateToolhelp32Snapshot: NativeFn;
+  Process32FirstW: NativeFn;
+  Process32NextW: NativeFn;
+  GetLastError: NativeFn;
 } | null = null;
 let _apiFailed = false;
+let _processEntryLayout: { size: number; pid: number; name: number } | null = null;
 
 function api(): typeof _api {
   if (_api) return _api;
@@ -36,6 +44,23 @@ function api(): typeof _api {
     const k = koffi();
     const kernel32 = k.load("kernel32.dll");
     const psapi = k.load("psapi.dll");
+    const processEntry = k.struct({
+      dwSize: "uint32",
+      cntUsage: "uint32",
+      th32ProcessID: "uint32",
+      th32DefaultHeapID: "uintptr_t",
+      th32ModuleID: "uint32",
+      cntThreads: "uint32",
+      th32ParentProcessID: "uint32",
+      pcPriClassBase: "int32",
+      dwFlags: "uint32",
+      szExeFile: k.array("uint16", MAX_PATH),
+    });
+    _processEntryLayout = {
+      size: k.sizeof(processEntry),
+      pid: k.offsetof(processEntry, "th32ProcessID"),
+      name: k.offsetof(processEntry, "szExeFile"),
+    };
     _api = {
       OpenProcess: kernel32.func("OpenProcess", "void *", ["uint32", "int32", "uint32"]),
       CloseHandle: kernel32.func("CloseHandle", "int32", ["void *"]),
@@ -46,6 +71,14 @@ function api(): typeof _api {
         "void *",
       ]),
       EnumProcesses: psapi.func("EnumProcesses", "int32", ["void *", "uint32", "void *"]),
+      ProcessIdToSessionId: kernel32.func("ProcessIdToSessionId", "int32", ["uint32", "void *"]),
+      CreateToolhelp32Snapshot: kernel32.func("CreateToolhelp32Snapshot", "intptr_t", [
+        "uint32",
+        "uint32",
+      ]),
+      Process32FirstW: kernel32.func("Process32FirstW", "int32", ["intptr_t", "void *"]),
+      Process32NextW: kernel32.func("Process32NextW", "int32", ["intptr_t", "void *"]),
+      GetLastError: kernel32.func("GetLastError", "uint32", []),
     };
     return _api;
   } catch {
@@ -106,4 +139,38 @@ export function enumProcessIds(): number[] {
     if (pid > 0) pids.push(pid);
   }
   return pids;
+}
+
+export function getProcessSessionId(pid: number): number | null {
+  const win32 = api();
+  if (!win32 || pid <= 0) return null;
+  const session = Buffer.alloc(4);
+  return win32.ProcessIdToSessionId(pid, session) ? session.readUInt32LE(0) : null;
+}
+
+/** Toolhelp names do not require opening protected or elevated processes. */
+export function enumProcessNames(): { pid: number; name: string }[] | null {
+  const win32 = api();
+  const layout = _processEntryLayout;
+  if (!win32 || !layout) return null;
+  const snapshot = win32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if (snapshot === -1 || snapshot === -1n) return null;
+  try {
+    const entry = Buffer.alloc(layout.size);
+    entry.writeUInt32LE(layout.size, 0);
+    if (!win32.Process32FirstW(snapshot, entry)) return null;
+    const processes: { pid: number; name: string }[] = [];
+    do {
+      processes.push({
+        pid: entry.readUInt32LE(layout.pid),
+        name: entry
+          .subarray(layout.name, layout.name + MAX_PATH * 2)
+          .toString("utf16le")
+          .split("\0", 1)[0],
+      });
+    } while (win32.Process32NextW(snapshot, entry));
+    return win32.GetLastError() === ERROR_NO_MORE_FILES ? processes : null;
+  } finally {
+    win32.CloseHandle(snapshot);
+  }
 }
