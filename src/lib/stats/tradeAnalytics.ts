@@ -1,7 +1,11 @@
 /** Pure trade-ledger analytics - no Svelte, i18n, or IPC.
  *  Cost basis is ESTIMATED: items with no recorded purchase stay unpriced
  *  rather than being booked as zero-cost profit. */
-import { localDayKey, toLocalDayKey as toDayKey } from "../../../config/shared/dayKey.js";
+import {
+  localDateRange,
+  localDayKey,
+  toLocalDayKey as toDayKey,
+} from "../../../config/shared/dayKey.js";
 import { fallbackNameFromUniqueName } from "../../../config/shared/displayName.js";
 import { normalizeWfmSlug } from "../../../config/shared/wfm.js";
 import { gameRefKey } from "../marketNaming.js";
@@ -362,16 +366,8 @@ export function resolveRangePreset(
 }
 
 export function filterEvents(events: TradeEvent[], range: DateRange): TradeEvent[] {
-  const from = range.from || "";
-  const to = range.to || "";
-  if (!from && !to) return events.slice();
-  return events.filter((e) => {
-    const day = toDayKey(e?.date ?? "");
-    if (!day) return false;
-    if (from && day < from) return false;
-    if (to && day > to) return false;
-    return true;
-  });
+  const inDateRange = localDateRange(range.from, range.to);
+  return events.filter((event) => inDateRange(Date.parse(event?.date ?? "")));
 }
 
 /** Stable date sort. On an equal timestamp a purchase sorts ahead of the sale it

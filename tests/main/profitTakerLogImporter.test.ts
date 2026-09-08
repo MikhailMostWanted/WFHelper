@@ -48,7 +48,8 @@ describe("profitTakerLogImporter", () => {
     expect(result.imported.map((run) => run.endReason)).toEqual(["completed", "completed"]);
     expect(result.imported[0].durationSec).toBeCloseTo(112.971, 2);
     expect(result.imported[1].durationSec).toBeCloseTo(100.618, 2);
-    expect(result.imported[1].solo).toBe(true);
+    expect(result.imported[1].players).toEqual(["HostPlayer"]);
+    expect(result.imported[1]).not.toHaveProperty("solo");
   });
 
   it("anchors the run's wall clock on the log header", async () => {

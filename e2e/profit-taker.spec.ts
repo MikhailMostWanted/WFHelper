@@ -86,8 +86,14 @@ describePt("Profit-Taker run analysis", () => {
       await expect(page.locator(`#content [data-pt-stat="${metric}"]`)).toBeVisible();
     }
 
-    // One body row plus one chip row per phase.
-    await expect(page.locator("#content [data-pt-phases] tbody")).toHaveCount(4);
+    await expect(page.locator("#content [data-pt-phase]")).toHaveCount(4);
+    await expect(page.locator('[data-pt-phase="4"] [data-pt-phase-elapsed]')).toContainText(
+      "112.971",
+    );
+    await page.locator('[data-pt-phase-view="table"]').click();
+    await expect(page.locator("#content [data-pt-phases] tbody [data-pt-phase]")).toHaveCount(4);
+    await page.locator('[data-pt-phase-view="cards"]').click();
+    await expect(page.locator("#content [data-pt-phase]")).toHaveCount(4);
     await expect(page.locator("#content [data-pt-notes]")).toBeVisible();
     await expect(page.locator("#content [data-pt-prev]")).toBeDisabled();
     await expect(page.locator("#content [data-pt-next]")).toBeDisabled();

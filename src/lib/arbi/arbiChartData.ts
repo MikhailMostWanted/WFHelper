@@ -44,7 +44,9 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatRunDate(epochMs: number): string {
+  if (!Number.isFinite(epochMs)) return "\u2014";
   const d = new Date(epochMs);
+  if (!Number.isFinite(d.getTime())) return "\u2014";
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }

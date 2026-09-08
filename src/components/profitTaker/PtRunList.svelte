@@ -3,17 +3,21 @@
   import { tr as t } from "../../lib/i18n.js";
   import type { PtRunRecord } from "../../types/ipc.js";
   import { deletePtRun, deletePtRunLog } from "../../stores/ptRuns.js";
-  import { formatPtTime } from "../../lib/profitTakerStats.js";
+  import {
+    formatPtTime,
+    ptSquadSize,
+    ptComparisonExclusionReason,
+    PT_EXCLUSION_KEYS,
+  } from "../../lib/profitTakerStats.js";
   import RunList from "../arbi/RunList.svelte";
 
   interface Props {
     runs: PtRunRecord[];
     onSelect: (id: string) => void;
-    /** Fastest clean run; gets the PB badge. */
-    bestRunId?: string | null;
+    bestRunIds?: ReadonlySet<string>;
   }
 
-  const { runs, onSelect, bestRunId = null }: Props = $props();
+  const { runs, onSelect, bestRunIds = new Set<string>() }: Props = $props();
 </script>
 
 {#snippet headers()}
@@ -23,6 +27,8 @@
 {/snippet}
 
 {#snippet cells(run: PtRunRecord)}
+  {@const size = ptSquadSize(run)}
+  {@const exclusion = ptComparisonExclusionReason(run)}
   <td class="whitespace-nowrap px-3 py-2 text-right font-mono font-semibold text-text-primary"
     >{formatPtTime(run.durationSec)}</td
   >
@@ -33,7 +39,11 @@
     <span class="flex flex-wrap items-center gap-1">
       <span
         class="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-muted"
-        >{run.solo ? $t("relics.squad.solo") : $t("relics.squadLabel")}</span
+        >{size === null
+          ? $t("pt.unknownSquad")
+          : size === 1
+            ? $t("pt.recordedPlayer")
+            : $t("pt.squadSize", { count: size })}</span
       >
       {#if run.aborted}
         <span
@@ -58,11 +68,18 @@
           title={$t("pt.badge.buggedHint")}>{$t("pt.badge.bugged")}</span
         >
       {/if}
-      {#if run.id === bestRunId}
+      {#if bestRunIds.has(run.id)}
         <span
           data-pt-pb
           class="rounded border border-success/40 bg-success/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success"
           >{$t("arbi.pb.badge")}</span
+        >
+      {/if}
+      {#if exclusion === "migrated" || exclusion === "flight" || exclusion === "telemetry" || exclusion === "squad"}
+        <span
+          data-pt-exclusion={exclusion}
+          class="rounded border border-warning/30 px-1.5 py-0.5 text-[10px] text-warning"
+          >{$t(PT_EXCLUSION_KEYS[exclusion])}</span
         >
       {/if}
       {#if run.source === "imported"}
@@ -88,6 +105,7 @@
   </td>
 {/snippet}
 
+<p data-pt-recorded-roster class="m-0 text-xs text-text-muted">{$t("pt.recordedRosterHint")}</p>
 <RunList
   {runs}
   {onSelect}

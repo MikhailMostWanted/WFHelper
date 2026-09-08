@@ -52,7 +52,9 @@
   import HeaderTabs from "../components/HeaderTabs.svelte";
   import PtRunList from "../components/profitTaker/PtRunList.svelte";
   import PtRunDetail from "../components/profitTaker/PtRunDetail.svelte";
-  import { ptBestRunId } from "../lib/profitTakerStats.js";
+  import { ptBestRunIds, ptFilterRuns, type PtFilters } from "../lib/profitTakerStats.js";
+  import { persistedString } from "../lib/persistence.js";
+  import PtAnalytics from "../components/profitTaker/PtAnalytics.svelte";
   import { ARBI_COMPARE_MAX } from "../lib/arbi/arbiCompare.js";
   import {
     arbiDiskUsageBytes,
@@ -121,8 +123,11 @@
   let comparing = false;
 
   let selectedPtRunId: string | null = null;
-  let ptFilterMode: "all" | "solo" | "squad" = "all";
-  let ptFilterCompleteOnly = false;
+  const ptView = persistedString("pt-subtab", ["runs", "analytics"] as const, "runs");
+  let ptFilterMode: PtFilters["squad"] = "all";
+  let ptFilterStatus: PtFilters["status"] = "all";
+  let ptFilterFrom = "";
+  let ptFilterTo = "";
   let ptFilterTag = "";
   let ptShowDuplicates = false;
 
@@ -169,19 +174,22 @@
   $: ptHiddenDuplicates = ptShowDuplicates
     ? 0
     : $ptRuns.filter((run) => run.duplicateOf !== undefined).length;
-  $: ptFilteredRuns = $ptRuns.filter((run) => {
-    if (!ptShowDuplicates && run.duplicateOf !== undefined) return false;
-    if (ptFilterMode === "solo" && !run.solo) return false;
-    if (ptFilterMode === "squad" && run.solo) return false;
-    if (ptFilterCompleteOnly && !run.complete) return false;
-    if (ptFilterTag && !(run.tags ?? []).some((t) => tagKey(t) === tagKey(ptFilterTag))) {
-      return false;
-    }
-    return true;
+  $: ptFilteredRuns = ptFilterRuns($ptRuns, {
+    squad: ptFilterMode,
+    status: ptFilterStatus,
+    from: ptFilterFrom,
+    to: ptFilterTo,
+    tag: ptFilterTag,
+    showDuplicates: ptShowDuplicates,
   });
   $: ptFiltersActive =
-    ptFilterMode !== "all" || ptFilterCompleteOnly || ptFilterTag !== "" || ptShowDuplicates;
-  $: ptBestId = ptBestRunId($ptRuns);
+    ptFilterMode !== "all" ||
+    ptFilterStatus !== "all" ||
+    ptFilterFrom !== "" ||
+    ptFilterTo !== "" ||
+    ptFilterTag !== "" ||
+    ptShowDuplicates;
+  $: ptBestIds = ptBestRunIds($ptRuns);
 
   $: compareRuns = $arbiRuns.filter((run) => selectedIds.has(run.id)).slice(0, ARBI_COMPARE_MAX);
   $: canCompare = selectedIds.size >= 2 && selectedIds.size <= ARBI_COMPARE_MAX;
@@ -199,7 +207,9 @@
 
   function clearPtFilters(): void {
     ptFilterMode = "all";
-    ptFilterCompleteOnly = false;
+    ptFilterStatus = "all";
+    ptFilterFrom = "";
+    ptFilterTo = "";
     ptFilterTag = "";
     ptShowDuplicates = false;
   }
@@ -601,13 +611,30 @@
         </div>
       </header>
 
+      <div class="flex gap-2">
+        {#each ["runs", "analytics"] as view}
+          <button
+            type="button"
+            data-pt-subtab={view}
+            aria-pressed={$ptView === view}
+            class="rounded-lg border px-4 py-2 text-sm font-semibold {$ptView === view
+              ? 'border-accent bg-accent/10 text-accent'
+              : 'border-border text-text-muted'}"
+            on:click={() => ptView.set(view === "analytics" ? "analytics" : "runs")}
+            >{$tr(view === "analytics" ? "common.analytics" : "pt.runs")}</button
+          >
+        {/each}
+      </div>
+
       {#if $overlaySettingsLoaded && $overlaySettings.arbiTrackingEnabled === false}
         <ThemedPanel className="border-warning-dim p-3">
           <p class="m-0 text-sm text-text-secondary">{$tr("arbi.trackingDisabled")}</p>
         </ThemedPanel>
       {/if}
 
-      {#if $ptRuns.length === 0}
+      {#if $ptRunsLoaded && $ptRuns.length === 0 && $ptView === "analytics"}
+        <PtAnalytics runs={[]} onSelect={(id) => (selectedPtRunId = id)} />
+      {:else if $ptRuns.length === 0}
         <!-- An empty store also means "first load still running", which "no runs yet" misreports. -->
         <ThemedPanel className="p-8">
           <p class="m-0 text-center text-sm text-text-muted">
@@ -624,11 +651,15 @@
                 <span class="uppercase tracking-wide text-text-muted">{$tr("pt.filter.mode")}</span>
                 <select
                   class="rounded border border-border bg-bg-raised px-2 py-1 text-text-primary outline-none focus:border-accent"
+                  data-pt-filter-squad
                   bind:value={ptFilterMode}
                 >
                   <option value="all">{$tr("common.all")}</option>
-                  <option value="solo">{$tr("relics.squad.solo")}</option>
-                  <option value="squad">{$tr("relics.squadLabel")}</option>
+                  <option value="solo">{$tr("pt.recordedPlayer")}</option>
+                  {#each ["2", "3", "4"] as size}<option value={size}
+                      >{$tr("pt.squadSize", { count: size })}</option
+                    >{/each}
+                  <option value="unknown">{$tr("pt.unknownSquad")}</option>
                 </select>
               </label>
               {#if ptAllTags.length > 0}
@@ -638,6 +669,7 @@
                   >
                   <select
                     class="rounded border border-border bg-bg-raised px-2 py-1 text-text-primary outline-none focus:border-accent"
+                    data-pt-filter-tag
                     bind:value={ptFilterTag}
                   >
                     <option value="">{$tr("arbi.filter.allTags")}</option>
@@ -647,10 +679,40 @@
                   </select>
                 </label>
               {/if}
-              <label class="flex cursor-pointer items-center gap-1.5 self-end pb-1">
-                <input type="checkbox" data-pt-complete-only bind:checked={ptFilterCompleteOnly} />
-                <span class="text-text-secondary">{$tr("pt.filter.completeOnly")}</span>
+              <label class="flex flex-col gap-1"
+                ><span class="uppercase tracking-wide text-text-muted">{$tr("browse.status")}</span>
+                <select
+                  data-pt-filter-status
+                  bind:value={ptFilterStatus}
+                  class="rounded border border-border bg-bg-raised px-2 py-1 text-text-primary"
+                >
+                  <option value="all">{$tr("common.all")}</option><option value="eligible"
+                    >{$tr("pt.eligible")}</option
+                  ><option value="bugged">{$tr("pt.badge.bugged")}</option><option
+                    value="incomplete">{$tr("arbi.incomplete")}</option
+                  >
+                </select>
               </label>
+              <label class="flex flex-col gap-1"
+                ><span class="uppercase tracking-wide text-text-muted"
+                  >{$tr("analysis.range.from")}</span
+                ><input
+                  type="date"
+                  data-pt-filter-from
+                  bind:value={ptFilterFrom}
+                  class="rounded border border-border bg-bg-raised px-2 py-1 text-text-primary"
+                /></label
+              >
+              <label class="flex flex-col gap-1"
+                ><span class="uppercase tracking-wide text-text-muted"
+                  >{$tr("analysis.range.to")}</span
+                ><input
+                  type="date"
+                  data-pt-filter-to
+                  bind:value={ptFilterTo}
+                  class="rounded border border-border bg-bg-raised px-2 py-1 text-text-primary"
+                /></label
+              >
               <label class="flex cursor-pointer items-center gap-1.5 self-end pb-1">
                 <input type="checkbox" data-pt-show-duplicates bind:checked={ptShowDuplicates} />
                 <span class="text-text-secondary">{$tr("arbi.filter.showDuplicates")}</span>
@@ -679,13 +741,17 @@
               </div>
             </div>
           {:else if sectionId === "arbi.ptRuns"}
-            <ThemedPanel className="p-2">
-              <PtRunList
-                runs={ptFilteredRuns}
-                onSelect={(id) => (selectedPtRunId = id)}
-                bestRunId={ptBestId}
-              />
-            </ThemedPanel>
+            {#if $ptView === "analytics"}
+              <PtAnalytics runs={ptFilteredRuns} onSelect={(id) => (selectedPtRunId = id)} />
+            {:else}
+              <ThemedPanel className="p-2">
+                <PtRunList
+                  runs={ptFilteredRuns}
+                  onSelect={(id) => (selectedPtRunId = id)}
+                  bestRunIds={ptBestIds}
+                />
+              </ThemedPanel>
+            {/if}
           {/if}
         </LayoutGrid>
       {/if}

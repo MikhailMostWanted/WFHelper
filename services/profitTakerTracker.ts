@@ -32,7 +32,6 @@ const tracker = createRunTracker<PtParsedRun, PtRunEndReason, PtRunRecord>({
       pylonSec: parsed.pylonSec,
       phases: parsed.phases,
       players: parsed.players,
-      solo: parsed.players.length === 1,
       complete: parsed.complete,
       bugged: parsed.bugged,
       aborted: parsed.aborted,

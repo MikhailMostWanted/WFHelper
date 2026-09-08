@@ -54,7 +54,7 @@ describe("arbiPersonalBest", () => {
     expect(dpm.rank).toBe(1);
     expect(dpm.poolSize).toBe(3);
     expect(dpm.vsBestPct).toBeCloseTo(100, 6);
-    expect(dpm.vsSecondPct).toBeCloseTo(300, 6);
+    expect(dpm.vsSecondPct).toBeCloseTo(100, 6);
   });
 
   it("reports a negative delta against the record for a weaker run", () => {
@@ -65,6 +65,18 @@ describe("arbiPersonalBest", () => {
     expect(dpm.rank).toBe(2);
     expect(dpm.vsBestPct).toBeCloseTo(-75, 6);
     expect(dpm.vsSecondPct).toBeNull();
+  });
+
+  it("compares a two-run PB to its runner-up and preserves tied records", () => {
+    const best = makeRun("best", { ...base, drones: 40 });
+    const second = makeRun("second", { ...base, drones: 20 });
+    expect(arbiPersonalBest(best, [best, second])[0].vsSecondPct).toBe(100);
+    const tied = makeRun("tied", { ...base, drones: 40 });
+    expect(arbiPersonalBest(best, [best, second, tied])[0]).toMatchObject({
+      isPb: true,
+      rank: 1,
+      vsSecondPct: 0,
+    });
   });
 
   it("keeps the pool to the same node and mission type", () => {

@@ -7,12 +7,22 @@
   import { log } from "../../lib/log.js";
   import ThemedButton from "../ThemedButton.svelte";
   import ThemedPanel from "../ThemedPanel.svelte";
+  import PtMetricCards from "./PtMetricCards.svelte";
+  import { persistedString } from "../../lib/persistence.js";
   import type { PtLeg } from "../../../config/shared/profitTakerTypes.js";
   import type { PtRunRecord } from "../../types/ipc.js";
   import { deletePtRun, updatePtNotes, updatePtTags } from "../../stores/ptRuns.js";
   import { formatRunDate } from "../../lib/arbi/arbiChartData.js";
   import {
     formatPtTime,
+    formatPtSeconds,
+    ptPhaseRows,
+    ptEligibleRuns,
+    ptSquadSize,
+    ptComparisonExclusionReason,
+    PT_EXCLUSION_KEYS,
+    ptComparison,
+    PT_METRIC_KEYS,
     ptMetricValue,
     ptPersonalBest,
     PT_METRICS,
@@ -30,15 +40,6 @@
   }
 
   const { run, onBack, orderedRuns = [], allRuns = [], onNavigate = () => {} }: Props = $props();
-
-  const METRIC_KEYS: Record<PtMetric, MessageKey> = {
-    total: "common.total",
-    flight: "pt.stat.flight",
-    shield: "pt.stat.shield",
-    leg: "pt.stat.leg",
-    body: "pt.stat.body",
-    pylon: "pt.stat.pylon",
-  };
 
   const ELEMENT_KEYS: Record<string, MessageKey | undefined> = {
     impact: "pt.element.impact",
@@ -72,7 +73,27 @@
   const pbRows = $derived(ptPersonalBest(run, allRuns));
   const totalPb = $derived(pbRows.find((row) => row.metric === "total") ?? null);
   const tags = $derived(run.tags ?? []);
-  const players = $derived(run.players ?? []);
+  const players = $derived(
+    (Array.isArray(run.players) ? run.players : []).filter(
+      (name): name is string => typeof name === "string" && !!name.trim(),
+    ),
+  );
+  const squadSize = $derived(ptSquadSize(run));
+  const exclusion = $derived(ptComparisonExclusionReason(run));
+  const phases = $derived(ptPhaseRows(run));
+  const baselines = $derived(
+    ptEligibleRuns(allRuns).filter(
+      (entry) => entry.id !== run.id && ptSquadSize(entry) === squadSize,
+    ),
+  );
+  let baselineId = $state("");
+  const baseline = $derived(baselines.find((entry) => entry.id === baselineId) ?? null);
+  const comparison = $derived(baseline ? ptComparison(run, baseline) : []);
+  const phaseMetrics = ["shield", "leg", "body", "pylon"] as const;
+  const phaseView = persistedString("pt-phase-view", ["cards", "table"] as const, "cards");
+  $effect(() => {
+    if (baselineId && !baselines.some((entry) => entry.id === baselineId)) baselineId = "";
+  });
 
   function deltaLabel(pct: number): string {
     return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
@@ -187,7 +208,9 @@
 <div class="flex flex-col gap-4">
   <div class="flex flex-wrap items-center justify-between gap-2">
     <div class="flex items-center gap-3">
-      <ThemedButton onClick={onBack}>{$t("arbi.back")}</ThemedButton>
+      <span data-pt-detail-back
+        ><ThemedButton onClick={onBack}>{$t("arbi.back")}</ThemedButton></span
+      >
       <div class="flex items-center gap-1">
         <button
           type="button"
@@ -232,7 +255,11 @@
 
   <div class="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wide">
     <span class="rounded border border-border px-1.5 py-0.5 text-text-muted"
-      >{run.solo ? $t("relics.squad.solo") : $t("relics.squadLabel")}</span
+      >{squadSize === null
+        ? $t("pt.unknownSquad")
+        : squadSize === 1
+          ? $t("pt.recordedPlayer")
+          : $t("pt.squadSize", { count: squadSize })}</span
     >
     {#if run.aborted}
       <span class="rounded border border-danger/40 px-1.5 py-0.5 text-danger"
@@ -267,6 +294,192 @@
       >
     {/if}
   </div>
+
+  <p data-pt-recorded-roster class="m-0 text-xs text-text-muted">{$t("pt.recordedRosterHint")}</p>
+  {#if exclusion}
+    <p
+      data-pt-exclusion={exclusion}
+      class="m-0 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning"
+    >
+      {$t("pt.excluded")}: {$t(PT_EXCLUSION_KEYS[exclusion])}
+    </p>
+  {:else}
+    <label class="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
+      {$t("pt.baseline")}
+      <select
+        data-pt-baseline
+        bind:value={baselineId}
+        class="max-w-full rounded border border-border bg-bg-raised px-3 py-1.5 text-text-primary"
+      >
+        <option value="">{$t("common.none")}</option>
+        {#each baselines as candidate (candidate.id)}<option value={candidate.id}
+            >{formatRunDate(candidate.startedAt)} | {formatPtSeconds(
+              candidate.durationSec,
+            )}s</option
+          >{/each}
+      </select>
+      <span class="text-xs text-text-muted">{$t("pt.baseline.hint")}</span>
+    </label>
+  {/if}
+
+  <PtMetricCards
+    rows={PT_METRICS.map((metric) => ({
+      metric,
+      value: metric === "pylon" && run.bugged ? null : ptMetricValue(run, metric),
+      detail: pbSubtext($t, metric),
+      delta: comparison.find((row) => row.metric === metric) ?? null,
+    }))}
+  />
+
+  <div class="flex items-center justify-between gap-3">
+    <h3 class="m-0 text-base font-semibold text-text-primary">{$t("pt.phases")}</h3>
+    <div class="flex gap-1">
+      {#each ["cards", "table"] as view}
+        <button
+          type="button"
+          data-pt-phase-view={view}
+          aria-pressed={$phaseView === view}
+          class="rounded border px-3 py-1.5 text-xs {$phaseView === view
+            ? 'border-accent bg-accent/10 text-accent'
+            : 'border-border text-text-muted'}"
+          onclick={() => phaseView.set(view === "table" ? "table" : "cards")}
+          >{$t(view === "cards" ? "pt.phase.cards" : "pt.phase.table")}</button
+        >
+      {/each}
+    </div>
+  </div>
+  {#if $phaseView === "cards"}
+    <div class="grid gap-3 xl:grid-cols-2" data-pt-phases>
+      {#each phases as row (row.index)}
+        <section
+          data-pt-phase={row.index}
+          class="min-w-0 rounded-xl border border-border bg-bg-surface p-4"
+        >
+          <header class="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <h4 class="m-0 font-display text-lg font-semibold text-text-primary">
+              {$t("pt.col.phase")}
+              {row.index}
+            </h4>
+            <div class="flex gap-6 text-right">
+              <div>
+                <span class="block text-[10px] uppercase tracking-wide text-text-muted"
+                  >{$t("pt.phase.duration")}</span
+                ><strong class="font-mono text-lg text-text-primary"
+                  ><span data-pt-phase-duration>{formatPtSeconds(row.phase?.totalSec ?? null)}</span
+                  >s</strong
+                >
+              </div>
+              <div>
+                <span class="block text-[10px] uppercase tracking-wide text-text-muted"
+                  >{$t("pt.phase.elapsed")}</span
+                ><strong class="font-mono text-lg text-accent"
+                  ><span data-pt-phase-elapsed>{formatPtSeconds(row.elapsed)}</span>s</strong
+                >
+              </div>
+            </div>
+          </header>
+          {#if row.phase}
+            <div class="grid gap-4 sm:grid-cols-[120px_minmax(0,1fr)]">
+              <dl class="m-0 space-y-2 border-r border-border pr-4 text-sm">
+                {#each phaseMetrics as metric}
+                  <div class="flex justify-between gap-2">
+                    <dt class="text-text-secondary">{$t(PT_METRIC_KEYS[metric])}</dt>
+                    <dd
+                      data-pt-phase-pylon={metric === "pylon" ? "" : undefined}
+                      class="m-0 font-mono text-text-primary"
+                    >
+                      {formatPtSeconds(
+                        metric === "pylon" && run.bugged && row.index === 3
+                          ? null
+                          : row.phase[`${metric}Sec`],
+                      )}
+                    </dd>
+                  </div>
+                {/each}
+              </dl>
+              <div class="min-w-0 space-y-3">
+                {#if row.phase.shields.length}
+                  <div>
+                    <h5
+                      class="m-0 mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted"
+                    >
+                      {$t("pt.phase.shieldOrder")}
+                    </h5>
+                    <ol class="m-0 flex list-none flex-wrap gap-1.5 p-0">
+                      {#each row.phase.shields as shield, i (i)}
+                        <li
+                          class="flex items-center gap-1.5 rounded-md bg-accent/10 px-2 py-1 text-xs"
+                        >
+                          <span class="text-accent">{i + 1}</span><span class="text-text-secondary"
+                            >{elementLabel($t, shield.element)}</span
+                          ><span class="font-mono text-text-primary"
+                            >{formatPtSeconds(shield.seconds)}s</span
+                          >
+                        </li>
+                      {/each}
+                    </ol>
+                  </div>
+                {/if}
+                <div>
+                  <h5
+                    class="m-0 mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted"
+                  >
+                    {$t("pt.phase.legOrder")}
+                  </h5>
+                  <ol class="m-0 grid list-none gap-1.5 p-0 sm:grid-cols-2">
+                    {#each row.phase.legs as leg, i (i)}
+                      <li
+                        class="flex items-center gap-2 rounded-md bg-success/10 px-2 py-1 text-xs"
+                      >
+                        <span class="text-success">{i + 1}</span><span
+                          class="flex-1 text-text-secondary">{$t(LEG_KEYS[leg.leg])}</span
+                        ><span class="font-mono text-text-primary"
+                          >{formatPtSeconds(leg.seconds)}s</span
+                        >
+                      </li>
+                    {/each}
+                  </ol>
+                </div>
+              </div>
+            </div>
+          {:else}<p class="m-0 py-5 text-sm text-text-muted">{$t("pt.phase.missing")}</p>{/if}
+        </section>
+      {/each}
+    </div>
+  {:else}
+    <ThemedPanel className="overflow-x-auto p-3">
+      <table class="w-full border-collapse text-sm" data-pt-phases>
+        <thead
+          ><tr class="border-b border-border text-left text-xs uppercase text-text-muted"
+            ><th class="p-2">{$t("pt.col.phase")}</th><th class="p-2 text-right"
+              >{$t("pt.phase.duration")}</th
+            ><th class="p-2 text-right">{$t("pt.phase.elapsed")}</th
+            >{#each phaseMetrics as metric}<th class="p-2 text-right"
+                >{$t(PT_METRIC_KEYS[metric])}</th
+              >{/each}</tr
+          ></thead
+        >
+        <tbody
+          >{#each phases as row (row.index)}<tr
+              data-pt-phase={row.index}
+              class="border-b border-border/50"
+              ><th class="p-2 text-left">{row.index}</th><td
+                class="p-2 text-right font-mono"
+                data-pt-phase-duration>{formatPtSeconds(row.phase?.totalSec ?? null)}</td
+              ><td class="p-2 text-right font-mono" data-pt-phase-elapsed
+                >{formatPtSeconds(row.elapsed)}</td
+              >{#each phaseMetrics as metric}<td class="p-2 text-right font-mono"
+                  >{formatPtSeconds(
+                    metric === "pylon" && run.bugged && row.index === 3
+                      ? null
+                      : (row.phase?.[`${metric}Sec`] ?? null),
+                  )}</td
+                >{/each}</tr
+            >{/each}</tbody
+        >
+      </table>
+    </ThemedPanel>
+  {/if}
 
   <div class="flex flex-wrap items-center gap-2">
     <span class="text-xs font-semibold uppercase tracking-wide text-text-muted"
@@ -325,94 +538,4 @@
       oninput={onNotesInput}
       onblur={flushNotes}></textarea>
   </label>
-
-  <ThemedPanel
-    className="grid [grid-template-columns:repeat(auto-fit,minmax(9rem,1fr))] gap-x-8 gap-y-4 px-6 py-4"
-  >
-    {#each PT_METRICS as metric (metric)}
-      {@const chip = pbSubtext($t, metric)}
-      <div class="flex min-w-0 flex-col gap-1.5" data-pt-stat={metric}>
-        <span
-          class="whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-text-muted"
-          >{$t(METRIC_KEYS[metric])}</span
-        >
-        <span
-          class="font-display whitespace-nowrap text-2xl font-bold leading-none text-text-primary"
-          >{formatPtTime(ptMetricValue(run, metric))}</span
-        >
-        {#if chip}
-          <span class="text-xs font-semibold {chip.good ? 'text-success' : 'text-warning'}"
-            >{chip.text}</span
-          >
-        {/if}
-      </div>
-    {/each}
-  </ThemedPanel>
-
-  <ThemedPanel className="p-3">
-    <h3 class="m-0 mb-2 text-sm font-semibold text-text-primary">{$t("pt.phases")}</h3>
-    <div class="overflow-x-auto">
-      <table class="w-full border-collapse text-sm" data-pt-phases>
-        <thead>
-          <tr
-            class="border-b border-border text-left text-xs uppercase tracking-wide text-text-muted"
-          >
-            <th class="px-2 py-1.5 font-semibold">{$t("pt.col.phase")}</th>
-            <th class="px-2 py-1.5 text-right font-semibold">{$t("common.total")}</th>
-            <th class="px-2 py-1.5 text-right font-semibold">{$t("pt.stat.shield")}</th>
-            <th class="px-2 py-1.5 text-right font-semibold">{$t("pt.stat.leg")}</th>
-            <th class="px-2 py-1.5 text-right font-semibold">{$t("pt.stat.body")}</th>
-            <th class="px-2 py-1.5 text-right font-semibold">{$t("pt.stat.pylon")}</th>
-          </tr>
-        </thead>
-        {#each run.phases as phase (phase.index)}
-          <tbody class="border-b border-border/50">
-            <tr>
-              <td class="px-2 py-1.5 font-semibold text-text-primary">{phase.index}</td>
-              <td class="px-2 py-1.5 text-right font-mono text-text-primary"
-                >{formatPtTime(phase.totalSec)}</td
-              >
-              <td class="px-2 py-1.5 text-right font-mono text-text-secondary"
-                >{formatPtTime(phase.shieldSec)}</td
-              >
-              <td class="px-2 py-1.5 text-right font-mono text-text-secondary"
-                >{formatPtTime(phase.legSec)}</td
-              >
-              <td class="px-2 py-1.5 text-right font-mono text-text-secondary"
-                >{formatPtTime(phase.bodySec)}</td
-              >
-              <td class="px-2 py-1.5 text-right font-mono text-text-secondary"
-                >{formatPtTime(phase.pylonSec)}</td
-              >
-            </tr>
-            {#if phase.shields.length > 0 || phase.legs.length > 0}
-              <tr>
-                <td class="px-2 pb-2" colspan="6">
-                  <span class="flex flex-wrap items-center gap-1">
-                    {#each phase.shields as shield, i (i)}
-                      <span
-                        class="rounded border border-border bg-bg-raised/60 px-1.5 py-0.5 text-[11px] text-text-secondary"
-                      >
-                        {elementLabel($t, shield.element)}
-                        <span class="font-mono text-text-muted">{formatPtTime(shield.seconds)}</span
-                        >
-                      </span>
-                    {/each}
-                    {#each phase.legs as leg, i (i)}
-                      <span
-                        class="rounded border border-border/60 px-1.5 py-0.5 text-[11px] text-text-muted"
-                      >
-                        {$t(LEG_KEYS[leg.leg])}
-                        <span class="font-mono">{formatPtTime(leg.seconds)}</span>
-                      </span>
-                    {/each}
-                  </span>
-                </td>
-              </tr>
-            {/if}
-          </tbody>
-        {/each}
-      </table>
-    </div>
-  </ThemedPanel>
 </div>

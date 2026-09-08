@@ -52,6 +52,31 @@ const pylonLine = (t: number) =>
   `${ts(t)} Script [Info]: ArachnoidCamperScript.lua: Pylon launch complete`;
 
 describe("profitTakerParser", () => {
+  it("does not turn a loadout before capture into a recorded squad member", () => {
+    const lines = fs
+      .readFileSync(path.join(FIXTURES, "host-single-run.log"), "utf8")
+      .split(/\r?\n/);
+    const clientIndex = lines.findIndex((line) => line.includes("ClientOne"));
+    const [client] = lines.splice(clientIndex, 1);
+    lines.unshift(client.replace(/^\d+\.\d+/, "5200.000"));
+    const [run] = parseAll(lines);
+    expect(run.complete).toBe(true);
+    expect(run.players).toEqual(["HostPlayer"]);
+  });
+
+  it("captures players loading between the PT mission name and active-job line", () => {
+    const lines = fs
+      .readFileSync(path.join(FIXTURES, "host-single-run.log"), "utf8")
+      .split(/\r?\n/);
+    const clientIndex = lines.findIndex((line) => line.includes("ClientOne"));
+    const [client] = lines.splice(clientIndex, 1);
+    const activeIndex = lines.findIndex((line) => line.includes("Active jobId"));
+    lines.splice(activeIndex, 0, client.replace(/^\d+\.\d+/, "5227.150"));
+    lines.unshift("5200.000 Game [Info]: PreviousHubPlayer loadout loader finished.");
+    const [run] = parseAll(lines);
+    expect(run.players).toEqual(["ClientOne", "HostPlayer"]);
+  });
+
   it("matches the reference analyser on a recorded host run", () => {
     const runs = parseFixture("host-single-run.log");
     expect(runs).toHaveLength(1);

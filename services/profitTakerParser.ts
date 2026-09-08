@@ -12,6 +12,8 @@ import type {
 /** Only BountyFour is the orb fight; One/Two/Three are the earlier heist phases. */
 const JOB_BOUNTY_FOUR = "/Lotus/Types/Gameplay/Venus/Jobs/Heists/HeistProfitTakerBountyFour";
 const ACTIVE_JOB = "ThemedSquadOverlay.lua: Active jobId set to ";
+const PT_MISSION_NAME =
+  "ThemedSquadOverlay.lua: Mission name: Fortuna (Venus) - PROFIT-TAKER - PHASE 4";
 const SESSION_MAP = "EidolonMP.lua: Session map string: ";
 const ELEVATOR_EXIT = "EidolonMP.lua: EIDOLONMP: Avatar left the zone";
 const BACK_TO_TOWN = "EidolonMP.lua: EIDOLONMP: TryTownTransition";
@@ -337,6 +339,9 @@ export function createProfitTakerParser(): PtParser {
     const ts = tsMatch ? parseFloat(tsMatch[1]) : 0;
 
     if (run?.ended) return null;
+
+    // Loadouts can finish before Active jobId; the mission-name line starts their capture.
+    if (!run && line.includes(PT_MISSION_NAME)) return startRun(ts, false);
 
     if (line.includes(ACTIVE_JOB)) {
       const isFour = line.includes(JOB_BOUNTY_FOUR);

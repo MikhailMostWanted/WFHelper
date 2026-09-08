@@ -66,7 +66,7 @@ describe("profitTakerTracker", () => {
     const [run] = tracker.getPtRuns();
     expect(saved).toEqual([run]);
     expect(run.complete).toBe(true);
-    expect(run.solo).toBe(false);
+    expect(run).not.toHaveProperty("solo");
     expect(run.durationSec).toBeCloseTo(112.971, 2);
     expect(run.phases).toHaveLength(4);
     expect(run.endReason).toBe("completed");
@@ -83,7 +83,7 @@ describe("profitTakerTracker", () => {
     expect(tracker.getPtRuns()).toHaveLength(1);
   });
 
-  it("does not classify a run without player telemetry as solo", async () => {
+  it("keeps a run without player telemetry without a fabricated solo field", async () => {
     const tracker = await freshTracker();
     for (const line of fixtureLines().filter(
       (entry) => !entry.includes("loadout loader finished"),
@@ -94,10 +94,10 @@ describe("profitTakerTracker", () => {
     const [run] = tracker.getPtRuns();
     expect(run.complete).toBe(true);
     expect(run.players).toEqual([]);
-    expect(run.solo).toBe(false);
+    expect(run).not.toHaveProperty("solo");
   });
 
-  it("keeps a recorded single-player run eligible for the solo group", async () => {
+  it("retains an observed player without claiming a complete solo roster", async () => {
     const tracker = await freshTracker();
     for (const line of fixtureLines().filter((entry) => !entry.includes("ClientOne"))) {
       tracker.processProfitTakerLine(line, "file");
@@ -105,7 +105,7 @@ describe("profitTakerTracker", () => {
     await tracker.awaitPendingPtSaves();
     const [run] = tracker.getPtRuns();
     expect(run.players).toEqual(["HostPlayer"]);
-    expect(run.solo).toBe(true);
+    expect(run).not.toHaveProperty("solo");
   });
 
   it("ignores dbwin-sourced lines", async () => {

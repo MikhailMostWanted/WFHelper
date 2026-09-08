@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { localDayKey, toLocalDayKey } from "../../../../config/shared/dayKey.js";
+import { localDateRange, localDayKey, toLocalDayKey } from "../../../../config/shared/dayKey.js";
 
 // Stubbing TZ writes process.env, and Node re-reads the zone for every Date
 // built after that, so these cases assert fixed keys instead of recomputing
@@ -47,5 +47,28 @@ describe("localDayKey", () => {
 
   it("returns an empty key for an invalid Date", () => {
     expect(localDayKey(new Date("not-a-date"))).toBe("");
+  });
+});
+
+describe("localDateRange", () => {
+  it("includes the whole local day across both DST transitions", () => {
+    for (const day of ["2026-03-08", "2026-11-01"]) {
+      const inside = localDateRange(day, day);
+      const start = new Date(`${day}T00:00:00`);
+      const next = new Date(start);
+      next.setDate(next.getDate() + 1);
+      expect(inside(start.getTime())).toBe(true);
+      expect(inside(next.getTime() - 1)).toBe(true);
+      expect(inside(next.getTime())).toBe(false);
+      expect(inside(start.getTime() - 1)).toBe(false);
+    }
+  });
+
+  it("rejects invalid timestamps only when a valid bound is active", () => {
+    expect(localDateRange()(NaN)).toBe(true);
+    expect(localDateRange("2026-01-01")(NaN)).toBe(false);
+    expect(localDateRange("2026-01-01")(null as unknown as number)).toBe(false);
+    expect(localDateRange("2026-02-31")(NaN)).toBe(true);
+    expect(localDateRange("2026-09-09", "2026-09-08")(new Date(2026, 8, 8).getTime())).toBe(false);
   });
 });

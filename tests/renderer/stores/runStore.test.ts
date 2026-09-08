@@ -41,7 +41,6 @@ function ptRun(id: string, extra: Partial<PtRunRecord> = {}): PtRunRecord {
     bodySec: 40,
     pylonSec: 20,
     phases: [],
-    solo: true,
     complete: true,
     bugged: false,
     aborted: false,

@@ -63,9 +63,8 @@ export interface PtRunRecord {
   bodySec: number;
   pylonSec: number;
   phases: PtPhase[];
-  /** Squad member names in load order, the local player included. */
+  /** PB groups count these recorded names; earlier loadouts may be absent. */
   players?: string[];
-  solo: boolean;
   complete: boolean;
   bugged: boolean;
   aborted: boolean;
