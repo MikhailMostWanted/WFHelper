@@ -1,6 +1,7 @@
 import electronLog from "electron-log/main";
 import fs from "node:fs";
 import path from "node:path";
+import { redactLogPaths, redactStoredLog } from "./logPrivacy";
 
 export interface ScopedLogger {
   info: (...args: unknown[]) => void;
@@ -20,6 +21,7 @@ const isTest = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 const loggerState = globalThis as typeof globalThis & {
   __wfhelperLoggerInitialized?: boolean;
   __wfhelperStreamGuardsInstalled?: boolean;
+  __wfhelperLogPrivacyInstalled?: boolean;
 };
 
 function resetLogFileOnAppStart(): void {
@@ -54,10 +56,30 @@ electronLog.transports.file.level = isTest
   : (level as typeof electronLog.transports.file.level);
 electronLog.transports.console.level = level as typeof electronLog.transports.console.level;
 electronLog.transports.file.maxSize = 5 * 1024 * 1024;
+if (!loggerState.__wfhelperLogPrivacyInstalled) {
+  // Last transform sees strings, so Error stacks and nested object paths are covered.
+  electronLog.transports.file.transforms.push(({ data }) => redactLogPaths(String(data)));
+  loggerState.__wfhelperLogPrivacyInstalled = true;
+}
 if (!isTest && !loggerState.__wfhelperLoggerInitialized) {
   electronLog.initialize();
   loggerState.__wfhelperLoggerInitialized = true;
   resetLogFileOnAppStart();
+  try {
+    const logPath = electronLog.transports.file.getFile()?.path;
+    if (logPath) {
+      const parsed = path.parse(logPath);
+      for (const file of [logPath, path.join(parsed.dir, `${parsed.name}.old${parsed.ext}`)]) {
+        try {
+          redactStoredLog(file);
+        } catch {
+          // A locked log must not prevent redacting the other file.
+        }
+      }
+    }
+  } catch {
+    // A locked old log must not prevent startup or redaction of new entries.
+  }
 }
 
 const timers = new Map<string, number>();

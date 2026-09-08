@@ -8,6 +8,7 @@ import { FEEDBACK_LIMITS, normalizeFeedback, type FeedbackResult } from "../conf
 import { withAbortTimeout } from "../config/shared/fetchWithTimeout";
 import { FEEDBACK_CONTEXT, FEEDBACK_SUBMIT } from "../config/shared/ipcChannels";
 import { getLogFilePath } from "../services/logger";
+import { redactLogPaths } from "../services/logPrivacy";
 import { assertMainRendererSender, handleAuthorized } from "./ipcSecurity";
 
 function feedbackContext() {
@@ -31,7 +32,7 @@ function readLogTail(): string | undefined {
       fs.readSync(handle, buffer, 0, length, size - length);
       let text = buffer.toString("utf8");
       if (length < size) text = text.slice(text.indexOf("\n") + 1);
-      return text.trim().length > 0 ? text : undefined;
+      return text.trim().length > 0 ? redactLogPaths(text) : undefined;
     } finally {
       fs.closeSync(handle);
     }
