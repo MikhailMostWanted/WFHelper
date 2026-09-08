@@ -19,7 +19,7 @@ import { formatWfmAssetUrl, sanitizeWfmSlug } from "../../config/shared/wfm.js";
 import { rendererPriceCacheKey } from "../../config/shared/wfmCacheKeys.js";
 import { isExcludedRankedMarketItem } from "../../config/shared/wfmExclusions.js";
 
-export type InventoryFilterTab = InventoryGroup | "resources" | "everything";
+export type InventoryFilterTab = InventoryGroup | "resources" | "everything" | "pets";
 
 /**
  * Groups the Everything tab can draw from, in tab order. Resources come from a
@@ -109,6 +109,7 @@ export const INVENTORY_FILTERS: Array<{ key: InventoryFilterTab; labelKey: Messa
   // No incomplete_sets tab: those live on the Mastery page, plus a Full Sets toggle.
   { key: "full_sets", labelKey: "inventory.tab.fullSets" },
   { key: "equipment", labelKey: "inventory.tab.equipment" },
+  { key: "pets", labelKey: "inventory.tab.pets" },
   { key: "resources", labelKey: "nav.resources" },
   { key: "misc", labelKey: "inventory.tab.misc" },
 ];

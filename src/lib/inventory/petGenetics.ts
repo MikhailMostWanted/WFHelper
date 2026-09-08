@@ -28,15 +28,15 @@ export interface PetInstance {
   instanceId: string | null;
   /** Player-chosen pet name. */
   name: string;
-  isMale: boolean;
-  size: number;
+  isMale: boolean | null;
+  size: number | null;
   /** Raw DE status, e.g. STATUS_STASIS. */
   status: string;
   /** Message key for the statuses we know; null hands over to statusLabel. */
   statusKey: MessageKey | null;
   /** Humanised status suffix, rendered whenever statusKey is null. */
   statusLabel: string;
-  printsRemaining: number;
+  printsRemaining: number | null;
   hatchDate: Date | null;
   isPuppy: boolean;
   dominant: PetTraits;
@@ -47,8 +47,8 @@ export interface PetImprint {
   instanceId: string | null;
   /** Name of the pet the code was taken from. */
   name: string;
-  isMale: boolean;
-  size: number;
+  isMale: boolean | null;
+  size: number | null;
   /** Species PowerSuit path, which DE stores as the Personality trait. */
   species: string;
   dominant: PetTraits;
@@ -265,19 +265,23 @@ function humanizeStatus(status: string): string {
 
 function parsePet(entry: RawInventoryEntry): PetInstance | null {
   const species = typeof entry.ItemType === "string" ? entry.ItemType : "";
-  const details = asRecord(entry.Details);
-  if (!species || !details) return null;
+  if (!species) return null;
+  const details = asRecord(entry.Details) ?? {};
 
   const status = typeof details.Status === "string" ? details.Status : "";
   return {
     instanceId: entryInstanceId(entry),
     name: typeof details.Name === "string" ? details.Name : "",
-    isMale: details.IsMale === true,
-    size: readNumber(details.Size, 1),
+    isMale: typeof details.IsMale === "boolean" ? details.IsMale : null,
+    size: Number.isFinite(readNumber(details.Size, Number.NaN))
+      ? readNumber(details.Size, 0)
+      : null,
     status,
     statusKey: STATUS_KEYS[status] ?? null,
     statusLabel: humanizeStatus(status),
-    printsRemaining: Math.max(0, Math.trunc(readNumber(details.PrintsRemaining, 0))),
+    printsRemaining: Number.isFinite(readNumber(details.PrintsRemaining, Number.NaN))
+      ? Math.max(0, Math.trunc(readNumber(details.PrintsRemaining, 0)))
+      : null,
     hatchDate: readHatchDate(details.HatchDate),
     isPuppy: details.IsPuppy === true,
     dominant: readTraits(details.DominantTraits),
@@ -293,8 +297,8 @@ function parseImprint(entry: RawInventoryEntry): PetImprint | null {
   return {
     instanceId: entryInstanceId(entry),
     name: typeof record.Name === "string" ? record.Name : "",
-    isMale: record.IsMale === true,
-    size: readNumber(record.Size, 1),
+    isMale: typeof record.IsMale === "boolean" ? record.IsMale : null,
+    size: Number.isFinite(readNumber(record.Size, Number.NaN)) ? readNumber(record.Size, 0) : null,
     species,
     dominant: readTraits(record.DominantTraits),
     recessive: readTraits(record.RecessiveTraits),

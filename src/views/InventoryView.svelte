@@ -61,6 +61,8 @@
   import InventoryOrderBookPanel from "../components/inventory/InventoryOrderBookPanel.svelte";
   import SharedFilterBar, { FILTER_BAR_EXPAND } from "../components/SharedFilterBar.svelte";
   import ResourcesView from "./ResourcesView.svelte";
+  import PetsInventory from "../components/inventory/PetsInventory.svelte";
+  import { parsePetGenetics } from "../lib/inventory/petGenetics.js";
   import ChipToggleRow from "../components/inventory/ChipToggleRow.svelte";
   import { parseResources } from "../lib/inventory.js";
   import {
@@ -236,6 +238,13 @@
   function handleFilterSelect(event: CustomEvent<InventoryFilterTab>): void {
     filter = event.detail;
     writeStorage(FILTER_TAB_KEY, filter);
+    if (filter === "pets") {
+      clearHotsetRefreshTimer();
+      hotsetRefreshSignature = "";
+      hydration.pause();
+    } else {
+      hydration.resume();
+    }
     // Resources hides the advanced panel, so a carried-over amount would cut
     // rows with no control and no badge to reveal it.
     if (filter === "resources" && $inventoryFilters.minimumAmount > 0) {
@@ -269,7 +278,7 @@
 
   // Resources drops the advanced row entirely, so there is nothing to reveal there.
   setContext(FILTER_BAR_EXPAND, () => {
-    if (filter !== "resources") showFilterPanel = true;
+    if (filter !== "resources" && filter !== "pets") showFilterPanel = true;
   });
 
   function applyListSort(patch: { sortBy: SharedSortKey; sortDirection: SortDirection }): void {
@@ -466,7 +475,8 @@
   }
 
   onMount(() => {
-    hydration.resume();
+    if (filter === "pets") hydration.pause();
+    else hydration.resume();
     // The "Order placed" badges read the orders store, which otherwise only the
     // Market tab fills; a straight-to-inventory session reads every item as unlisted.
     void ensureMarketOrdersLoaded();
@@ -664,10 +674,14 @@
   }
 
   $: filteredResources = filterAndSortResources(resourceList, $inventoryFilters);
+  $: petGenetics = filter === "pets" ? parsePetGenetics($inventoryData) : null;
+  $: marketTab = filter !== "resources" && filter !== "pets";
   $: filteredTotalCount =
-    filter === "resources"
-      ? filteredResources.length
-      : visibleItems.length + (showEverythingResources ? filteredResources.length : 0);
+    filter === "pets"
+      ? (petGenetics?.totalPets ?? 0)
+      : filter === "resources"
+        ? filteredResources.length
+        : visibleItems.length + (showEverythingResources ? filteredResources.length : 0);
   function countActiveAdvancedFilters(state: SharedFiltersState): number {
     let active = 0;
     if (state.orderPlaced !== "all") active++;
@@ -690,16 +704,16 @@
   $: showDucats = filter === "all_parts" || filter === "full_sets" || filter === "everything";
   $: metricNeeds = metricNeedsFromFilters($inventoryFilters, filter);
   $: wfmItemsLoaded = Object.keys($wfmItems).length > 0;
-  $: if ($startupPriceCacheReady && wfmItemsLoaded) {
+  $: if (filter !== "pets" && $startupPriceCacheReady && wfmItemsLoaded) {
     prefetchVisibleMetrics(filtered, metricNeeds);
     maybeScheduleRankedHotsetRefresh(allRankedBaseItems);
   }
 
   // The header stack is conditional; an absent block must not leave an empty slot.
   $: availableHeaderSections = [
-    ...(filter !== "resources" ? ["inventory.valueStrip"] : []),
-    ...($inventorySelectionMode && filter !== "resources" ? ["inventory.selectionBar"] : []),
-    ...(showFilterPanel && filter !== "resources" ? ["inventory.filters"] : []),
+    ...(marketTab ? ["inventory.valueStrip"] : []),
+    ...($inventorySelectionMode && marketTab ? ["inventory.selectionBar"] : []),
+    ...(showFilterPanel && marketTab ? ["inventory.filters"] : []),
   ];
 </script>
 
@@ -711,9 +725,10 @@
     {showFilterPanel}
     sortOptions={tabSortOptions}
     advancedCount={activeAdvancedCount}
-    filtersEnabled={filter !== "resources"}
+    filtersEnabled={marketTab}
+    basicFiltersEnabled={filter !== "pets"}
     selectionMode={$inventorySelectionMode}
-    selectionEnabled={filter !== "resources"}
+    selectionEnabled={marketTab}
     onToggleSelectionMode={handleToggleSelectionMode}
     on:filter={handleFilterSelect}
     on:toggle={handleToggleFilterPanel}
@@ -782,7 +797,9 @@
 
   <LayoutGrid view="inventory" only={INVENTORY_GRID_SECTIONS} gapClass="gap-0" let:sectionId>
     {#if sectionId === "inventory.grid"}
-      {#if filter === "resources"}
+      {#if filter === "pets" && petGenetics}
+        <PetsInventory genetics={petGenetics} database={$itemDb} />
+      {:else if filter === "resources"}
         <ResourcesView resources={filteredResources} />
       {:else}
         <div

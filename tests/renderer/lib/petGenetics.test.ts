@@ -183,6 +183,27 @@ describe("parsePetGenetics", () => {
     expect(data.bySpecies.get(KUBROW_SPECIES)).toHaveLength(1);
   });
 
+  it("keeps owned pets whose export has no genetics without inventing traits", () => {
+    const result = parsePetGenetics({
+      KubrowPets: [
+        { ItemType: KUBROW_SPECIES, ItemId: { $oid: "missing-details" } },
+        { ItemType: KUBROW_SPECIES, Details: { Name: "Minimal" } },
+      ],
+    });
+    expect(result.totalPets).toBe(2);
+    expect(result.bySpecies.get(KUBROW_SPECIES)).toEqual([
+      expect.objectContaining({
+        instanceId: "missing-details",
+        isMale: null,
+        size: null,
+        printsRemaining: null,
+        dominant: {},
+        recessive: {},
+      }),
+      expect.objectContaining({ name: "Minimal", isMale: null, size: null, printsRemaining: null }),
+    ]);
+  });
+
   it("returns empty maps for missing or empty inventory", () => {
     for (const input of [null, undefined, {} as RawInventoryData, { KubrowPets: [] }]) {
       const data = parsePetGenetics(input);

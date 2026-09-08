@@ -15,6 +15,7 @@
   export let sortOptions: Array<[SharedSortKey, string]> | null = null;
   export let advancedCount = 0;
   export let filtersEnabled = true;
+  export let basicFiltersEnabled = true;
   export let selectionMode = false;
   export let selectionEnabled = true;
   export let onToggleSelectionMode: () => void = () => {};
@@ -83,14 +84,16 @@
     </div>
     <!-- max-w-full + wrap: an unwrappable block here stretches the whole header past what a 900px window fits. -->
     <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2 pb-2">
-      <SharedFilterBar
-        scope="inventory"
-        singleLine={true}
-        showBasic={true}
-        showAdvanced={false}
-        basicVariant="quick"
-        {sortOptions}
-      />
+      {#if basicFiltersEnabled}
+        <SharedFilterBar
+          scope="inventory"
+          singleLine={true}
+          showBasic={true}
+          showAdvanced={false}
+          basicVariant="quick"
+          {sortOptions}
+        />
+      {/if}
       {#if selectionEnabled}
         <button
           class="filter-tab min-h-8 py-0 text-xs"

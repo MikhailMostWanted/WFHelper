@@ -15,9 +15,10 @@
     pets: PetInstance[];
     prints: PetImprint[];
     locale: LocaleCode;
+    showName?: boolean;
   }
 
-  let { pets, prints, locale }: Props = $props();
+  let { pets, prints, locale, showName = true }: Props = $props();
 
   interface TraitRow {
     kind: PetTraitKind;
@@ -57,7 +58,7 @@
 
 {#snippet chip(info: PetTraitInfo | null)}
   {#if info}
-    <span class="flex items-center gap-1.5">
+    <span class="flex min-w-0 items-center gap-1.5">
       {#if info.hex}
         <span
           class="h-3.5 w-3.5 shrink-0 rounded-[var(--radius-sm)] border border-border"
@@ -69,7 +70,7 @@
           class="h-3.5 w-3.5 shrink-0 rounded-[var(--radius-sm)] border border-border bg-surface-hover"
         ></span>
       {/if}
-      <span>{info.label}</span>
+      <span class="min-w-0 [overflow-wrap:anywhere]">{info.label}</span>
     </span>
   {:else}
     <span class="text-text-muted">{$tr("common.none")}</span>
@@ -101,20 +102,30 @@
   {#each petBlocks as block, petIndex (block.pet.instanceId ?? petIndex)}
     <div data-pet-instance={block.pet.instanceId ?? petIndex}>
       <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-text-muted">
-        {#if block.pet.name}
+        {#if showName && block.pet.name}
           <span class="font-display text-sm font-semibold text-text-primary">{block.pet.name}</span>
         {/if}
-        <span>{block.pet.isMale ? $tr("pet.male") : $tr("pet.female")}</span>
+        {#if block.pet.isMale !== null}
+          <span>{block.pet.isMale ? $tr("pet.male") : $tr("pet.female")}</span>
+        {/if}
         <span>{block.pet.statusKey ? $tr(block.pet.statusKey) : block.pet.statusLabel}</span>
-        <span>{$tr("pet.size", { value: block.pet.size.toFixed(2) })}</span>
-        <span>{$tr("pet.printsRemaining", { count: block.pet.printsRemaining })}</span>
+        {#if block.pet.size !== null}
+          <span>{$tr("pet.size", { value: block.pet.size.toFixed(2) })}</span>
+        {/if}
+        {#if block.pet.printsRemaining !== null}
+          <span>{$tr("pet.printsRemaining", { count: block.pet.printsRemaining })}</span>
+        {/if}
         {#if block.pet.hatchDate}
           <span>
             {$tr("pet.hatched", { date: block.pet.hatchDate.toLocaleDateString(locale) })}
           </span>
         {/if}
       </div>
-      {@render traitTable(block.rows)}
+      {#if block.rows.length}
+        {@render traitTable(block.rows)}
+      {:else}
+        <p class="mt-2 text-xs text-text-muted">{$tr("pet.traitsUnavailable")}</p>
+      {/if}
     </div>
   {/each}
 
@@ -129,8 +140,12 @@
             <span class="text-text-secondary">
               {$tr("pet.imprintOf", { name: block.imprint.name })}
             </span>
-            <span>{block.imprint.isMale ? $tr("pet.male") : $tr("pet.female")}</span>
-            <span>{$tr("pet.size", { value: block.imprint.size.toFixed(2) })}</span>
+            {#if block.imprint.isMale !== null}
+              <span>{block.imprint.isMale ? $tr("pet.male") : $tr("pet.female")}</span>
+            {/if}
+            {#if block.imprint.size !== null}
+              <span>{$tr("pet.size", { value: block.imprint.size.toFixed(2) })}</span>
+            {/if}
           </div>
           {@render traitTable(block.rows)}
         </div>
