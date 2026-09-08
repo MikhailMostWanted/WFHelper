@@ -382,7 +382,13 @@ async function readSlotTitle(
         `"${bestRejected.item.name}" (${bestRejected.mode} ${bestRejected.confidence.toFixed(3)})`,
     );
   }
-  rankedCandidates.sort((a, b) => b.score - a.score || b.confidence - a.confidence);
+  // A clipped component name can be an exact base Blueprint match in the other reader.
+  rankedCandidates.sort(
+    (a, b) =>
+      b.score - a.score ||
+      b.confidence - a.confidence ||
+      (a.mode === "exact" && b.mode === "exact" ? b.item.name.length - a.item.name.length : 0),
+  );
 
   return {
     candidates: rankedCandidates,
