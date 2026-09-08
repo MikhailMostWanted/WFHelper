@@ -7,6 +7,9 @@ import { setGameLocale } from "../services/gameLocale";
 import * as wfmCatalog from "../services/wfmCatalog";
 import * as masteryHelper from "../services/masteryHelper";
 import * as codexProfile from "../services/codexProfile";
+import { getInventorySource, getInventoryStatus, getLoadedInventoryHash } from "./inventoryIpc";
+import { mergeCodexInventoryScans } from "../config/shared/codexInventory";
+import { broadcastToRenderers } from "./popoutIpc";
 import * as relicService from "../services/relicService";
 import * as dropData from "../services/dropData";
 import * as autoUpdater from "../services/autoUpdater";
@@ -21,6 +24,8 @@ import {
   DB_GET_MASTERY,
   DB_GET_CODEX_SCANS,
   PERSONAL_PROFILE_GET,
+  PROFILE_ACCOUNT_CHANGED,
+  INVENTORY_STATUS_UPDATED,
   DB_GET_RELIC_DATABASE,
   DROP_SEARCH,
   APP_UPDATE_CHECK,
@@ -46,8 +51,16 @@ import { isObject } from "./ipcValidators";
 import { toNonEmptyString } from "../config/shared/stringValidation";
 
 const log = withScope("systemIpc");
+let stopProfileAccountListener: (() => void) | null = null;
+let stopInventoryBindingListener: (() => void) | null = null;
 
 function register(): void {
+  stopProfileAccountListener ??= codexProfile.onProfileAccountChanged(() =>
+    broadcastToRenderers(PROFILE_ACCOUNT_CHANGED),
+  );
+  stopInventoryBindingListener ??= codexProfile.onInventoryProfileBindingChanged(() =>
+    broadcastToRenderers(INVENTORY_STATUS_UPDATED, getInventoryStatus()),
+  );
   handleAuthorized(DB_GET_ITEM_DATABASE, assertMainRendererSender, () =>
     itemDb.getRendererLookup(),
   );
@@ -85,13 +98,30 @@ function register(): void {
     return masteryHelper.computeMasteryProgress(data as Record<string, unknown>);
   });
 
-  handleAuthorized(PERSONAL_PROFILE_GET, assertMainRendererSender, (_event, refresh: unknown) =>
-    codexProfile.getPersonalProfile(refresh === true),
+  handleAuthorized(
+    PERSONAL_PROFILE_GET,
+    assertMainRendererSender,
+    async (_event, refresh: unknown) => {
+      const generation = codexProfile.getProfileAccountGeneration();
+      const result = await codexProfile.getPersonalProfile(refresh === true);
+      if (generation !== codexProfile.getProfileAccountGeneration())
+        return { profile: null, fetchedAt: null, status: "account-changed", nextRefreshAt: 0 };
+      return { ...result, inventorySource: getInventorySource() };
+    },
   );
 
-  handleAuthorized(DB_GET_CODEX_SCANS, assertMainRendererSender, (_event, force: unknown) =>
-    codexProfile.getCodexScans(force === true),
-  );
+  handleAuthorized(DB_GET_CODEX_SCANS, assertMainRendererSender, async (_event, force: unknown) => {
+    const generation = codexProfile.getProfileAccountGeneration();
+    const result = await codexProfile.getCodexScans(force === true);
+    if (generation !== codexProfile.getProfileAccountGeneration())
+      return { error: "account-changed", nextRefreshAt: 0 };
+    const hash = getLoadedInventoryHash();
+    const scans =
+      hash && codexProfile.isInventorySnapshotForCurrentAccount(hash)
+        ? mergeCodexInventoryScans(result.scans ?? [], ctx.currentInventoryData)
+        : result.scans;
+    return { ...result, ...(scans ? { scans } : {}), inventorySource: getInventorySource() };
+  });
 
   handleAuthorized(DROP_SEARCH, assertMainRendererSender, async (_event, payload: unknown) => {
     if (!isObject(payload)) return [];

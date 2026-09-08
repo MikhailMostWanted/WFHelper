@@ -139,6 +139,7 @@ export interface PreloadAPI {
     text: IpcInvokeMap["marketAlertsImport"]["args"][0],
   ) => Promise<IpcInvokeMap["marketAlertsImport"]["return"]>;
   onInventoryUpdated: (callback: (data: IpcEventMap["inventory-updated"]) => void) => () => void;
+  onProfileAccountChanged: (callback: () => void) => () => void;
   onInventoryStatusUpdated: (
     callback: (status: IpcEventMap["inventory-status-updated"]) => void,
   ) => () => void;

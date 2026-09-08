@@ -16,11 +16,14 @@ test.describe("Codex artwork fallback", () => {
   let page: Page;
 
   test.beforeAll(async () => {
-    harness = await launchElectronTestHarness("wfh-codex-art-");
+    harness = await launchElectronTestHarness("wfh-codex-art-", {
+      userDataFiles: { "codex-profile.json": { accountId: "a".repeat(24) } },
+    });
     page = harness.page;
     fs.writeFileSync(
       path.join(harness.sandboxDir, "user-data", "codex-scans.json"),
       JSON.stringify({
+        accountId: "a".repeat(24),
         fetchedAt: Date.now(),
         scans: [{ type: "/Lotus/Types/Enemies/Grineer/AIWeek/BladeSawmanAvatar", count: 20 }],
       }),

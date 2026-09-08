@@ -111,3 +111,13 @@ describe("tileSetSpawnPlanets", () => {
     expect(tileSetSpawnPlanets(null)).toEqual([]);
   });
 });
+
+describe("Eximus requirements", () => {
+  it("uses its own requirement instead of the base enemy's", () => {
+    expect(findEnemyByType(`${BUTCHER}#leader`)?.scans).toBe(3);
+  });
+
+  it("keeps an unknown Eximus requirement unknown", () => {
+    expect(findEnemyByType(`${AKKALAK_TURRET}#leader`)?.scans).toBeNull();
+  });
+});

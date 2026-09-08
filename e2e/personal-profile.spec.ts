@@ -137,6 +137,11 @@ test("personal profile renders cached data and follows refresh failures and acco
     await expect(panel.locator('[data-profile-color="pricol-en"] code')).toHaveText("#12345680");
     await page.screenshot({ path: testInfo.outputPath("personal-appearance.png") });
 
+    await openView(page, "settings");
+    await openView(page, "stats");
+    await expect(stats.locator('[data-tour-tab="personal"][data-active]')).toBeVisible();
+    await expect(panel.locator("[data-profile-name]")).toHaveText(fixture.displayName!);
+
     await evaluateInMain(
       app,
       ({ app, ipcMain }, channel) => {

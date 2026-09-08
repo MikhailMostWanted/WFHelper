@@ -70,6 +70,7 @@ export interface PersonalProfile {
 }
 
 export interface PersonalProfileResult {
+  inventorySource?: "helper" | "manual" | "aleca";
   profile: PersonalProfile | null;
   fetchedAt: number | null;
   status: "ready" | "no-data" | "no-account" | "fetch-failed" | "account-changed";

@@ -97,7 +97,7 @@ describe("parsePersonalProfile", () => {
     ).not.toHaveProperty("registeredAt");
   });
 
-  it("keeps table identities, chooses the most complete duplicate and never sums", () => {
+  it("keeps table identities and the largest reported duplicate counters without summing", () => {
     const profile = parsePersonalProfile({
       Stats: {
         Weapons: [
@@ -113,7 +113,7 @@ describe("parsePersonalProfile", () => {
       },
     });
     expect(profile?.equipment).toEqual([
-      { type: "/Test/A", kills: 8, equipTime: 1.25 },
+      { type: "/Test/A", kills: 90, xp: 2, equipTime: 1.25 },
       { type: "/Test/B", xp: 0 },
     ]);
     expect(profile?.abilities).toEqual([{ type: "/Unknown/Ability", used: 0 }]);
@@ -324,4 +324,30 @@ describe("enrichPersonalProfileNames", () => {
       expect(revivePersonalProfile({ ...profile, missions: [{ type: "Node", name }] })).toBeNull();
     }
   });
+});
+
+it("combines split Stats locations and preserves explicitly empty tables", () => {
+  const result = parsePersonalProfile({
+    Stats: { TimePlayedSec: 0, Weapons: [] },
+    Results: [
+      { Stats: { TimePlayedSec: 99, Income: 25, Weapons: [{ type: "/Weapon/Old" }], Enemies: [] } },
+    ],
+  });
+  expect(result?.career).toEqual({ TimePlayedSec: 0, Income: 25 });
+  expect(result?.equipment).toEqual([]);
+  expect(result?.enemies).toEqual([]);
+});
+
+it("decodes a signed profile color matching the independent profile viewer", () => {
+  const result = parsePersonalProfile({
+    Stats: {},
+    Results: [
+      {
+        LoadOutInventory: {
+          Suits: [{ ItemType: "/Suit/Fixture", Configs: [{ pricol: { t0: -25600 } }] }],
+        },
+      },
+    ],
+  });
+  expect(result?.appearance[0].configs[0].colors.pricol?.t0).toBe("#ff9c00ff");
 });

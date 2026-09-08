@@ -126,14 +126,27 @@
   onMount(() => {
     void refresh();
     const unsubscribe = on("inventory-updated", reloadCachedProfile);
-    const timer = setInterval(() => {
-      now = Date.now();
-    }, 1000);
+    const unsubscribeSource = on("inventory-status-updated", reloadCachedProfile);
+    const unsubscribeAccount = on("profile-account-changed", () => {
+      result = null;
+      reloadCachedProfile();
+    });
     return () => {
       disposed = true;
-      clearInterval(timer);
       unsubscribe();
+      unsubscribeSource();
+      unsubscribeAccount();
     };
+  });
+  $effect(() => {
+    const deadline = result?.nextRefreshAt ?? 0;
+    now = Date.now();
+    if (deadline <= Date.now()) return;
+    const timer = setInterval(() => {
+      now = Date.now();
+      if (Date.now() >= deadline) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
   });
 
   function selectSection(next: Section): void {
@@ -288,6 +301,13 @@
     >
       {profile ? $t("profile.stale") : $t("profile.fetchFailed")}
     </p>{/if}
+  {#if result?.inventorySource && result.inventorySource !== "helper"}<p
+      class="m-0 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-warning"
+      role="status"
+      data-profile-source-warning
+    >
+      {$t("profile.importSourceWarning")}
+    </p>{/if}
   {#if busy && !profile}
     <div class="empty-state"><p>{$t("common.loading")}</p></div>
   {:else if !profile}
@@ -422,14 +442,14 @@
               class="btn-secondary btn-sm"
               data-profile-previous
               disabled={currentPage === 0}
-              onclick={() => (page = currentPage - 1)}>{$t("stats.previousTitle")}</button
+              onclick={() => (page = currentPage - 1)}>{$t("profile.previousPage")}</button
             >
             <span>{$t("profile.page", { current: currentPage + 1, total: lastPage + 1 })}</span>
             <button
               class="btn-secondary btn-sm"
               data-profile-next
               disabled={currentPage === lastPage}
-              onclick={() => (page = currentPage + 1)}>{$t("common.next")}</button
+              onclick={() => (page = currentPage + 1)}>{$t("profile.nextPage")}</button
             >
           </div>
         {/if}

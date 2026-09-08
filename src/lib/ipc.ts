@@ -81,6 +81,7 @@ const eventApiMap: Record<
     ),
   "inventory-updated": (cb) =>
     window.api.onInventoryUpdated(cb as (data: IpcEventMap["inventory-updated"]) => void),
+  "profile-account-changed": (cb) => window.api.onProfileAccountChanged(cb as () => void),
   "inventory-status-updated": (cb) =>
     window.api.onInventoryStatusUpdated(
       cb as (status: IpcEventMap["inventory-status-updated"]) => void,

@@ -1525,7 +1525,8 @@
       ],
       "type": "Ranged",
       "description": "The Narmer Veil is in full control.",
-      "baseLevel": 1
+      "baseLevel": 1,
+      "eximusScans": 3
     },
     "/Lotus/Types/Enemies/Corpus/Narmer/NarmerGuardSpacemanAgent": {
       "name": "Narmer Jailer",
@@ -4349,7 +4350,8 @@
       ],
       "type": "Support",
       "description": "Detects intruders",
-      "baseLevel": 1
+      "baseLevel": 1,
+      "eximusScans": 3
     },
     "/Lotus/Types/Enemies/Grineer/AIWeek/Avatars/NightwatchHeavyGunnerAvatar": {
       "name": "Nightwatch Bombard",
@@ -6360,7 +6362,8 @@
       ],
       "type": "Ranged",
       "description": "Heavily Armored.",
-      "baseLevel": 3
+      "baseLevel": 3,
+      "eximusScans": 3
     },
     "/Lotus/Types/Enemies/Grineer/GrineerMarinePistol": {
       "name": "Seeker",
@@ -6424,7 +6427,8 @@
       ],
       "type": "Ranged",
       "description": "The Narmer Veil is in full control.",
-      "baseLevel": 1
+      "baseLevel": 1,
+      "eximusScans": 3
     },
     "/Lotus/Types/Enemies/Grineer/Narmer/NarmerEidolonAlarmDroneAgent": {
       "name": "Tusk Seeker Drone",
@@ -6838,7 +6842,8 @@
       ],
       "type": "Ranged",
       "description": "A Grineer specialist packing twin grakatas and able to drop mobile cover",
-      "baseLevel": 1
+      "baseLevel": 1,
+      "eximusScans": 3
     },
     "/Lotus/Types/Enemies/Grineer/RailJack/Saturn/GrnSaturnCaptainHeavyAgent": {
       "name": "Gyre Gokstad Officer",
@@ -7608,7 +7613,8 @@
       ],
       "type": "Heavy",
       "description": "Heavy melee unit with a disrupting attack.",
-      "baseLevel": 1
+      "baseLevel": 1,
+      "eximusScans": 3
     },
     "/Lotus/Types/Enemies/Infested/AiWeek/Ancients/DiseasedAncient": {
       "name": "Brood Mother",
@@ -11874,7 +11880,8 @@
         "Empyrean"
       ],
       "type": "Melee",
-      "baseLevel": 1
+      "baseLevel": 1,
+      "eximusScans": 3
     },
     "Lotus/Types/Enemies/Grineer/AIWeek/GrineerWorkerB": {
       "name": "Drudge Brazer",
@@ -14715,15 +14722,13 @@
       "key": "/Lotus/Types/Enemies/Grineer/Vip/CaptainVorBossAgent"
     },
     "/lotus/types/enemies/grineer/vip/avatars/marineleaderavatar": {
-      "key": "/Lotus/Types/Enemies/Grineer/Vip/Hek/HekDroneStage1Agent",
-      "eximus": true
+      "key": "/Lotus/Types/Enemies/Grineer/Vip/Hek/HekDroneStage1Agent"
     },
     "/lotus/types/enemies/grineer/vip/avatars/marineleaderdecoyavatar": {
       "key": "/Lotus/Types/Enemies/Grineer/Vip/Hek/HekDroneStage1Agent"
     },
     "/lotus/types/enemies/grineer/vip/avatars/ninjaleaderavatar": {
-      "key": "/Lotus/Types/Enemies/Grineer/Vip/TylRegor/TylRegorAgent",
-      "eximus": true
+      "key": "/Lotus/Types/Enemies/Grineer/Vip/TylRegor/TylRegorAgent"
     },
     "/lotus/types/enemies/grineer/vip/grineerroyalguard/grineerroyalguardavatar": {
       "key": "/Lotus/Types/Enemies/Grineer/Vip/GrineerRoyalGuard/GrineerRoyalGuardAgent"

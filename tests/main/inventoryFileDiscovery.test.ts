@@ -253,6 +253,25 @@ describe("findInventoryFile", () => {
     );
   });
 
+  it("exposes only the hash of loaded helper data, including inside listeners", async () => {
+    const helper = writeValidInventory(
+      path.join(tmpDir, "userData", "api-helper", "inventory.json"),
+      "bound",
+      Date.now(),
+    );
+    const expectedHash = crypto.createHash("sha256").update(fs.readFileSync(helper)).digest("hex");
+    writeState(helper, "helper");
+    const inventoryIpc = await loadModule();
+    expect(inventoryIpc.getLoadedInventoryHash()).toBeNull();
+    const seen: Array<string | null> = [];
+    inventoryIpc.addInventoryListener(() => seen.push(inventoryIpc.getLoadedInventoryHash()));
+    inventoryIpc.readInventory(helper);
+    expect(seen).toEqual([expectedHash]);
+    expect(inventoryIpc.getLoadedInventoryHash()).toBe(expectedHash);
+    inventoryIpc.readInventory(helper, "manual");
+    expect(inventoryIpc.getLoadedInventoryHash()).toBeNull();
+  });
+
   it("accepts changed helper contents immediately after the startup read", async () => {
     const now = Date.now();
     const helper = writeValidInventory(

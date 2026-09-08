@@ -30,6 +30,10 @@ export type CodexFactionPlanets = Record<string, string[]>;
  *  hint for the 47 wiki entries that name a tileset but no planet. */
 export type CodexTileSetPlanets = Record<string, string[]>;
 
-export type CodexScansResult =
-  | { fetchedAt: number; scans: CodexScanEntry[] }
-  | { error: "no-account" | "fetch-failed" | "no-data" };
+export interface CodexScansResult {
+  fetchedAt?: number;
+  scans?: CodexScanEntry[];
+  error?: "no-account" | "fetch-failed" | "no-data" | "account-changed";
+  nextRefreshAt?: number;
+  inventorySource?: "helper" | "manual" | "aleca";
+}

@@ -435,3 +435,35 @@ describe("codex extras that merge into one display row", () => {
     }
   });
 });
+
+describe("export-verified Codex aliases", () => {
+  it.each([
+    "Narmer Crewman",
+    "Taro Stropha Crewman",
+    "Sensor Regulator",
+    "Commander",
+    "Narmer Lancer",
+    "Gyre Eviscerator",
+    "Ancient Disruptor",
+  ])("shows the unscanned %s Eximus requirement", (name) => {
+    expect(buildCodexRows([]).find((row) => row.name === `${name} Eximus`)).toMatchObject({
+      scanned: 0,
+      required: 3,
+      complete: false,
+    });
+  });
+
+  it.each([
+    ["MarineLeaderAvatar", "Councilor Vay Hek"],
+    ["NinjaLeaderAvatar", "Tyl Regor"],
+  ])("treats STANDARD %s as its base boss", (avatar, name) => {
+    const rows = buildCodexRows([
+      {
+        type: `/Lotus/Types/Enemies/Grineer/Vip/Avatars/${avatar}`,
+        count: 3,
+      },
+    ]);
+    expect(rows.find((row) => row.name === name)?.scanned).toBe(3);
+    expect(rows.find((row) => row.name === `${name} Eximus`)).toBeUndefined();
+  });
+});

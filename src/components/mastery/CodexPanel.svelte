@@ -14,8 +14,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
-  import { locale, tr } from "../../lib/i18n.js";
-  import { invoke, send } from "../../lib/ipc.js";
+  import { locale, tr, type MessageKey } from "../../lib/i18n.js";
+  import { invoke, on, send } from "../../lib/ipc.js";
+  import type { CodexScansResult } from "../../../config/shared/codexTypes.js";
   import type { CodexRow, CodexSortKey } from "../../lib/codexScans.js";
   import { loadCodexScans } from "../../lib/codexScansLazy.js";
   import { devMode } from "../../stores/devMode.js";
@@ -27,7 +28,14 @@
   let codex: CodexScans | null = null;
   let rows: CodexRow[] = [];
   let fetchedAt: number | null = null;
-  let error: "no-account" | "fetch-failed" | "no-data" | null = null;
+  let errorKey: MessageKey;
+  let error: CodexScansResult["error"] | null = null;
+  let inventorySource: CodexScansResult["inventorySource"];
+  let nextRefreshAt = 0;
+  let now = Date.now();
+  let disposed = false;
+  let generation = 0;
+  let reloadPending = false;
   let loading = false;
   let search = "";
   let incompleteOnly = false;
@@ -41,33 +49,63 @@
   }
 
   async function load(refresh = false): Promise<void> {
-    if (loading) return;
+    if (loading || disposed) return;
+    const request = ++generation;
     loading = true;
     try {
-      // A rejected chunk load lands in the catch below, so Refresh retries it.
       const [mod, result] = await Promise.all([
         codex ?? loadCodexScans(),
         invoke("getCodexScans", refresh),
       ]);
+      if (disposed || request !== generation) return;
       codex = mod;
-      if ("error" in result) {
-        error = result.error;
-      } else {
-        error = null;
-        fetchedAt = result.fetchedAt;
-        rows = mod.buildCodexRows(result.scans);
-        // A refresh can carry icons that were still missing when a URL last 404'd.
-        if (refresh) resetImageProbes();
-      }
+      error = result.error ?? null;
+      inventorySource = result.inventorySource;
+      nextRefreshAt = result.nextRefreshAt ?? 0;
+      fetchedAt = result.fetchedAt ?? null;
+      rows = result.scans ? mod.buildCodexRows(result.scans) : [];
+      if (refresh) resetImageProbes();
     } catch {
-      error = "fetch-failed";
+      if (!disposed && request === generation) error = "fetch-failed";
     } finally {
-      loading = false;
+      if (!disposed) {
+        loading = false;
+        if (reloadPending) {
+          reloadPending = false;
+          void load();
+        }
+      }
     }
+  }
+
+  function invalidate(clear = false): void {
+    generation += 1;
+    if (clear) {
+      rows = [];
+      fetchedAt = null;
+      nextRefreshAt = 0;
+      error = "account-changed";
+    }
+    if (loading) reloadPending = true;
+    else void load();
   }
 
   onMount(() => {
     void load();
+    const unsubscribeInventory = on("inventory-updated", () => invalidate());
+    const unsubscribeStatus = on("inventory-status-updated", () => invalidate());
+    const unsubscribeAccount = on("profile-account-changed", () => invalidate(true));
+    const timer = setInterval(() => {
+      now = Date.now();
+    }, 1000);
+    return () => {
+      disposed = true;
+      generation += 1;
+      unsubscribeInventory();
+      unsubscribeStatus();
+      unsubscribeAccount();
+      clearInterval(timer);
+    };
   });
 
   // Legacy mode: only an instance-level assignment invalidates the markup, so the
@@ -121,7 +159,16 @@
     ) ?? [];
   $: doneCount = rows.filter((row) => row.complete === true).length;
   $: knownCount = rows.filter((row) => row.complete !== null).length;
-  $: updatedLabel = fetchedAt ? new Date(fetchedAt).toLocaleTimeString($locale) : null;
+  $: updatedLabel = fetchedAt ? new Date(fetchedAt).toLocaleString($locale) : null;
+  $: refreshWait = Math.max(0, Math.ceil((nextRefreshAt - now) / 1000));
+  $: errorKey =
+    error === "no-account"
+      ? "codex.noAccount"
+      : error === "no-data"
+        ? "codex.noData"
+        : error === "account-changed"
+          ? "profile.accountChanged"
+          : "codex.fetchFailed";
   // The credit stays one key so a translator can move the link; omitting the
   // param leaves "{link}" in place as the split point.
   $: attributionParts = $tr("codex.attribution").split("{link}");
@@ -151,19 +198,44 @@
     {/if}
     <div class="shared-select-group">
       <span class="shared-chip-label">{$tr("common.sort")}</span>
-      <select class="shared-filter-select" bind:value={sortBy}>
+      <select
+        data-codex-sort
+        class="shared-filter-select"
+        aria-label={$tr("common.sort")}
+        bind:value={sortBy}
+      >
         <option value="name">{$tr("common.name")}</option>
         <option value="scans">{$tr("common.scans")}</option>
         <option value="progress">{$tr("codex.sortProgress")}</option>
       </select>
     </div>
     <div class="ml-auto flex items-center gap-2 text-xs text-text-muted">
-      {#if updatedLabel}<span>{$tr("codex.updated", { when: updatedLabel })}</span>{/if}
-      <button class="btn-secondary btn-sm" disabled={loading} on:click={() => void load(true)}>
-        {loading ? $tr("codex.refreshing") : $tr("common.refresh")}
+      {#if updatedLabel}<span data-codex-updated
+          >{$tr("codex.updated", { when: updatedLabel })}</span
+        >{/if}
+      <button
+        data-codex-refresh
+        class="btn-secondary btn-sm"
+        disabled={loading || refreshWait > 0}
+        on:click={() => void load(true)}
+      >
+        {loading
+          ? $tr("codex.refreshing")
+          : refreshWait > 0
+            ? $tr("profile.refreshWait", { seconds: refreshWait })
+            : $tr("common.refresh")}
       </button>
     </div>
   </div>
+
+  {#if inventorySource === "manual" || inventorySource === "aleca"}
+    <p data-codex-source-warning class="m-0 text-sm text-warning">
+      {$tr("profile.importSourceWarning")}
+    </p>
+  {/if}
+  {#if error && rows.length > 0}
+    <p data-codex-error role="alert" class="m-0 text-sm text-warning">{$tr(errorKey)}</p>
+  {/if}
 
   {#if rows.length > 0}
     <div class="filter-tabs flex-wrap" data-tour="mastery-codex-factions">
@@ -193,6 +265,8 @@
   {#if loading && rows.length === 0}
     <!-- The scan table is a separate chunk now, so first open has a real wait. -->
     <div class="empty-state"><p>{$tr("common.loading")}</p></div>
+  {:else if error === "account-changed" && rows.length === 0}
+    <div class="empty-state"><p>{$tr("profile.accountChanged")}</p></div>
   {:else if error === "no-data" && rows.length === 0}
     <div class="empty-state"><p>{$tr("codex.noData")}</p></div>
   {:else if error === "no-account" && rows.length === 0}

@@ -15,8 +15,8 @@
   let { items }: { items: ProfileAppearanceItem[] } = $props();
   const CATEGORY_KEYS: Record<ProfileAppearanceItem["category"], MessageKey> = {
     Suits: "profile.warframe",
-    LongGuns: "common.primary",
-    Pistols: "appearance.label.textSecondary",
+    LongGuns: "profile.primaryWeapon",
+    Pistols: "profile.secondaryWeapon",
     Melee: "rivens.type.melee",
   };
   const GROUP_KEYS: Record<ProfileColorGroup, MessageKey> = {

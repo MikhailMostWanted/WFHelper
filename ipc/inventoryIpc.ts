@@ -61,6 +61,7 @@ const MAX_INVENTORY_BYTES = 50 * 1024 * 1024;
 const JSON_ENCODING = "utf-8";
 
 let _lastInventoryHash: string | null = null;
+let _loadedInventoryHash: string | null = null;
 let _lastListenerInventoryHash: string | null = null;
 let _trustedInventoryPath: string | null = null;
 /** Sources that read plain inventory JSON; only their acquisition differs. */
@@ -141,6 +142,14 @@ function _persistState(): void {
 }
 
 _loadPersistedState();
+
+export function getLoadedInventoryHash(): string | null {
+  return ctx.currentInventoryData &&
+    _activeInventorySource === "helper" &&
+    _trustedInventorySource === "helper"
+    ? _loadedInventoryHash
+    : null;
+}
 
 type InventoryDataListener = (data: Record<string, unknown>) => void;
 const _inventoryListeners: InventoryDataListener[] = [];
@@ -337,6 +346,7 @@ function readInventory(filePath: string, source: JsonInventorySource = "helper")
     // Startup reads must populate the UI even when the persisted hash matches.
     data = parseInventoryRaw(snapshot.raw);
     ctx.currentInventoryData = data as Record<string, unknown> | null;
+    _loadedInventoryHash = hash;
     _loadedInventoryModifiedAt = snapshot.modifiedAt;
     _lastReadError = null;
     _activeInventorySource = source;
@@ -365,6 +375,7 @@ function readAlecaFrameInventory(filePath: string): unknown {
     const fileBuffer = fs.readFileSync(filePath);
     const hash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
     ctx.currentInventoryData = data as Record<string, unknown> | null;
+    _loadedInventoryHash = hash;
     _loadedInventoryModifiedAt = modifiedAt;
     _lastReadError = null;
     _lastInventoryHash = hash;
@@ -420,6 +431,7 @@ function watchInventoryFile(filePath: string, source: InventorySource = "helper"
       _persistState();
       log.info("Inventory file changed, reloading...");
       ctx.currentInventoryData = data as Record<string, unknown> | null;
+      _loadedInventoryHash = hash;
       _loadedInventoryModifiedAt = snapshot.modifiedAt;
       _lastReadError = null;
       rememberInventoryPath(filePath, source);

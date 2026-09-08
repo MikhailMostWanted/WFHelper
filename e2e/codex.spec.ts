@@ -16,12 +16,15 @@ test.describe("Mastery codex tab", () => {
   let page: Page;
 
   test.beforeAll(async () => {
-    harness = await launchElectronTestHarness("wfh-codex-e2e-");
+    harness = await launchElectronTestHarness("wfh-codex-e2e-", {
+      userDataFiles: { "codex-profile.json": { accountId: "a".repeat(24) } },
+    });
     page = harness.page;
     // A fresh scans cache keeps getCodexScans off the network entirely.
     fs.writeFileSync(
       path.join(harness.sandboxDir, "user-data", "codex-scans.json"),
       JSON.stringify({
+        accountId: "a".repeat(24),
         fetchedAt: Date.now(),
         scans: [
           { type: "/Lotus/Types/Enemies/Grineer/AIWeek/BladeSawmanAvatar", count: 20 },

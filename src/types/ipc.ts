@@ -841,6 +841,7 @@ interface TradeRecordedEvent {
 export interface IpcEventMap {
   "reward-overlay-edit-state": RewardOverlayEditState;
   "inventory-updated": RawInventoryData;
+  "profile-account-changed": void;
   "inventory-status-updated": InventoryStatus;
   "item-db-updated": undefined;
   "app-update-status": AppUpdateState;

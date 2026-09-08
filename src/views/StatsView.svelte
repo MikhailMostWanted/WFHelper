@@ -47,6 +47,7 @@
   import StatsTradePanel from "../components/stats/StatsTradePanel.svelte";
   import HeaderTabs from "../components/HeaderTabs.svelte";
   import PersonalStatsPanel from "../components/stats/PersonalStatsPanel.svelte";
+  import { persistedString } from "../lib/persistence.js";
   import StatResourcePicker from "../components/stats/StatResourcePicker.svelte";
   import { buildStatIconMap } from "../lib/assetUrls.js";
   import { itemDb } from "../stores/data.js";
@@ -73,7 +74,7 @@
     labelStep,
   } from "../lib/stats/chartData.js";
 
-  let statsTab = "tracking";
+  const statsTab = persistedString("stats-tab", ["tracking", "personal"] as const, "tracking");
   $: statsTabs = [
     { key: "tracking", label: $tr("profile.tracking") },
     { key: "personal", label: $tr("profile.personal") },
@@ -664,15 +665,15 @@
     <h2>{$tr("common.stats")}</h2>
     <HeaderTabs
       options={statsTabs}
-      activeKey={statsTab}
+      activeKey={$statsTab}
       onSelect={(key) => {
-        statsTab = key;
+        statsTab.set(key === "personal" ? "personal" : "tracking");
         expandedKey = null;
         tooltip = null;
         showResourcePicker = false;
       }}
     />
-    {#if statsTab === "tracking"}
+    {#if $statsTab === "tracking"}
       <div class="ml-auto flex flex-wrap items-center gap-2">
         <ThemedButton
           active={showValue}
@@ -714,7 +715,7 @@
     {/if}
   </div>
 
-  {#if statsTab === "personal"}
+  {#if $statsTab === "personal"}
     <PersonalStatsPanel />
   {:else if loading}
     <div class="empty-state"><p>{$tr("common.loading")}</p></div>

@@ -91,7 +91,12 @@ function nameIndex(): Map<string, string | null> {
 /** Codex path lookup; an Eximus row resolves to the enemy it belongs to. */
 export function findEnemyByType(type: string): EnemyInfo | null {
   const base = type.endsWith(LEADER_SUFFIX) ? type.slice(0, -LEADER_SUFFIX.length) : type;
-  return fromRequirement(base) ?? fromExtra(base);
+  const info = fromRequirement(base) ?? fromExtra(base);
+  if (info && type.endsWith(LEADER_SUFFIX)) {
+    info.scans =
+      CODEX_SCAN_REQUIREMENTS[base]?.eximusScans ?? CODEX_EXTRA_INFO[base]?.eximusScans ?? null;
+  }
+  return info;
 }
 
 /** Display-name lookup for callers that only have the drop table's spelling. */

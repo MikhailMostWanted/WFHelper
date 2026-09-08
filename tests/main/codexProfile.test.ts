@@ -23,15 +23,28 @@ describe("parseProfileScans", () => {
     expect(result?.length).toBe(2);
   });
 
-  it("drops malformed entries and clamps negatives", () => {
+  it("drops malformed entries and invalid numeric counts", () => {
     const result = parseProfileScans({
       Stats: { Scans: [{ scans: -2, type: "/L/X" }, { scans: 1 }, { type: "/L/Y" }, null] },
     });
-    expect(result).toEqual([{ type: "/L/X", count: 0 }]);
+    expect(result).toEqual([]);
   });
 
   it("returns null when no scans array exists", () => {
     expect(parseProfileScans({})).toBeNull();
     expect(parseProfileScans(null)).toBeNull();
   });
+});
+
+it("never coerces null, booleans or numeric strings into scan counts", () => {
+  expect(
+    parseProfileScans({
+      Stats: {
+        Scans: [null, true, "12", -1, 1.5, Infinity, 3].map((scans) => ({
+          type: "/Lotus/X",
+          scans,
+        })),
+      },
+    }),
+  ).toEqual([{ type: "/Lotus/X", count: 3 }]);
 });

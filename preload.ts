@@ -22,6 +22,7 @@ import {
   DB_GET_MASTERY,
   DB_GET_CODEX_SCANS,
   PERSONAL_PROFILE_GET,
+  PROFILE_ACCOUNT_CHANGED,
   OVERLAY_PLACEMENT_LAYOUT,
   OVERLAY_SAVE_PLACEMENT,
   OVERLAY_SAVE_SCALE,
@@ -230,6 +231,7 @@ try {
       ipcRenderer,
       INVENTORY_UPDATED,
     ),
+    onProfileAccountChanged: ipcDataBridge<void>(ipcRenderer, PROFILE_ACCOUNT_CHANGED),
     onInventoryStatusUpdated: ipcDataBridge<IpcEventMap["inventory-status-updated"]>(
       ipcRenderer,
       INVENTORY_STATUS_UPDATED,

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import DetailModalBase from "./DetailModalBase.svelte";
   import WikiButton from "../components/WikiButton.svelte";
   import { loadCodexScans } from "../lib/codexScansLazy.js";
@@ -7,7 +8,7 @@
   import { loadEnemyInfo } from "../lib/enemies/enemyInfoLazy.js";
   // Aliased: a store named `tr` makes svelte-check flag every <tr> row as a lowercase component.
   import { tr as t } from "../lib/i18n.js";
-  import { invoke } from "../lib/ipc.js";
+  import { invoke, on } from "../lib/ipc.js";
   import { buildWikiUrl } from "../lib/wikiUrl.js";
   import { currentView } from "../stores/app.js";
   import { activeEnemy, wikiSearchRequest } from "../stores/modals.js";
@@ -23,11 +24,6 @@
 
   type CodexModule = Awaited<ReturnType<typeof loadCodexScans>>;
 
-  // Rebuilding ~1500 joined rows per open is wasted work; the profile snapshot
-  // only changes when the Codex tab refreshes it.
-  let cachedRows: { fetchedAt: number; rows: ReturnType<CodexModule["buildCodexRows"]> } | null =
-    null;
-
   let info = $state<EnemyInfo | null>(null);
   let displayName = $state("");
   let imageUrl = $state<string | null>(null);
@@ -42,6 +38,10 @@
   let dropQuery = $state("");
   let loading = $state(false);
   let resolved = $state(false);
+  let dropsFailed = $state(false);
+  let infoFailed = $state(false);
+  let scansFailed = $state(false);
+  let importedSource = $state(false);
 
   let token = 0;
 
@@ -58,6 +58,10 @@
     dropTotal = 0;
     dropQuery = "";
     resolved = false;
+    dropsFailed = false;
+    infoFailed = false;
+    scansFailed = false;
+    importedSource = false;
   }
 
   async function loadScanCount(
@@ -70,65 +74,86 @@
     const result = await invoke("getCodexScans", false);
     // A second enemy opened during the fetch owns the panel now.
     if (id !== token) return;
-    if ("error" in result) return;
-    if (cachedRows?.fetchedAt !== result.fetchedAt) {
-      cachedRows = { fetchedAt: result.fetchedAt, rows: codex.buildCodexRows(result.scans) };
-    }
+    scansFailed = result.error !== undefined;
+    importedSource = result.inventorySource === "manual" || result.inventorySource === "aleca";
+    if (!result.scans) return;
+    const rows = codex.buildCodexRows(result.scans);
     const match = key
-      ? cachedRows.rows.find((row) => row.type === key)
-      : cachedRows.rows.find((row) => normalizeEnemyName(row.name) === name);
+      ? rows.find((row) => row.type === key)
+      : rows.find((row) => normalizeEnemyName(row.name) === name);
     if (!match) return;
     scanned = match.scanned;
-    if (match.required !== null) required = match.required;
+    required = match.required;
   }
 
   async function load(target: { name: string; type?: string }, id: number): Promise<void> {
     loading = true;
     reset();
     displayName = target.name;
-    try {
-      const [enemies, codex, dropResult] = await Promise.all([
-        loadEnemyInfo(),
-        loadCodexScans(),
-        invoke("searchDrops", target.name, "place"),
-      ]);
-      if (id !== token) return;
-
-      const found = target.type
+    const [enemyResult, codexResult, dropResult] = await Promise.allSettled([
+      loadEnemyInfo(),
+      loadCodexScans(),
+      invoke("searchDrops", target.name, "place"),
+    ]);
+    if (id !== token) return;
+    const enemies = enemyResult.status === "fulfilled" ? enemyResult.value : null;
+    const codex = codexResult.status === "fulfilled" ? codexResult.value : null;
+    infoFailed = !enemies;
+    const found = enemies
+      ? target.type
         ? enemies.findEnemyByType(target.type)
-        : enemies.findEnemyByName(target.name);
-      info = found;
-      resolved = true;
-      if (found) {
-        displayName = target.type ? target.name : found.name;
-        imageUrl = codex.enemyImageUrl(found.image);
-        factionLabel =
-          codex.CODEX_FACTIONS.find((faction) => faction.key === found.faction)?.label ?? null;
-        factionPlanets = enemies.factionSpawnPlanets(found);
-        tileSetPlanets = enemies.tileSetSpawnPlanets(found);
-        required = found.scans;
-      }
+        : enemies.findEnemyByName(target.name)
+      : null;
+    info = found;
+    resolved = enemies !== null;
+    if (found && enemies) {
+      displayName = target.type ? target.name : found.name;
+      imageUrl = codex?.enemyImageUrl(found.image) ?? null;
+      factionLabel =
+        codex?.CODEX_FACTIONS.find((faction) => faction.key === found.faction)?.label ?? null;
+      factionPlanets = enemies.factionSpawnPlanets(found);
+      tileSetPlanets = enemies.tileSetSpawnPlanets(found);
+      required = found.scans;
+    }
 
-      // A place search is a substring match, so "Butcher" also returns "Arid
-      // Butcher" rows; the exact source sorts first and every row shows its place.
-      const exact = normalizeEnemyName(target.name);
-      dropQuery = target.name;
-      dropTotal = dropResult.total;
-      drops = [...dropResult.rows]
+    const exact = normalizeEnemyName(target.name);
+    dropQuery = target.name;
+    if (dropResult.status === "fulfilled") {
+      dropTotal = dropResult.value.total;
+      drops = [...dropResult.value.rows]
         .sort(
           (a, b) =>
             Number(normalizeEnemyName(b.place) === exact) -
               Number(normalizeEnemyName(a.place) === exact) || b.chance - a.chance,
         )
         .slice(0, MAX_DROP_ROWS);
-
-      await loadScanCount(codex, target.type ?? found?.key ?? null, exact, id);
+    } else dropsFailed = true;
+    try {
+      if (codex) await loadScanCount(codex, target.type ?? found?.key ?? null, exact, id);
+      else scansFailed = true;
     } catch {
-      if (id === token) resolved = true;
+      if (id === token) scansFailed = true;
     } finally {
       if (id === token) loading = false;
     }
   }
+
+  onMount(() => {
+    const reload = () => {
+      const target = $activeEnemy;
+      const id = ++token;
+      if (target) void load(target, id);
+    };
+    const unsubs = [
+      on("profile-account-changed", reload),
+      on("inventory-updated", reload),
+      on("inventory-status-updated", reload),
+    ];
+    return () => {
+      token += 1;
+      unsubs.forEach((unsubscribe) => unsubscribe());
+    };
+  });
 
   $effect(() => {
     const target = $activeEnemy;
@@ -215,10 +240,22 @@
             {$t("dailies.simarisScans", { scans: scanned, required })}
           {:else if required !== null}
             {$t("enemy.scansRequired", { count: required })}
+          {:else if scanned !== null}
+            {$t("enemy.scansUnknown", { count: scanned })}
           {:else if resolved && !info}
             {$t("enemy.noCodexEntry")}
           {/if}
         </p>
+        {#if importedSource}
+          <p data-enemy-source-warning class="detail-muted m-0 mt-1">
+            {$t("profile.importSourceWarning")}
+          </p>
+        {/if}
+        {#if infoFailed || scansFailed}
+          <p data-enemy-scan-error role="status" class="detail-muted m-0 mt-1">
+            {$t(infoFailed ? "enemy.infoUnavailable" : "codex.fetchFailed")}
+          </p>
+        {/if}
       </div>
     </div>
 
@@ -256,6 +293,8 @@
           </div>
         {:else if loading}
           <p class="detail-muted m-0">{$t("common.loading")}</p>
+        {:else if infoFailed}
+          <p role="status" class="detail-muted m-0">{$t("enemy.infoUnavailable")}</p>
         {:else}
           <p class="detail-muted m-0">{$t("enemy.noSpawnData")}</p>
         {/if}
@@ -308,6 +347,10 @@
           </div>
         {:else if loading}
           <p class="detail-muted m-0">{$t("common.loading")}</p>
+        {:else if dropsFailed}
+          <p data-enemy-drops-error role="status" class="detail-muted m-0">
+            {$t("enemy.dropsUnavailable")}
+          </p>
         {:else}
           <p class="detail-muted m-0">{$t("enemy.noDrops")}</p>
         {/if}

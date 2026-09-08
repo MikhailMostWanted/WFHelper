@@ -73,6 +73,20 @@ const enemies = readPep("ExportEnemies.json");
 const LEADER_PATH_RE = /(AvatarLeader|LeaderAvatar|Leader)$/i;
 const baseAvatarPath = (avatarPath) =>
   avatarPath.replace(/AvatarLeader$/i, "Avatar").replace(/LeaderAvatar$/i, "Avatar");
+const avatarRoles = new Map();
+for (const agent of Object.values(enemies.agents)) {
+  for (const [kind, avatarPath] of Object.entries(agent.avatarTypes || {})) {
+    const key = avatarPath.toLowerCase();
+    if (!avatarRoles.has(key)) avatarRoles.set(key, new Set());
+    avatarRoles.get(key).add(kind);
+  }
+}
+function isEximusAvatar(avatarPath) {
+  const roles = avatarRoles.get(avatarPath.toLowerCase());
+  if (roles?.has("EXIMUS")) return true;
+  if (roles?.has("STANDARD")) return false;
+  return LEADER_PATH_RE.test(avatarPath);
+}
 
 // null marks a path two entries claim, which is unusable rather than a coin flip.
 const avatarOwners = new Map();
@@ -293,23 +307,41 @@ for (const [avatarPath, avatar] of Object.entries(enemies.avatars)) {
   if (!name) continue;
   const twin = wikiByName.get(name.toLowerCase());
   if (twin) {
-    claimAvatar(avatarPath, twin, LEADER_PATH_RE.test(avatarPath));
+    claimAvatar(avatarPath, twin, isEximusAvatar(avatarPath));
     bridgedByName += 1;
     continue;
   }
   orphans.push([avatarPath, avatar]);
 }
 
+// Name-bridged aliases also carry requirements missed by the exact Agent lookup.
+const eximusRequirements = new Map();
+const originalAvatarPaths = new Map(
+  Object.keys(enemies.avatars).map((key) => [key.toLowerCase(), key]),
+);
+for (const [avatarPath, owner] of avatarOwners) {
+  if (!owner?.eximus) continue;
+  const original = originalAvatarPaths.get(avatarPath);
+  const scans = statedScans(original);
+  if (scans === null) continue;
+  if (!eximusRequirements.has(owner.internal)) eximusRequirements.set(owner.internal, new Set());
+  eximusRequirements.get(owner.internal).add(scans);
+}
+for (const [internal, scans] of eximusRequirements) {
+  if (scans.size !== 1) throw new Error(`Conflicting Eximus scan requirements: ${internal}`);
+  all.get(internal).eximusScans = [...scans][0];
+}
+
 // An Eximus avatar is not its own codex entry, so it contributes a count to the
 // base rather than a second row under the same display name.
 const orphanEximus = new Map();
 for (const [avatarPath] of orphans) {
-  if (!LEADER_PATH_RE.test(avatarPath)) continue;
+  if (!isEximusAvatar(avatarPath)) continue;
   orphanEximus.set(baseAvatarPath(avatarPath).toLowerCase(), avatarPath);
 }
 let orphanEnemies = 0;
 for (const [avatarPath, avatar] of orphans) {
-  const leader = LEADER_PATH_RE.test(avatarPath);
+  const leader = isEximusAvatar(avatarPath);
   // An Eximus-only orphan still needs the base row its scans hang from.
   const key = leader ? baseAvatarPath(avatarPath) : avatarPath;
   if (leader && enemies.avatars[key]) continue;

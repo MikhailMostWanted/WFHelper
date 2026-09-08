@@ -1,3 +1,5 @@
+import { asRecord as record } from "../config/shared/objectValidation";
+import { toNonEmptyString as text } from "../config/shared/stringValidation";
 import {
   PROFILE_CAREER_KEYS,
   PROFILE_COLOR_CHANNELS,
@@ -15,20 +17,8 @@ const ENEMY_FIELDS = ["kills", "headshots", "assists", "finishers", "deaths", "s
 const APPEARANCE_CATEGORIES = ["Suits", "LongGuns", "Pistols", "Melee"] as const;
 const PRESET_KEYS = { Suits: "s", LongGuns: "l", Pistols: "p", Melee: "m" } as const;
 
-function record(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
 function number(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
-}
-
-function text(value: unknown, limit: number): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 && trimmed.length <= limit ? trimmed : undefined;
 }
 
 function numericFields<K extends string>(
@@ -61,8 +51,17 @@ function table<K extends string>(
     const name = withNames ? text(source.name, 240) : undefined;
     if (name) row.name = name;
     const previous = rows.get(type);
-    // Prefer the more complete duplicate without inventing cumulative totals.
-    if (!previous || Object.keys(row).length > Object.keys(previous).length) rows.set(type, row);
+    // Duplicate cumulative counters overlap, so keep each maximum rather than summing.
+    if (previous) {
+      for (const key of keys) {
+        const oldValue = previous[key];
+        const newValue = row[key];
+        if (oldValue !== undefined && (newValue === undefined || oldValue > newValue))
+          row[key] = oldValue;
+      }
+      if (!row.name && previous.name) row.name = previous.name;
+    }
+    rows.set(type, row);
   }
   return [...rows.values()];
 }
@@ -170,8 +169,10 @@ export function parsePersonalProfile(payload: unknown): PersonalProfile | null {
   const root = record(payload);
   if (!root) return null;
   const player = record(Array.isArray(root.Results) ? root.Results[0] : undefined) ?? {};
-  const stats = record(root.Stats) ?? record(player.Stats);
-  if (!stats) return null;
+  const rootStats = record(root.Stats);
+  const playerStats = record(player.Stats);
+  if (!rootStats && !playerStats) return null;
+  const stats = { ...playerStats, ...rootStats };
   const enemies = table(stats.Enemies, ENEMY_FIELDS);
   const scans = new Map(table(stats.Scans, ["scans"])?.map((row) => [row.type, row.scans]));
   for (const enemy of enemies ?? []) {

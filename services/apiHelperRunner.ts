@@ -511,6 +511,7 @@ async function fetchInventoryWithAuthz(authz: string, destPath: string): Promise
     try {
       const res = await httpsGetBuffer(url, headers, MAX_INVENTORY_RESPONSE_BYTES);
       if (res.statusCode === 200 && res.body.length > 0) {
+        codexProfile.noteInventorySnapshot(authz, res.body);
         fs.writeFileSync(destPath, res.body);
         log.info(`Inventory fetched from ${host} (${res.body.length} bytes)`);
         return;
