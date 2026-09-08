@@ -36,8 +36,7 @@
   /** Auctions only; 0 means "no buyout", which WFM accepts. */
   let listingBuyout = $state(0);
   let listingMinReputation = $state(0);
-  /** List an unranked riven at its rank-8 numbers, the way buyers compare them. */
-  let listAtMaxRank = $state(false);
+  let listingRank = $derived(riven.currentRank);
   let listingBusy = $state(false);
   let listingErrorKey = $state<MessageKey | null>(null);
   /** Server-supplied text, already localized by WFM or not translatable at all. */
@@ -150,6 +149,7 @@
   }
 
   async function handleListOnWfm() {
+    if (listingBusy) return;
     if (listingPrice < 1) {
       setListingError(
         listingType === "auction" ? "rivens.detail.startingBidMin" : "rivens.detail.priceMin",
@@ -169,10 +169,11 @@
     listingErrorRaw = "";
     listingSuccessKey = null;
 
-    const asMaxRank = canListAtMaxRank && listAtMaxRank;
     const stats = riven.stats.map((s) => ({
       tag: s.tag,
-      value: asMaxRank ? s.maxRankValue : s.displayValue,
+      value:
+        s.rankValues?.[listingRank] ??
+        (listingRank === riven.maxRank ? s.maxRankValue : s.displayValue),
       positive: s.positive,
       multiplier: s.multiplier,
     }));
@@ -182,38 +183,45 @@
       listingType === "direct" ? listingPrice : listingBuyout > 0 ? listingBuyout : null;
     const startingPrice = listingPrice;
 
-    const result = contract
-      ? await tradeInvoke("updateRivenAuction", {
-          auctionId: contract.id,
-          buyoutPrice,
-          startingPrice,
-          minReputation: listingType === "auction" ? listingMinReputation : 0,
-          isPrivate: listingVisibility === "private",
-          description: listingDescription,
-        })
-      : await tradeInvoke("createRivenAuction", {
-          weaponName: riven.weaponName,
-          rivenName: riven.rivenName,
-          stats,
-          rerolls: riven.rerolls,
-          masteryReq: riven.masteryReq,
-          polarity: riven.polarity,
-          modRank: asMaxRank ? riven.maxRank : riven.currentRank,
-          buyoutPrice,
-          startingPrice,
-          minReputation: listingType === "auction" ? listingMinReputation : 0,
-          isPrivate: listingVisibility === "private",
-          description: listingDescription,
-        });
+    try {
+      const result = contract
+        ? await tradeInvoke("updateRivenAuction", {
+            auctionId: contract.id,
+            buyoutPrice,
+            startingPrice,
+            minReputation: listingType === "auction" ? listingMinReputation : 0,
+            isPrivate: listingVisibility === "private",
+            description: listingDescription,
+          })
+        : await tradeInvoke("createRivenAuction", {
+            weaponName: riven.weaponName,
+            rivenName: riven.rivenName,
+            stats,
+            rerolls: riven.rerolls,
+            masteryReq: riven.masteryReq,
+            polarity: riven.polarity,
+            modRank: listingRank,
+            buyoutPrice,
+            startingPrice,
+            minReputation: listingType === "auction" ? listingMinReputation : 0,
+            isPrivate: listingVisibility === "private",
+            description: listingDescription,
+          });
 
-    listingBusy = false;
-    if (result.ok) {
-      listingSuccessKey = contract ? "rivens.detail.contractUpdated" : "rivens.detail.listedOnWfm";
-      oncontractupdated?.();
-    } else if (result.error) {
-      listingErrorRaw = result.error;
-    } else {
-      setListingError(contract ? "rivens.detail.failedUpdate" : "rivens.detail.failedCreate");
+      if (result.ok) {
+        listingSuccessKey = contract
+          ? "rivens.detail.contractUpdated"
+          : "rivens.detail.listedOnWfm";
+        oncontractupdated?.();
+      } else if (result.error) {
+        listingErrorRaw = result.error;
+      } else {
+        setListingError(contract ? "rivens.detail.failedUpdate" : "rivens.detail.failedCreate");
+      }
+    } catch (error) {
+      listingErrorRaw = error instanceof Error ? error.message : String(error);
+    } finally {
+      listingBusy = false;
     }
   }
 
@@ -299,7 +307,9 @@
           >
         {/if}
         <span>{$tr("rivens.detail.rerolls", { count: riven.rerolls })}</span>
-        <span>{$tr("rivens.detail.rank", { current: riven.currentRank, max: riven.maxRank })}</span>
+        <span data-riven-detail-rank={riven.currentRank}
+          >{$tr("rivens.detail.rank", { current: riven.currentRank, max: riven.maxRank })}</span
+        >
         {#if riven.masteryReq > 0}
           <span>{$tr("rivens.mr", { level: riven.masteryReq })}</span>
         {/if}
@@ -613,12 +623,32 @@
                 />
               </div>
             </div>
+            {#if !isContractListing}
+              <label class="flex w-fit items-center gap-2 text-xs text-text-secondary">
+                {$tr("common.rank")}
+                <select class="shared-select" data-riven-listing-rank bind:value={listingRank}>
+                  {#each Array.from({ length: riven.maxRank + 1 }, (_, rank) => rank) as rank}
+                    <option
+                      value={rank}
+                      disabled={rank !== riven.currentRank &&
+                        rank !== riven.maxRank &&
+                        riven.stats.some((stat) => stat.rankValues?.[rank] == null)}>{rank}</option
+                    >
+                  {/each}
+                </select>
+              </label>
+            {/if}
             {#if canListAtMaxRank}
               <label
                 class="flex w-fit cursor-pointer items-center gap-2 text-xs text-text-secondary"
                 title={$tr("rivens.detail.maxRankTooltip", { current: riven.currentRank })}
               >
-                <input type="checkbox" bind:checked={listAtMaxRank} />
+                <input
+                  type="checkbox"
+                  checked={listingRank === riven.maxRank}
+                  onchange={(event) =>
+                    (listingRank = event.currentTarget.checked ? riven.maxRank : riven.currentRank)}
+                />
                 {$tr("rivens.detail.listWithRankStats", { max: riven.maxRank })}
               </label>
             {/if}
@@ -642,6 +672,7 @@
                       type="number"
                       class="w-20 text-sm py-1 px-2 rounded-md border border-border bg-bg-raised text-text-primary outline-none transition-[border-color] duration-150 focus:border-accent-bright"
                       bind:value={listingPrice}
+                      data-riven-listing-price
                       min="1"
                       aria-label={listingType === "auction"
                         ? $tr("rivens.detail.startingBidAria")
@@ -689,6 +720,7 @@
               <button
                 class="font-display text-xs font-bold py-2 px-5 rounded-md border-0 bg-accent-bright text-bg-base cursor-pointer transition-all duration-150 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed hover:enabled:brightness-[1.15]"
                 onclick={handleListOnWfm}
+                data-riven-listing-submit
                 disabled={listingBusy}
               >
                 {listingBusy
@@ -701,7 +733,9 @@
               </button>
             </div>
             {#if listingErrorText}
-              <div class="text-xs py-1 text-danger">{listingErrorText}</div>
+              <div class="text-xs py-1 text-danger" data-riven-listing-error>
+                {listingErrorText}
+              </div>
             {/if}
             {#if listingSuccessText}
               <div class="text-xs py-1 text-success">{listingSuccessText}</div>

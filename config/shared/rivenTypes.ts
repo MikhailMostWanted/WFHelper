@@ -4,6 +4,8 @@ export interface DecodedRivenStat {
   displayValue: number;
   /** Same roll recomputed at rank 8, for listing an unranked riven as maxed. */
   maxRankValue: number;
+  /** Each rank recomputed from the fingerprint to avoid scaling rounded values. */
+  rankValues?: number[];
   rollFloat: number;
   grade: string;
   positive: boolean;

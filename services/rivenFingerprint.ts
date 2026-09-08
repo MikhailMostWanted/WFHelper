@@ -293,7 +293,7 @@ function decodeSingleRiven(entry: {
 
   const isMelee = rivenData.isMeleeWeapon(weaponName);
 
-  const lvl = typeof fp.lvl === "number" ? fp.lvl : 8;
+  const lvl = typeof fp.lvl === "number" ? fp.lvl : 0;
   const buffs = Array.isArray(fp.buffs) ? fp.buffs : [];
   const curses = Array.isArray(fp.curses) ? fp.curses : [];
   const numBuffs = buffs.length;
@@ -329,6 +329,7 @@ function decodeSingleRiven(entry: {
       name: displayName,
       displayValue: buffValueAt(ctx, lvl),
       maxRankValue: buffValueAt(ctx, MAX_RIVEN_RANK),
+      rankValues: Array.from({ length: MAX_RIVEN_RANK + 1 }, (_, rank) => buffValueAt(ctx, rank)),
       rollFloat,
       grade,
       positive: true,
@@ -367,6 +368,7 @@ function decodeSingleRiven(entry: {
       name: displayName,
       displayValue: curseValueAt(ctx, lvl),
       maxRankValue: curseValueAt(ctx, MAX_RIVEN_RANK),
+      rankValues: Array.from({ length: MAX_RIVEN_RANK + 1 }, (_, rank) => curseValueAt(ctx, rank)),
       rollFloat,
       grade,
       positive: false,
