@@ -25,6 +25,10 @@ export const PRICE_SEED_STATE_KEY = 'archive:price-seed:v1';
 export const PRICE_SEED_SLUGS_KEY = 'archive:price-seed:slugs:v1';
 export const TOP_TRADED_SWEEP_KEY = 'top-traded:sweep:v1';
 export const TOP_TRADED_DOC_KEY = 'top-traded:v1';
+// Per-item price series folded out of the day archives, sharded so one doc stays small.
+export const PRICE_HISTORY_PREFIX = 'history:prices:v2:';
+export const PRICE_HISTORY_STATE_KEY = 'history:prices:state:v2';
+export const PRICE_HISTORY_BUCKETS = 64;
 // Wiki-sourced Coda/Tenet vendor elements and bonus percentages.
 export const ADVERSARY_VENDORS_DOC_KEY = 'adversary-vendors:doc:v1';
 // Wiki-sourced Nightwave Cred store, tab by tab.

@@ -1,4 +1,5 @@
 import type { MasteryData, RawInventoryData, ItemDbEntry } from "./inventory.js";
+import type { MarketStatPoint, MarketStatsMergeMode } from "../../config/shared/marketStats.js";
 import type {
   WfmContractsQuery,
   WfmContractsResult,
@@ -319,6 +320,10 @@ export interface IpcInvokeMap {
   wfmLookupItemBySlug: {
     args: [slug: string];
     return: WfmLookupItemResponse;
+  };
+  marketStatsHistoryMerge: {
+    args: [slug: string, points: MarketStatPoint[], mode?: MarketStatsMergeMode];
+    return: MarketStatPoint[] | null;
   };
   wfmGetMe: {
     args: [];

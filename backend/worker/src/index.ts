@@ -9,6 +9,7 @@ import { archiveBaroVisit, archiveDailyPrices, sweepRivenArchive } from './servi
 import { logEvent, takeResponseLogFields } from './services/logging';
 import { refreshNightwaveOfferings } from './services/nightwaveOfferings';
 import { prewarmBatch, prewarmOrderSummaryCatalog } from './services/prewarm';
+import { foldPriceHistory } from './services/priceHistory';
 import { seedPriceHistory } from './services/priceHistorySeed';
 import { syncSupporters } from './services/supporters';
 import { sweepTopTraded } from './services/topTraded';
@@ -61,6 +62,7 @@ function routeMetadata(req: Request): RouteMetadata {
 	if (pathname === '/v1/baro-history') return { type: 'request', route: '/v1/baro-history' };
 
 	const publicSlugRoutes = [
+		['/v1/price-history/', '/v1/price-history/:slug'],
 		['/v1/prices/', '/v1/prices/:slug'],
 		['/v1/meta/', '/v1/meta/:slug'],
 		['/v1/order-summary/', '/v1/order-summary/:slug'],
@@ -216,6 +218,8 @@ export default {
 			} else {
 				await runCronStage('cron:price-seed', () => seedPriceHistory(env));
 				await runCronStage('cron:top-traded', () => sweepTopTraded(env));
+				// Reads the same archive index as the stages above, so it shares their deferral.
+				await runCronStage('cron:price-history', () => foldPriceHistory(env));
 			}
 			await runCronStage('cron:adversary-vendors', () => refreshAdversaryVendors(env));
 			await runCronStage('cron:nightwave-offerings', () => refreshNightwaveOfferings(env));

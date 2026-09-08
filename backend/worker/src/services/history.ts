@@ -99,8 +99,7 @@ function baroIndexBound(retentionDays: number): number {
 	return clamp(Math.ceil(retentionDays / 14) + 4, 8, MAX_INDEX_ENTRIES);
 }
 
-async function readArchiveIndex(env: Env, family: ArchiveFamily): Promise<string[]> {
-	const stored = await getJsonFromKv(env.ITEM_META, indexKey(family));
+function archiveIndexEntries(stored: Record<string, unknown> | null): string[] {
 	const raw = stored?.entries;
 	if (!Array.isArray(raw)) return [];
 
@@ -116,8 +115,23 @@ async function readArchiveIndex(env: Env, family: ArchiveFamily): Promise<string
 	return entries;
 }
 
-export async function recordArchiveEntries(env: Env, family: ArchiveFamily, ids: string[], maxEntries: number): Promise<void> {
-	const entries = await readArchiveIndex(env, family);
+export async function readPriceArchiveRevisions(env: Env): Promise<Record<string, string>> {
+	const stored = await getJsonFromKv(env.ITEM_META, indexKey('prices'));
+	const revisions = isRecord(stored?.revisions) ? stored.revisions : {};
+	return Object.fromEntries(
+		archiveIndexEntries(stored).map((date) => [date, typeof revisions[date] === 'string' ? revisions[date] : 'legacy']),
+	);
+}
+
+export async function recordArchiveEntries(
+	env: Env,
+	family: ArchiveFamily,
+	ids: string[],
+	maxEntries: number,
+	changed: Record<string, string> = {},
+): Promise<void> {
+	const stored = await getJsonFromKv(env.ITEM_META, indexKey(family));
+	const entries = archiveIndexEntries(stored);
 	const known = new Set(entries);
 	for (const id of ids) {
 		if (!id || known.has(id)) continue;
@@ -130,7 +144,19 @@ export async function recordArchiveEntries(env: Env, family: ArchiveFamily, ids:
 	const overflow = Math.max(0, entries.length - maxEntries);
 	const pruned = overflow > 0 ? entries.splice(0, overflow) : [];
 
-	await env.ITEM_META.put(indexKey(family), JSON.stringify({ v: 1, updatedAt: Date.now(), entries }));
+	const revisions =
+		family === 'prices'
+			? Object.fromEntries(
+					entries.map((id) => [id, changed[id] ?? (isRecord(stored?.revisions) ? stored.revisions[id] : undefined) ?? 'legacy']),
+				)
+			: undefined;
+	if (
+		family === 'prices' &&
+		JSON.stringify(entries) === JSON.stringify(archiveIndexEntries(stored)) &&
+		entries.every((id) => revisions?.[id] === (isRecord(stored?.revisions) ? stored.revisions[id] : 'legacy'))
+	)
+		return;
+	await env.ITEM_META.put(indexKey(family), JSON.stringify({ v: 1, updatedAt: Date.now(), entries, revisions }));
 
 	for (const stale of pruned.slice(0, MAX_INDEX_DELETES_PER_RUN)) {
 		try {
@@ -176,6 +202,11 @@ export async function archiveDailyPrices(env: Env, options: { now?: number } = {
 		const key = `${ARCHIVE_PRICES_PREFIX}${date}`;
 		const existing = await env.ITEM_META.get(key);
 		if (existing) {
+			const day = parseJsonRecord(existing);
+			if (Array.isArray(day?.rows))
+				await recordArchiveEntries(env, 'prices', [date], config.historyRetentionDays, {
+					[date]: typeof day.revision === 'string' ? day.revision : 'legacy',
+				});
 			return { ...base, status: 'exists', bytes: byteLength(existing) };
 		}
 
@@ -194,9 +225,11 @@ export async function archiveDailyPrices(env: Env, options: { now?: number } = {
 			if (isRecord(price) && typeof price.priceBasis === 'string' && price.priceBasis.length <= 128 && price.priceBasis)
 				priceBasisByKey[key] = price.priceBasis;
 		}
+		const revision = crypto.randomUUID();
 		const body = JSON.stringify({
 			v: 1,
 			date,
+			revision,
 			generatedAt: now,
 			source: 'snapshot',
 			columns: ['key', 'median', 'volume'],
@@ -210,7 +243,7 @@ export async function archiveDailyPrices(env: Env, options: { now?: number } = {
 		}
 
 		await env.ITEM_META.put(key, body, { expirationTtl: retentionTtlSec(env) });
-		await recordArchiveEntry(env, 'prices', date, config.historyRetentionDays);
+		await recordArchiveEntries(env, 'prices', [date], config.historyRetentionDays, { [date]: revision });
 		logEvent({ type: 'cron', route: 'archive:prices', status: 200, count: rows.length, bytes });
 		return { ...base, status: 'written', rows: rows.length, bytes };
 	} catch (err) {
@@ -294,6 +327,7 @@ export async function mergeVolumes(
 	if (!config.historyArchiveEnabled) return result;
 
 	const today = utcDate(now);
+	const revisions: Record<string, string> = {};
 	for (const date of [...byDate.keys()].sort()) {
 		const samples = byDate.get(date);
 		if (!samples || samples.size === 0) continue;
@@ -334,11 +368,19 @@ export async function mergeVolumes(
 			rows[at] = [row[0], row[1], sample.volume];
 			filled += 1;
 		}
-		if (filled === 0 && added === 0 && priced === 0) continue;
+		if (filled === 0 && added === 0 && priced === 0) {
+			if (Array.isArray(existing?.rows)) {
+				result.dates.push(date);
+				revisions[date] = typeof existing.revision === 'string' ? existing.revision : 'legacy';
+			}
+			continue;
+		}
 
+		const revision = crypto.randomUUID();
 		const body = JSON.stringify({
 			v: 1,
 			date,
+			revision,
 			generatedAt: numeric(existing?.generatedAt) ?? now,
 			source: typeof existing?.source === 'string' ? existing.source : 'wfm-statistics-volume',
 			columns: ['key', 'median', 'volume'],
@@ -353,12 +395,13 @@ export async function mergeVolumes(
 
 		await env.ITEM_META.put(key, body, { expirationTtl: dayRetentionTtlSec(date, now, config.historyRetentionDays) });
 		result.dates.push(date);
+		revisions[date] = revision;
 		result.filled += filled;
 		result.added += added;
 		if (!existingRaw) result.created.push(date);
 	}
 
-	if (result.created.length > 0) await recordArchiveEntries(env, 'prices', result.created, config.historyRetentionDays);
+	if (result.dates.length > 0) await recordArchiveEntries(env, 'prices', result.dates, config.historyRetentionDays, revisions);
 	return result;
 }
 

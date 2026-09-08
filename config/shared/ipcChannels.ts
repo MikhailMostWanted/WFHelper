@@ -40,6 +40,7 @@ export const WFM_DELETE_ORDER = "wfm:delete-order";
 export const WFM_SET_VISIBLE = "wfm:set-visible";
 export const WFM_SEARCH_ITEMS = "wfm:search-items";
 export const WFM_LOOKUP_ITEM = "wfm:lookup-item-by-slug";
+export const MARKET_STATS_HISTORY_MERGE = "market:stats-history-merge";
 export const WFM_GET_ME = "wfm:get-me";
 export const WFM_SET_STATUS = "wfm:set-status";
 export const WFM_PRESENCE_STATE = "wfm:presence-state";

@@ -16,6 +16,7 @@ import { readNightwaveOfferingsDoc } from '../services/nightwaveOfferings';
 import { readBaroHistory } from '../services/baroHistory';
 import { isRelicSlug, normalizeOrderSubtype } from '../services/orderSubtype';
 import { readPublishedSupporters } from '../services/supporters';
+import { readPriceHistory } from '../services/priceHistory';
 import { readTopTradedDoc } from '../services/topTraded';
 import { recordActiveUser } from '../services/activeUsers';
 import { readRankedSummaryCatalogFromKv, sanitizeSnapshotForClient } from '../services/prewarm';
@@ -43,6 +44,7 @@ const routeStats = {
 	wfmItemsRequests: 0,
 	supportersRequests: 0,
 	topTradedRequests: 0,
+	priceHistoryRequests: 0,
 	adversaryVendorsRequests: 0,
 	nightwaveOfferingsRequests: 0,
 	baroHistoryRequests: 0,
@@ -57,6 +59,8 @@ const SUPPORTERS_CACHE_CONTROL = 'public, max-age=3600';
 const SUPPORTERS_CACHE_VERSION = 1;
 const TOP_TRADED_CACHE_CONTROL = 'public, max-age=3600';
 const TOP_TRADED_CACHE_VERSION = 1;
+const PRICE_HISTORY_CACHE_CONTROL = 'public, max-age=3600';
+const PRICE_HISTORY_CACHE_VERSION = 2;
 const ADVERSARY_VENDORS_CACHE_CONTROL = 'public, max-age=3600';
 const ADVERSARY_VENDORS_CACHE_VERSION = 1;
 const NIGHTWAVE_OFFERINGS_CACHE_CONTROL = 'public, max-age=3600';
@@ -602,6 +606,56 @@ export async function handlePublicRoutes(req: Request, url: URL, env: Env, ctx?:
 		}
 
 		const responseHeaders: Record<string, string> = { 'cache-control': NIGHTWAVE_OFFERINGS_CACHE_CONTROL, etag };
+		const response = rawJsonResponse(body, req, env, 200, responseHeaders);
+		if (ctx) {
+			ctx.waitUntil(edgeCache.put(cacheKey, new Response(body, { status: 200, headers: responseHeaders })));
+		}
+		return annotateResponse(response, { cacheHit: false });
+	}
+
+	const priceHistorySlug = getSlug(url.pathname, '/v1/price-history/');
+	if (req.method === 'GET' && priceHistorySlug) {
+		// Public and bootstrap-free like the other cron-owned aggregates: the cron folds the
+		// day archives into per-item series, so a request never reaches upstream.
+		if (isWfmExcludedSlug(priceHistorySlug)) return excludedMarketResponse(req, env);
+
+		const guardResponse = await guardPublicRequest(req, env, 'price-history');
+		if (guardResponse) return guardResponse;
+
+		routeStats.priceHistoryRequests += 1;
+		const cacheKey = new Request(
+			`${url.origin}/v1/price-history/${encodeURIComponent(priceHistorySlug)}?v=${PRICE_HISTORY_CACHE_VERSION}`,
+			{ method: 'GET' },
+		);
+		const edgeCache = caches.default;
+		const cachedResponse = await edgeCache.match(cacheKey);
+		if (cachedResponse) {
+			const cachedEtag = cachedResponse.headers.get('etag');
+			if (requestHasMatchingEtag(req, cachedEtag)) {
+				return annotateResponse(notModifiedResponse(cachedEtag, PRICE_HISTORY_CACHE_CONTROL, req, env), { cacheHit: true });
+			}
+			const cachedHeaders: Record<string, string> = { 'cache-control': PRICE_HISTORY_CACHE_CONTROL };
+			if (cachedEtag) cachedHeaders.etag = cachedEtag;
+			return annotateResponse(streamJsonResponse(cachedResponse.body, req, env, 200, cachedHeaders), { cacheHit: true });
+		}
+
+		const lookup = await readPriceHistory(env, priceHistorySlug);
+		if (lookup.status === 'catalog_unavailable') {
+			return annotateResponse(jsonResponse({ ok: false, error: lookup.status }, req, env, 503), { cacheHit: false });
+		}
+		if (lookup.status !== 'ok') {
+			// Never cached: the first fold of a bucket has to show up at once.
+			const error = lookup.status === 'not_ready' ? 'price_history_not_ready' : 'not_found';
+			return annotateResponse(jsonResponse({ ok: false, error }, req, env, 404), { cacheHit: false });
+		}
+
+		const body = JSON.stringify({ ok: true, slug: priceHistorySlug, generatedAt: lookup.generatedAt, rows: lookup.rows });
+		const etag = await clientBodyEtag(body, PRICE_HISTORY_CACHE_VERSION);
+		if (requestHasMatchingEtag(req, etag)) {
+			return annotateResponse(notModifiedResponse(etag, PRICE_HISTORY_CACHE_CONTROL, req, env), { cacheHit: true });
+		}
+
+		const responseHeaders: Record<string, string> = { 'cache-control': PRICE_HISTORY_CACHE_CONTROL, etag };
 		const response = rawJsonResponse(body, req, env, 200, responseHeaders);
 		if (ctx) {
 			ctx.waitUntil(edgeCache.put(cacheKey, new Response(body, { status: 200, headers: responseHeaders })));

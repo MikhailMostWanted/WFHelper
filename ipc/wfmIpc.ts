@@ -21,6 +21,7 @@ import * as wfmSession from "../services/wfmSession";
 import * as wfmOrders from "../services/wfmOrders";
 import * as wfmContracts from "../services/wfmContracts";
 import * as wfmCatalog from "../services/wfmCatalog";
+import * as marketStatsHistory from "../services/marketStatsHistory";
 import * as wfmPresence from "../services/wfmPresence";
 import { startListening, stopListening } from "../services/wfmWebSocketListener";
 import ctx from "./context";
@@ -36,6 +37,7 @@ import {
   WFM_SET_VISIBLE,
   WFM_SEARCH_ITEMS,
   WFM_LOOKUP_ITEM,
+  MARKET_STATS_HISTORY_MERGE,
   WFM_GET_ME,
   WFM_SET_STATUS,
   WFM_PRESENCE_STATE,
@@ -148,6 +150,15 @@ function register(): void {
   handleAuthorized(WFM_SESSION, assertMainRendererSender, async () => {
     return wfmSession.getSession();
   });
+
+  handleAuthorized(
+    MARKET_STATS_HISTORY_MERGE,
+    assertMainRendererSender,
+    async (_event, payload) => {
+      const raw = isObject(payload) ? payload : null;
+      return marketStatsHistory.mergeMarketStatsHistory(raw?.slug, raw?.points, raw?.mode);
+    },
+  );
 
   handleAuthorized(WFM_GET_ORDERS, assertMainRendererSender, async () =>
     withWfmError("get-orders", () => wfmOrders.getMyOrders(), "Failed to fetch orders."),

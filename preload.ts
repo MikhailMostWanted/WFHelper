@@ -37,6 +37,7 @@ import {
   WFM_SET_VISIBLE,
   WFM_SEARCH_ITEMS,
   WFM_LOOKUP_ITEM,
+  MARKET_STATS_HISTORY_MERGE,
   WFM_GET_ME,
   WFM_SET_STATUS,
   WFM_PRESENCE_STATE,
@@ -207,6 +208,8 @@ try {
       ipcRenderer.invoke(WFM_SEARCH_ITEMS, { query, limit }),
     wfmLookupItemBySlug: (slug): Ret<"wfmLookupItemBySlug"> =>
       ipcRenderer.invoke(WFM_LOOKUP_ITEM, { slug }),
+    marketStatsHistoryMerge: (slug, points, mode): Ret<"marketStatsHistoryMerge"> =>
+      ipcRenderer.invoke(MARKET_STATS_HISTORY_MERGE, { slug, points, mode }),
     wfmGetMe: inv<"wfmGetMe">(WFM_GET_ME),
     wfmPresenceState: inv<"wfmPresenceState">(WFM_PRESENCE_STATE),
 

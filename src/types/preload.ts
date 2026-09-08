@@ -62,6 +62,11 @@ export interface PreloadAPI {
   wfmLookupItemBySlug: (
     slug: IpcInvokeMap["wfmLookupItemBySlug"]["args"][0],
   ) => Promise<IpcInvokeMap["wfmLookupItemBySlug"]["return"]>;
+  marketStatsHistoryMerge: (
+    slug: IpcInvokeMap["marketStatsHistoryMerge"]["args"][0],
+    points: IpcInvokeMap["marketStatsHistoryMerge"]["args"][1],
+    mode?: IpcInvokeMap["marketStatsHistoryMerge"]["args"][2],
+  ) => Promise<IpcInvokeMap["marketStatsHistoryMerge"]["return"]>;
   wfmGetMe: () => Promise<IpcInvokeMap["wfmGetMe"]["return"]>;
   wfmPresenceState: () => Promise<IpcInvokeMap["wfmPresenceState"]["return"]>;
   getMasteryProgress: () => Promise<IpcInvokeMap["getMasteryProgress"]["return"]>;

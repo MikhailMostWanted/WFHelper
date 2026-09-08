@@ -428,6 +428,7 @@
   "browse.donchianChannel": "唐奇安通道",
   "browse.emptyHint": "搜索任意可交易物品，即可实时查看 warframe.market 上的卖家和买家。",
   "browse.hours48": "48 小时",
+  "browse.latest": "最新",
   "browse.loadingStats": "正在加载统计数据...",
   "browse.maxRank": "最高等级 {rank}",
   "browse.maxed": "满级",

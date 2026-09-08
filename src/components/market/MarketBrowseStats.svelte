@@ -1,27 +1,18 @@
 <script lang="ts">
   import { SvelteMap } from "svelte/reactivity";
 
+  import type { MarketStatPoint } from "../../../config/shared/marketStats.js";
   import { WFM_HEADERS } from "../../../config/shared/wfm.js";
   import { locale, tr, type LocaleCode } from "../../lib/i18n.js";
+  import { invoke } from "../../lib/ipc.js";
+  import { fetchBackendPriceHistory } from "../../lib/wfm/priceHistory.js";
 
   export let slug: string | null = null;
 
-  interface StatEntry {
-    time: number;
-    volume: number;
-    median: number;
-    movingAvg: number | null;
-    avgPrice: number;
-    openPrice: number;
-    closedPrice: number;
-    minPrice: number;
-    maxPrice: number;
-    donchTop: number;
-    donchBot: number;
-    rank: number | null;
-  }
+  type StatEntry = MarketStatPoint;
 
-  type Period = "48hours" | "90days";
+  // "latest" is the rolling year the app keeps on disk from every 90-day fetch.
+  type Period = "48hours" | "90days" | "latest";
   type StatBuckets = Record<Period, StatEntry[]>;
   type LoadState = "idle" | "loading" | "ready" | "error";
 
@@ -53,7 +44,7 @@
     x: number;
     medianY: number;
     movingY: number | null;
-    avgY: number;
+    avgY: number | null;
   }
 
   interface Candle {
@@ -126,6 +117,7 @@
     if (cached) {
       apply(cached);
       state = "ready";
+      void mergeLatest(target, cached["90days"], token);
       return;
     }
 
@@ -138,15 +130,46 @@
       state = "error";
       return;
     }
+    fetched.latest = fetched["90days"];
     cache.set(target, fetched);
     apply(fetched);
     state = "ready";
+    void mergeLatest(target, fetched["90days"], token);
   }
 
   function apply(next: StatBuckets): void {
     buckets = next;
     const available = collectRanks(next);
     activeRank = available.includes(0) ? 0 : (available[0] ?? null);
+  }
+
+  function publishLatest(target: string, latest: StatEntry[], token: number): void {
+    if (token !== requestToken || !buckets) return;
+    buckets = { ...buckets, latest };
+    cache.set(target, buckets);
+    const available = collectRanks(buckets);
+    if (activeRank == null || !available.includes(activeRank))
+      activeRank = available.includes(0) ? 0 : (available[0] ?? null);
+  }
+
+  async function mergeLatest(target: string, days: StatEntry[], token: number): Promise<void> {
+    let stored: StatEntry[];
+    try {
+      stored = (await invoke("marketStatsHistoryMerge", target, days)) ?? days;
+    } catch {
+      stored = days;
+    }
+    if (token !== requestToken) return;
+    publishLatest(target, stored, token);
+
+    const history = await fetchBackendPriceHistory(target);
+    if (token !== requestToken || !history || history.length === 0) return;
+    try {
+      const merged = (await invoke("marketStatsHistoryMerge", target, history, "fill")) ?? stored;
+      publishLatest(target, merged, token);
+    } catch {
+      return;
+    }
   }
 
   function retry(): void {
@@ -179,6 +202,7 @@
       return {
         "48hours": parseEntries(closed["48hours"]),
         "90days": parseEntries(closed["90days"]),
+        latest: [],
       };
     } catch {
       return null;
@@ -195,36 +219,30 @@
       const median = Number(record.median);
       if (!Number.isFinite(time) || !Number.isFinite(median)) continue;
 
-      const volume = Number(record.volume);
-      const movingAvg = Number(record.moving_avg);
-      const donchTop = Number(record.donch_top);
-      const donchBot = Number(record.donch_bot);
       const rank = Number(record.mod_rank);
-      const openPrice = finiteOr(record.open_price, median);
-      const closedPrice = finiteOr(record.closed_price, median);
-      const highPrice = finiteOr(record.max_price, Math.max(openPrice, closedPrice));
-      const lowPrice = finiteOr(record.min_price, Math.min(openPrice, closedPrice));
       out.push({
+        source: "wfm",
         time,
-        volume: Number.isFinite(volume) && volume > 0 ? volume : 0,
+        volume: finiteOrNull(record.volume),
         median,
-        movingAvg: Number.isFinite(movingAvg) ? movingAvg : null,
-        avgPrice: finiteOr(record.avg_price, median),
-        openPrice,
-        closedPrice,
-        maxPrice: Math.max(highPrice, openPrice, closedPrice),
-        minPrice: Math.min(lowPrice, openPrice, closedPrice),
-        donchTop: Number.isFinite(donchTop) ? Math.max(donchTop, median) : median,
-        donchBot: Number.isFinite(donchBot) ? Math.min(donchBot, median) : median,
+        movingAvg: finiteOrNull(record.moving_avg),
+        avgPrice: finiteOrNull(record.avg_price),
+        openPrice: finiteOrNull(record.open_price),
+        closedPrice: finiteOrNull(record.closed_price),
+        maxPrice: finiteOrNull(record.max_price),
+        minPrice: finiteOrNull(record.min_price),
+        donchTop: finiteOrNull(record.donch_top),
+        donchBot: finiteOrNull(record.donch_bot),
         rank: record.mod_rank == null || !Number.isFinite(rank) ? null : rank,
       });
     }
     return out.sort((a, b) => a.time - b.time);
   }
 
-  function finiteOr(raw: unknown, fallback: number): number {
+  function finiteOrNull(raw: unknown): number | null {
+    if (raw == null) return null;
     const value = Number(raw);
-    return Number.isFinite(value) ? value : fallback;
+    return Number.isFinite(value) && value >= 0 ? value : null;
   }
 
   // Ranked items interleave rows of several mod_rank values on the same
@@ -232,7 +250,7 @@
   function collectRanks(source: StatBuckets | null): number[] {
     if (!source) return [];
     const found: number[] = [];
-    for (const bucket of [source["90days"], source["48hours"]]) {
+    for (const bucket of [source.latest, source["90days"], source["48hours"]]) {
       for (const entry of bucket) {
         if (entry.rank != null && !found.includes(entry.rank)) found.push(entry.rank);
       }
@@ -265,8 +283,11 @@
     code: LocaleCode,
   ): ChartModel {
     const plotW = width - MARGIN.left - MARGIN.right;
-    const step = plotW / (rows.length - 1);
-    const xAt = (index: number): number => MARGIN.left + index * step;
+    const barWidth = Math.max(1, Math.min(18, plotW / (rows.length - 1) - 2));
+    const candleWidth = Math.max(3, barWidth * 0.6);
+    const inset = Math.max(barWidth, candleWidth) / 2;
+    const step = (plotW - 2 * inset) / (rows.length - 1);
+    const xAt = (index: number): number => MARGIN.left + inset + index * step;
 
     let low = Infinity;
     let high = -Infinity;
@@ -274,9 +295,9 @@
     // Candle wicks share the price domain so the scale never shifts when a
     // series is toggled on or off.
     for (const row of rows) {
-      low = Math.min(low, row.donchBot, row.minPrice);
-      high = Math.max(high, row.donchTop, row.maxPrice);
-      peakVolume = Math.max(peakVolume, row.volume);
+      low = Math.min(low, row.donchBot ?? row.median, row.minPrice ?? row.median);
+      high = Math.max(high, row.donchTop ?? row.median, row.maxPrice ?? row.median);
+      peakVolume = Math.max(peakVolume, row.volume ?? 0);
     }
     const spread = high - low;
     const pad = spread > 0 ? spread * 0.08 : Math.max(1, high * 0.05);
@@ -288,37 +309,55 @@
     const volumeY = (value: number): number =>
       VOLUME_BASE - (peakVolume > 0 ? (value / peakVolume) * VOLUME_H : 0);
 
-    const bandTop = rows.map(
-      (row, i) => `${i === 0 ? "M" : "L"}${round(xAt(i))},${round(priceY(row.donchTop))}`,
-    );
-    const bandBottom = rows
-      .map((row, i) => `L${round(xAt(i))},${round(priceY(row.donchBot))}`)
-      .reverse();
+    const bands: string[] = [];
+    let top: string[] = [];
+    let bottom: string[] = [];
+    function finishBand(): void {
+      if (top.length > 0) bands.push(`${top.join("")}${bottom.reverse().join("")}Z`);
+      top = [];
+      bottom = [];
+    }
+    rows.forEach((row, i) => {
+      if (row.donchTop == null || row.donchBot == null) {
+        finishBand();
+        return;
+      }
+      top.push(`${top.length === 0 ? "M" : "L"}${round(xAt(i))},${round(priceY(row.donchTop))}`);
+      bottom.push(`L${round(xAt(i))},${round(priceY(row.donchBot))}`);
+    });
+    finishBand();
 
-    const barWidth = Math.max(1, Math.min(18, step - 2));
     const bars = rows.map((row, i) => {
-      const y = volumeY(row.volume);
+      const y = volumeY(row.volume ?? 0);
       return {
         x: xAt(i) - barWidth / 2,
         y,
         width: barWidth,
-        height: Math.max(row.volume > 0 ? 1 : 0, VOLUME_BASE - y),
+        height: Math.max((row.volume ?? 0) > 0 ? 1 : 0, VOLUME_BASE - y),
       };
     });
 
-    const candleWidth = Math.max(3, barWidth * 0.6);
-    const candles = rows.map((row, i) => {
+    const candles = rows.flatMap((row, i) => {
+      if (
+        row.openPrice == null ||
+        row.closedPrice == null ||
+        row.maxPrice == null ||
+        row.minPrice == null
+      )
+        return [];
       const openY = priceY(row.openPrice);
       const closeY = priceY(row.closedPrice);
-      return {
-        x: xAt(i) - candleWidth / 2,
-        width: candleWidth,
-        wickTop: priceY(row.maxPrice),
-        wickBottom: priceY(row.minPrice),
-        bodyY: Math.min(openY, closeY),
-        bodyH: Math.max(1, Math.abs(openY - closeY)),
-        rising: row.closedPrice >= row.openPrice,
-      };
+      return [
+        {
+          x: xAt(i) - candleWidth / 2,
+          width: candleWidth,
+          wickTop: priceY(row.maxPrice),
+          wickBottom: priceY(row.minPrice),
+          bodyY: Math.min(openY, closeY),
+          bodyH: Math.max(1, Math.abs(openY - closeY)),
+          rising: row.closedPrice >= row.openPrice,
+        },
+      ];
     });
 
     const labelCount = Math.max(2, Math.min(rows.length, Math.round(plotW / X_LABEL_SPACING)));
@@ -334,14 +373,18 @@
 
     return {
       width,
-      band: `${bandTop.join("")}${bandBottom.join("")}Z`,
+      band: bands.join(""),
       median: monotonePath(rows.map((row, i) => ({ x: xAt(i), y: priceY(row.median) }))),
       movingAvg: segmentedMonotonePath(
         rows.map((row, i) =>
           row.movingAvg == null ? null : { x: xAt(i), y: priceY(row.movingAvg) },
         ),
       ),
-      avgPrice: monotonePath(rows.map((row, i) => ({ x: xAt(i), y: priceY(row.avgPrice) }))),
+      avgPrice: segmentedMonotonePath(
+        rows.map((row, i) =>
+          row.avgPrice == null ? null : { x: xAt(i), y: priceY(row.avgPrice) },
+        ),
+      ),
       candles,
       priceTicks: niceTicks(domainLow, domainHigh, 5).map((value) => ({
         value,
@@ -359,7 +402,7 @@
         x: xAt(i),
         medianY: priceY(row.median),
         movingY: row.movingAvg == null ? null : priceY(row.movingAvg),
-        avgY: priceY(row.avgPrice),
+        avgY: row.avgPrice == null ? null : priceY(row.avgPrice),
       })),
       step,
     };
@@ -441,7 +484,7 @@
     const bounds = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
     if (bounds.width <= 0) return;
     const userX = ((event.clientX - bounds.left) / bounds.width) * model.width;
-    const index = Math.round((userX - MARGIN.left) / model.step);
+    const index = Math.round((userX - model.markers[0].x) / model.step);
     hoverIndex = Math.min(model.markers.length - 1, Math.max(0, index));
   }
 
@@ -505,6 +548,12 @@
           class:active={period === "90days"}
           on:click={() => setPeriod("90days")}>{$tr("browse.days90")}</button
         >
+        <button
+          class="filter-tab"
+          class:active={period === "latest"}
+          data-market-stats-period="latest"
+          on:click={() => setPeriod("latest")}>{$tr("browse.latest")}</button
+        >
       </div>
     </div>
     {#if ranks.length > 1}
@@ -546,7 +595,7 @@
   {:else}
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-text-secondary">
       <label class="inline-flex cursor-pointer items-center gap-1.5">
-        <input type="checkbox" bind:checked={showCandles} />
+        <input type="checkbox" bind:checked={showCandles} data-market-stats-candles />
         <span class="inline-block h-2.5 w-2 rounded-sm" style="background: var(--success)"></span>
         {$tr("browse.candleChart")}
       </label>
@@ -580,7 +629,11 @@
     <!-- min-w-0 + overflow-hidden: the fixed-width svg must never hold the
          layout open, or the chart can grow but never shrink back. -->
     <div class="min-w-0 overflow-hidden rounded-xl border border-border bg-bg-surface p-3">
-      <div class="relative" bind:clientWidth={containerWidth}>
+      <div
+        class="relative"
+        bind:clientWidth={containerWidth}
+        data-market-stats-points={visible.length}
+      >
         <svg
           width={chart.width}
           height={H}
@@ -622,7 +675,7 @@
             <path d={chart.band} fill="var(--info)" opacity="0.1" stroke="none" />
           {/if}
           {#if showCandles}
-            <g opacity="0.9">
+            <g opacity="0.9" data-market-stats-candle-series>
               {#each chart.candles as candle, index (index)}
                 {@const tone = candle.rising ? "var(--success)" : "var(--danger)"}
                 <line
@@ -683,16 +736,18 @@
               fill="var(--text-muted)">{tick.label}</text
             >
           {/each}
-          {#each chart.bars as bar, index (index)}
-            <rect
-              x={bar.x}
-              y={bar.y}
-              width={bar.width}
-              height={bar.height}
-              fill="var(--info)"
-              opacity="0.65"
-            />
-          {/each}
+          <g data-market-stats-volume-series>
+            {#each chart.bars as bar, index (index)}
+              <rect
+                x={bar.x}
+                y={bar.y}
+                width={bar.width}
+                height={bar.height}
+                fill="var(--info)"
+                opacity="0.65"
+              />
+            {/each}
+          </g>
           {#if hovered}
             <rect
               x={hovered.bar.x}
@@ -717,18 +772,21 @@
               y1={VOLUME_BASE}
               x2={chart.width - MARGIN.right}
               y2={VOLUME_BASE}
+              data-market-stats-volume-axis
             />
           </g>
 
-          {#each chart.xLabels as label, index (index)}
-            <text
-              x={label.x}
-              y={H - 7}
-              font-size="11"
-              text-anchor={label.anchor}
-              fill="var(--text-muted)">{label.label}</text
-            >
-          {/each}
+          <g data-market-stats-date-labels>
+            {#each chart.xLabels as label, index (index)}
+              <text
+                x={label.x}
+                y={H - 7}
+                font-size="11"
+                text-anchor={label.anchor}
+                fill="var(--text-muted)">{label.label}</text
+              >
+            {/each}
+          </g>
 
           {#if hovered}
             <line
@@ -750,7 +808,7 @@
             {#if showMovingAvg && hovered.marker.movingY != null}
               <circle cx={hovered.marker.x} cy={hovered.marker.movingY} r="3" fill="var(--info)" />
             {/if}
-            {#if showAvgPrice}
+            {#if showAvgPrice && hovered.marker.avgY != null}
               <circle cx={hovered.marker.x} cy={hovered.marker.avgY} r="3" fill="var(--danger)" />
             {/if}
           {/if}
@@ -778,12 +836,12 @@
                 })}
               </div>
             {/if}
-            {#if showAvgPrice}
+            {#if showAvgPrice && hovered.entry.avgPrice != null}
               <div class="text-text-secondary">
                 {$tr("common.avg", { value: formatPlat(hovered.entry.avgPrice, $locale) })}
               </div>
             {/if}
-            {#if showCandles}
+            {#if showCandles && hovered.entry.openPrice != null && hovered.entry.closedPrice != null && hovered.entry.maxPrice != null && hovered.entry.minPrice != null}
               <div class="text-text-secondary">
                 {$tr("browse.tooltipCandle", {
                   open: formatPlat(hovered.entry.openPrice, $locale),
@@ -793,9 +851,9 @@
                 })}
               </div>
             {/if}
-            <div class="text-text-secondary">
-              {$tr("browse.tooltipVolume", { value: hovered.entry.volume })}
-            </div>
+            {#if hovered.entry.volume != null}<div class="text-text-secondary">
+                {$tr("browse.tooltipVolume", { value: hovered.entry.volume })}
+              </div>{/if}
           </div>
         {/if}
       </div>

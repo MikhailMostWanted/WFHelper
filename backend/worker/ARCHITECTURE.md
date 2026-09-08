@@ -7,7 +7,7 @@ covers runtime ownership and invariants. See `README.md` for setup and operator 
 
 - `src/index.ts` handles CORS rejection, route dispatch, 404 responses, request logging, and cron.
 - `src/routes/public.ts` owns health, bootstrap, snapshot, item-catalog, top-traded,
-  adversary-vendor, nightwave-offerings, price, meta, and order routes.
+  price-history, adversary-vendor, nightwave-offerings, price, meta, and order routes.
 - `src/routes/admin.ts` owns authenticated prewarm, catalog, hotset, and status routes.
 - `src/routes/feedback.ts` validates opt-in reports and forwards them to a private Discord webhook.
 - `src/services/readThrough.ts` owns cache-first reads, stale refresh, negative markers, and
@@ -44,7 +44,7 @@ Rate Limiting binding defaults in `wrangler.jsonc` are per IP:
 
 - health: 5 per minute
 - bootstrap and full orders: 60 per minute
-- prices, meta, order summaries, supporters, top traded, Baro history, adversary vendors, and Nightwave offerings: 200 per minute
+- prices, meta, order summaries, supporters, top traded, price history, Baro history, adversary vendors, and Nightwave offerings: 200 per minute
 - snapshot and item catalog: 2 per minute
 - admin: 60 per minute
 
@@ -295,6 +295,39 @@ existing archive, no negative markers are written, and each entry point catches 
 failing archive cannot break prewarm or the supporter sync. `HISTORY_ARCHIVE_ENABLED=0` stops all
 three families. Every write logs its byte size on route `archive:prices`, `archive:rivens`,
 `archive:baro`, or `archive:price-seed`, and a value past 4MB is refused rather than stored.
+
+### Per-item price series
+
+The day archives are keyed by date, so reading one item's year would mean downloading every day.
+`services/priceHistory.ts` folds them the other way into 64 bucket documents
+`history:prices:v1:{bucket}`, each `{ v: 1, updatedAt, lastDate, series }` where `series` maps an
+archive row key (a bare slug or `{slug}:rank-v3:r{n}`) to `[date, median, volume|null]` entries,
+ascending by date, one entry per date and at most 400 per key. The bucket is the fnv1a-32 hash of
+the bare slug modulo 64, so every rank of an item lands in the same document. Medians that are not
+finite or not positive are skipped.
+
+`foldPriceHistory()` advances one bucket per 15-minute tick. `history:prices:state:v1` holds
+`{ bucket, updatedAt }`; the stage reads that bucket's document, takes the oldest
+`daysPerTick` (30) dated entries of `archive:index:prices:v1` newer than the document's `lastDate`,
+reads those day archives one at a time so only one is ever in memory, folds the rows whose bare
+slug hashes to the bucket, writes the document with `lastDate` set to the newest folded date, and
+then moves the state to the next bucket. A tick that finds no new date writes no document and only
+advances the bucket. A document past 4MB is refused with `history_too_large` on route
+`history:prices`, and the bucket still advances so one oversized shard cannot stall the rotation.
+The stage reads the shared archive index, so it runs in the same deferred branch as the price seed
+and the top-traded sweep and never on the tick that collides with the daily cron.
+`HISTORY_ARCHIVE_ENABLED=0` stops it.
+
+`GET /v1/price-history/{slug}` serves that item's series as
+`{ ok: true, slug, generatedAt, rows: [[date, rank|null, median, volume|null]] }`, sorted by date
+then rank. The archive's bare row of a ranked mod holds its rank 0 price, so it is reported as rank
+0 whenever the slug also has ranked keys, and as `null` when it has none. The route is public,
+needs no bootstrap token, uses the price/meta rate-limit class, and is edge-cached for one hour with
+a body ETag. A slug on the non-tradable exclusion list answers the shared 404. A bucket the cron has
+not folded yet answers `404 {"ok":false,"error":"price_history_not_ready"}` and a folded bucket
+holding no series for the slug answers `404 {"ok":false,"error":"not_found"}`; neither is cached, so
+the first fold shows up immediately. The desktop app fills the gaps of its own rolling year from
+this route, which is why entries stay whole days and never carry a partial current day.
 
 ## Baro visit history
 

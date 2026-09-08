@@ -61,6 +61,7 @@ interface PriceSeedResult {
 
 interface FlushResult {
 	dates: string[];
+	revisions: Record<string, string>;
 	rows: number;
 	bytes: number;
 }
@@ -146,7 +147,7 @@ function seedRowsFromStats(payload: unknown, slug: string, rank: number | null, 
  * replaced, so a live day keeps its own medians and only gains the keys it lacks.
  */
 async function flushSeedDates(env: Env, buffered: Map<string, PriceRow[]>, now: number, retentionDays: number): Promise<FlushResult> {
-	const result: FlushResult = { dates: [], rows: 0, bytes: 0 };
+	const result: FlushResult = { dates: [], revisions: {}, rows: 0, bytes: 0 };
 
 	for (const date of [...buffered.keys()].sort()) {
 		const key = `${ARCHIVE_PRICES_PREFIX}${date}`;
@@ -163,11 +164,19 @@ async function flushSeedDates(env: Env, buffered: Map<string, PriceRow[]>, now: 
 			metadata.priceBasisByKey[row[0]] = DAILY_MEDIAN_BASIS;
 			added += 1;
 		}
-		if (added === 0) continue;
+		if (added === 0) {
+			if (Array.isArray(existing?.rows)) {
+				result.dates.push(date);
+				result.revisions[date] = typeof existing.revision === 'string' ? existing.revision : 'legacy';
+			}
+			continue;
+		}
 
+		const revision = crypto.randomUUID();
 		const body = JSON.stringify({
 			v: 1,
 			date,
+			revision,
 			generatedAt: toFiniteNumber(existing?.generatedAt) ?? now,
 			// A day the live archive already wrote keeps its source and only gains rows.
 			source: typeof existing?.source === 'string' ? existing.source : 'wfm-statistics-seed',
@@ -183,6 +192,7 @@ async function flushSeedDates(env: Env, buffered: Map<string, PriceRow[]>, now: 
 
 		await env.ITEM_META.put(key, body, { expirationTtl: dayRetentionTtlSec(date, now, retentionDays) });
 		result.dates.push(date);
+		result.revisions[date] = revision;
 		result.rows += added;
 		result.bytes = Math.max(result.bytes, bytes);
 	}
@@ -280,7 +290,7 @@ export async function seedPriceHistory(env: Env, options: { now?: number; batchS
 		result.dates = flushed.dates.length;
 		result.rows = flushed.rows;
 		result.bytes = flushed.bytes;
-		if (flushed.dates.length > 0) await recordArchiveEntries(env, 'prices', flushed.dates, config.historyRetentionDays);
+		if (flushed.dates.length > 0) await recordArchiveEntries(env, 'prices', flushed.dates, config.historyRetentionDays, flushed.revisions);
 
 		// The latch waits for the retry budget: a slug lost to an outage would otherwise
 		// never be asked for again, and WFM serves no window older than 90 days.

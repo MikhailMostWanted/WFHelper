@@ -14,6 +14,7 @@ type PublicRateLimitRoute =
 	| 'wfm-items'
 	| 'supporters'
 	| 'top-traded'
+	| 'price-history'
 	| 'baro-history'
 	| 'adversary-vendors'
 	| 'nightwave-offerings';
