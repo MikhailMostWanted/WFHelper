@@ -8,6 +8,7 @@ import {
   type PopoutTarget,
   type PopoutWindowInfo,
 } from "../../config/shared/popoutTypes.js";
+import { FILTER_SCOPES, defaultFilterControlOrder } from "../lib/filters.js";
 import { isSafeMode } from "../lib/customCss/safeMode.js";
 import { invoke, on } from "../lib/ipc.js";
 import { normalizeLayoutState } from "../lib/layout/plan.js";
@@ -21,19 +22,22 @@ import {
   clampSidebarWidth,
   hiddenTabs,
   sidebarOrder,
+  sidebarLabels,
+  sanitizeSidebarLabels,
   sidebarWidth,
   tabVisibility,
 } from "./sidebarTabs.js";
 import type { ToggleableView } from "../types/views.js";
 
 const STORAGE_KEY = "wf_workspaces_v1";
-const MAX_WORKSPACES = 20;
+export const MAX_WORKSPACES = 20;
 const MAX_NAME_LENGTH = 60;
 
 interface WorkspaceSidebar {
   order: SidebarViewName[];
   hidden: ToggleableView[];
   width: number;
+  labels?: Partial<Record<SidebarViewName, string>>;
 }
 
 interface WorkspacePopout {
@@ -83,16 +87,27 @@ function normalizeSidebar(raw: unknown): WorkspaceSidebar {
   }
   const width =
     typeof entry.width === "number" ? clampSidebarWidth(entry.width) : get(sidebarWidth);
-  return { order, hidden, width };
+  return {
+    order,
+    hidden,
+    width,
+    ...(entry.labels ? { labels: sanitizeSidebarLabels(entry.labels) } : {}),
+  };
 }
 
 function normalizeFilterLayout(raw: unknown): Record<string, WorkspaceFilterLayout> | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const out: Record<string, WorkspaceFilterLayout> = {};
   for (const [scope, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (!value || typeof value !== "object") continue;
+    if (!value || typeof value !== "object" || !FILTER_SCOPES.some((id) => id === scope)) continue;
     const entry = value as Record<string, unknown>;
-    out[scope] = { order: readStringArray(entry.order), hidden: readStringArray(entry.hidden) };
+    const supported = new Set<string>(
+      defaultFilterControlOrder(scope as (typeof FILTER_SCOPES)[number]),
+    );
+    out[scope] = {
+      order: readStringArray(entry.order).filter((id) => supported.has(id)),
+      hidden: readStringArray(entry.hidden).filter((id) => supported.has(id)),
+    };
   }
   return Object.keys(out).length > 0 ? out : null;
 }
@@ -118,7 +133,7 @@ function normalizePopouts(raw: unknown): WorkspacePopout[] {
   return out;
 }
 
-function normalizeWorkspace(raw: unknown): Workspace | null {
+export function normalizeWorkspace(raw: unknown): Workspace | null {
   if (!raw || typeof raw !== "object") return null;
   const entry = raw as Record<string, unknown>;
   if (typeof entry.id !== "string" || entry.id === "") return null;
@@ -135,7 +150,7 @@ function normalizeWorkspace(raw: unknown): Workspace | null {
   return workspace;
 }
 
-function normalizeFile(raw: unknown): WorkspacesFile {
+export function normalizeWorkspaces(raw: unknown): WorkspacesFile {
   if (!raw || typeof raw !== "object") return emptyFile();
   const entry = raw as Record<string, unknown>;
   if (entry.version !== 1) return emptyFile();
@@ -158,7 +173,7 @@ function normalizeFile(raw: unknown): WorkspacesFile {
 }
 
 function load(): WorkspacesFile {
-  return readStoredJson(STORAGE_KEY, normalizeFile, emptyFile, () =>
+  return readStoredJson(STORAGE_KEY, normalizeWorkspaces, emptyFile, () =>
     log.warn("[Workspaces] stored workspaces are not readable JSON; starting empty"),
   );
 }
@@ -168,7 +183,7 @@ const file = writable<WorkspacesFile>(load());
 export const workspaces: Readable<WorkspacesFile> = { subscribe: file.subscribe };
 
 function commit(next: WorkspacesFile): void {
-  const normalized = normalizeFile(next);
+  const normalized = normalizeWorkspaces(next);
   writeStorage(STORAGE_KEY, JSON.stringify(normalized));
   file.set(normalized);
 }
@@ -185,6 +200,7 @@ function captureSidebar(): WorkspaceSidebar {
     order: [...get(sidebarOrder)],
     hidden: TOGGLEABLE_VIEWS.filter((view) => hiddenSet.has(view)),
     width: get(sidebarWidth),
+    labels: get(sidebarLabels),
   };
 }
 
@@ -215,9 +231,7 @@ export async function closeAllPopouts(): Promise<void> {
   await refreshOpenPopouts();
 }
 
-export async function saveWorkspace(name: string): Promise<string | null> {
-  const trimmed = name.trim().slice(0, MAX_NAME_LENGTH);
-  if (!trimmed) return null;
+export async function captureWorkspace(): Promise<Workspace> {
   let popouts: WorkspacePopout[] = [];
   try {
     popouts = (await invoke("popoutList")).map((info) => ({
@@ -229,14 +243,20 @@ export async function saveWorkspace(name: string): Promise<string | null> {
     // A workspace without its windows still beats losing the layout.
     log.warn("[Workspaces] popoutList failed while saving:", err);
   }
-  const workspace: Workspace = {
-    id: newId(),
-    name: trimmed,
+  return {
+    id: "current",
+    name: "Current",
     sidebar: captureSidebar(),
     layout: get(layoutState),
     filterLayout: getFilterLayoutState(),
     popouts,
   };
+}
+
+export async function saveWorkspace(name: string): Promise<string | null> {
+  const trimmed = name.trim().slice(0, MAX_NAME_LENGTH);
+  if (!trimmed) return null;
+  const workspace = { ...(await captureWorkspace()), id: newId(), name: trimmed };
   const current = get(file);
   // At the cap the oldest entry makes room, so saving never silently no-ops.
   const kept = current.workspaces.slice(
@@ -313,16 +333,38 @@ export async function applyWorkspace(id: string): Promise<boolean> {
   const workspace = get(file).workspaces.find((entry) => entry.id === id);
   if (!workspace) return false;
 
+  await applyWorkspaceState(workspace);
+  return true;
+}
+
+export async function applyWorkspaceState(workspace: Workspace): Promise<void> {
   applyLayoutState(workspace.layout);
   if (workspace.filterLayout) applyFilterLayoutState(workspace.filterLayout);
 
   sidebarOrder.set([...workspace.sidebar.order]);
   sidebarWidth.set(workspace.sidebar.width);
+  if (workspace.sidebar.labels) sidebarLabels.set(workspace.sidebar.labels);
   const hidden = new Set<string>(workspace.sidebar.hidden);
   for (const view of TOGGLEABLE_VIEWS) tabVisibility[view].set(!hidden.has(view));
 
   await applyPopouts(workspace.popouts);
-  return true;
+}
+
+export function mergeImportedWorkspaces(imported: WorkspacesFile): void {
+  const current = get(file);
+  if (current.workspaces.length + imported.workspaces.length > MAX_WORKSPACES) {
+    throw new Error("workspace-capacity");
+  }
+  const names = new Set(current.workspaces.map((entry) => entry.name));
+  const additions = imported.workspaces.map((entry) => {
+    let name = entry.name;
+    for (let suffix = 2; names.has(name); suffix += 1) {
+      name = `${entry.name.slice(0, MAX_NAME_LENGTH - 8)} (${suffix})`;
+    }
+    names.add(name);
+    return { ...entry, id: newId(), name };
+  });
+  commit({ ...current, workspaces: [...current.workspaces, ...additions] });
 }
 
 let launchRestoreDone = false;

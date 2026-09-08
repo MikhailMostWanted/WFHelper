@@ -88,7 +88,7 @@ function normalizeSidebarLabel(raw: string): string {
 
 // One validation point for both a hand-edited localStorage entry and a UI write:
 // unknown views, non-strings and blank labels are dropped rather than stored.
-function sanitizeSidebarLabels(input: unknown): SidebarLabels {
+export function sanitizeSidebarLabels(input: unknown): SidebarLabels {
   if (input == null || typeof input !== "object" || Array.isArray(input)) return {};
   const out: SidebarLabels = {};
   for (const [view, value] of Object.entries(input as Record<string, unknown>)) {

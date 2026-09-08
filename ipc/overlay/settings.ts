@@ -49,6 +49,7 @@ type OverlaySettingsControllerOptions = {
   defaults: OverlaySettingsDict;
   onRelicRewardTrigger: (source?: string) => void;
   onToggleOverlayInteractionMode: (source?: string) => void;
+  configureWarframeLifecycle: (enabled: boolean) => Promise<void>;
 };
 
 function normalizeHotkey(value: unknown, fallbackHotkey: string): string {
@@ -433,13 +434,40 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
   }
 
   function setOverlaySettings(nextSettings: unknown): OverlaySettings {
+    const previous = ctx.overlaySettings;
     ctx.overlaySettings = normalizeOverlaySettings({
       ...ctx.overlaySettings,
       ...(asRecord(nextSettings) ?? {}),
     }) as OverlaySettings;
 
-    saveOverlaySettings();
+    if (!saveOverlaySettings()) {
+      ctx.overlaySettings = previous;
+      throw new Error("Could not save overlay settings");
+    }
     return { ...ctx.overlaySettings };
+  }
+
+  let settingsUpdate: Promise<unknown> = Promise.resolve();
+
+  function setOverlaySettingsWithLifecycle(
+    nextSettings: unknown,
+    beforeSave?: () => void,
+  ): Promise<OverlaySettings> {
+    const update = settingsUpdate.then(async () => {
+      const nextEnabled = asRecord(nextSettings)?.warframeLifecycleEnabled;
+      const previousEnabled = ctx.overlaySettings.warframeLifecycleEnabled === true;
+      const lifecycleChanged = typeof nextEnabled === "boolean" && nextEnabled !== previousEnabled;
+      if (lifecycleChanged) await options.configureWarframeLifecycle(nextEnabled);
+      try {
+        beforeSave?.();
+        return setOverlaySettings(nextSettings);
+      } catch (error) {
+        if (lifecycleChanged) await options.configureWarframeLifecycle(previousEnabled);
+        throw error;
+      }
+    });
+    settingsUpdate = update.catch(() => undefined);
+    return update;
   }
 
   return {
@@ -450,5 +478,6 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
     registerOverlayHotkey,
     setHotkeysActive,
     setOverlaySettings,
+    setOverlaySettingsWithLifecycle,
   };
 }

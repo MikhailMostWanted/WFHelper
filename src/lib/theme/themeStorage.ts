@@ -340,6 +340,11 @@ function cloneCustomTheme(theme: CustomThemePreset): CustomThemePreset {
   };
 }
 
+export function normalizeThemeSettings(value: unknown): ThemeSettings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return cloneDefaultTheme();
+  return migrateAndNormalize(value as Record<string, unknown>);
+}
+
 /** Load theme settings from localStorage. Returns DEFAULT_THEME on failure. */
 export function loadThemeSettings(): ThemeSettings {
   try {

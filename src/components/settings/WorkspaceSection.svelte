@@ -7,6 +7,12 @@
     type PopoutTarget,
     type PopoutView,
   } from "../../../config/shared/popoutTypes.js";
+  import {
+    applyCustomization,
+    CUSTOMIZATION_MAX_BYTES,
+    exportCustomization,
+    parseCustomization,
+  } from "../../lib/customization.js";
   import { tr, type MessageKey } from "../../lib/i18n.js";
   import { confirmWithDialog } from "../../lib/ipc.js";
   import { sectionById } from "../../lib/layout/registry.js";
@@ -28,6 +34,70 @@
     world: VIEW_LABEL_KEYS.world,
     arbitrations: VIEW_LABEL_KEYS.arbi,
   };
+
+  let { onCustomizationApplied }: { onCustomizationApplied?: () => void } = $props();
+
+  let transferInput: HTMLInputElement | null = $state(null);
+  let transferBusy = $state(false);
+  let includeCustomCss = $state(false);
+  let transferMessage: MessageKey | null = $state(null);
+
+  function transferFailure(error: unknown): void {
+    transferMessage =
+      error instanceof Error && error.message === "workspace-capacity"
+        ? "customization.capacity"
+        : error instanceof Error && error.message === "too-large"
+          ? "customization.tooLarge"
+          : "customization.failed";
+  }
+
+  async function exportFile(): Promise<void> {
+    transferBusy = true;
+    transferMessage = null;
+    try {
+      const payload = await exportCustomization();
+      const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "wfhelper-customization.json";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      transferFailure(error);
+    } finally {
+      transferBusy = false;
+    }
+  }
+
+  async function importFile(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const selected = input.files?.[0];
+    input.value = "";
+    if (!selected || transferBusy) return;
+    transferBusy = true;
+    transferMessage = null;
+    try {
+      if (selected.size > CUSTOMIZATION_MAX_BYTES) throw new Error("too-large");
+      const payload = parseCustomization(await selected.text());
+      if (
+        !(await confirmWithDialog(
+          $tr("customization.confirm", {
+            count: payload.savedWorkspaces.workspaces.length,
+            css: $tr(includeCustomCss ? "customization.replaceCss" : "customization.keepCss"),
+          }),
+          $tr,
+        ))
+      )
+        return;
+      await applyCustomization(payload, includeCustomCss);
+      onCustomizationApplied?.();
+      transferMessage = "customization.imported";
+    } catch (error) {
+      transferFailure(error);
+    } finally {
+      transferBusy = false;
+    }
+  }
 
   let draftName = $state("");
   let renamingId: string | null = $state(null);
@@ -69,6 +139,43 @@
 </script>
 
 <SettingsSection title={$tr("workspaces.title")} description={$tr("workspaces.description")}>
+  <p class="mt-2 text-xs text-text-secondary">{$tr("customization.description")}</p>
+  <label class="my-2 flex items-center gap-2 text-xs text-text-secondary">
+    <input
+      type="checkbox"
+      bind:checked={includeCustomCss}
+      disabled={transferBusy}
+      data-customization-css
+    />
+    {$tr("customization.includeCss")}
+  </label>
+  <div class="mt-2 mb-4 flex flex-wrap gap-2">
+    <button
+      class="btn-secondary btn-sm"
+      data-customization-export
+      disabled={transferBusy}
+      onclick={exportFile}>{$tr("customization.export")}</button
+    >
+    <button
+      class="btn-secondary btn-sm"
+      data-customization-import
+      disabled={transferBusy}
+      onclick={() => transferInput?.click()}>{$tr("customization.import")}</button
+    >
+    <input
+      class="hidden"
+      type="file"
+      accept=".json,application/json"
+      data-customization-file
+      bind:this={transferInput}
+      onchange={importFile}
+    />
+  </div>
+  {#if transferMessage}
+    <p class="mb-3 text-xs text-text-secondary" role="status" data-customization-status>
+      {$tr(transferMessage)}
+    </p>
+  {/if}
   <div class="mt-2 flex flex-wrap items-center gap-2">
     <input
       class="min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--ui-control-border)] bg-[var(--ui-control-bg)] px-2 py-1 text-sm text-text-primary"

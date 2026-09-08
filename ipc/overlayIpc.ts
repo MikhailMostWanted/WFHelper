@@ -271,6 +271,7 @@ const settingsController = createOverlaySettingsController({
   defaults: OVERLAY_SETTINGS_DEFAULTS,
   onRelicRewardTrigger,
   onToggleOverlayInteractionMode: toggleOverlayInteractionMode,
+  configureWarframeLifecycle,
 });
 
 rewardOverlayIpc.configureOverlaySettingsPersistence(settingsController.saveOverlaySettings);
@@ -353,7 +354,7 @@ function moveInteractiveOverlayWindow(sender: WebContents, rawDelta: unknown): v
 }
 
 function register(): void {
-  registerOverlayEditor(settingsController.saveOverlaySettings, (kind) => {
+  const overlayEditor = registerOverlayEditor(settingsController.saveOverlaySettings, (kind) => {
     if (kind === "reward")
       rewardOverlayIpc.rewardWindowsController.positionOverlayWindow(
         rewardOverlayIpc.rewardWindowsController.getAnchorMeta(),
@@ -409,15 +410,16 @@ function register(): void {
       // Moving the global size slider resets per-overlay overrides - otherwise
       // it would visibly do nothing once every window has its own scale.
       const incoming = asRecord(nextSettings);
+      const importsLayouts =
+        incoming && ("rewardLayout" in incoming || "overlayLayouts" in incoming);
+      if (importsLayouts) overlayEditor.assertIdle();
       const nextScale = incoming ? clampNumber(incoming.overlayScale, 0.75, 1.5, NaN) : NaN;
       const scaleChanged =
         Number.isFinite(nextScale) && nextScale !== ctx.overlaySettings.overlayScale;
       const previousSettings = ctx.overlaySettings;
-      if (typeof incoming?.warframeLifecycleEnabled === "boolean") {
-        await configureWarframeLifecycle(incoming.warframeLifecycleEnabled);
-      }
-      const settings = settingsController.setOverlaySettings(
+      const settings = await settingsController.setOverlaySettingsWithLifecycle(
         scaleChanged ? { ...(incoming ?? {}), overlayWindowScales: {} } : nextSettings,
+        importsLayouts ? () => overlayEditor.assertIdle() : undefined,
       );
       settingsController.registerOverlayHotkey();
       applyOverlayAvailabilitySettings(previousSettings);
@@ -442,6 +444,7 @@ function register(): void {
         rewardOverlayIpc.plannerWindowsController.getAnchorMeta(),
       );
       rivenOverlayIpc.positionRivenOverlayWindows();
+      if (importsLayouts) overlayEditor.refresh();
       return settings;
     },
   );

@@ -69,6 +69,7 @@
   };
 
   let settingsTab: "general" | "appearance" | "customization" | "overlay" = "general";
+  let customizationRevision = 0;
   // The store owns the language: the select only mirrors it, so an external
   // setLocale is not written back over.
   let languageChoice: LocaleCode;
@@ -939,9 +940,18 @@
       </div>
     {:else if settingsTab === "customization"}
       <div class="settings-tab-grid settings-masonry py-3">
-        <SidebarTabsSection />
-        <WorkspaceSection />
-        <CustomCssSection />
+        {#key customizationRevision}
+          <SidebarTabsSection />
+        {/key}
+        <WorkspaceSection
+          onCustomizationApplied={() => {
+            applyToForm($overlaySettings);
+            customizationRevision += 1;
+          }}
+        />
+        {#key customizationRevision}
+          <CustomCssSection />
+        {/key}
       </div>
     {:else if settingsTab === "overlay"}
       <div class="settings-tab-grid settings-masonry py-3">

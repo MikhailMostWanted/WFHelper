@@ -8,6 +8,7 @@ import type { BrowserWindow, IpcMainInvokeEvent, WebContents } from "electron";
 import { OVERLAY_SETTINGS_DEFAULTS } from "../../config/runtime/overlaySettings";
 import {
   OVERLAY_EDIT_BEGIN,
+  OVERLAY_EDIT_STATE,
   OVERLAY_EDIT_END,
   OVERLAY_EDIT_PREVIEW,
   OVERLAY_EDIT_UPDATE,
@@ -15,6 +16,8 @@ import {
 } from "../../config/shared/ipcChannels";
 import {
   DEFAULT_OVERLAY_FIELD_STYLE,
+  OVERLAY_LAYOUT_KINDS,
+  getOverlayDescriptor,
   type OverlayEditState,
 } from "../../config/shared/overlayLayout";
 import ctx from "../../ipc/context";
@@ -115,6 +118,72 @@ describe("overlay editor IPC boundaries", () => {
       ((await invoke(OVERLAY_LAYOUT_GET, planner.event)) as OverlayEditState).layout.fields
         .relicName?.hidden,
     ).toBe(true);
+  });
+
+  it("blocks imported layouts while a draft is active and permits them after cancel", async () => {
+    const main = windowStub(1, "dist/index.html");
+    ctx.mainWindow = main.window;
+    const controls = registerOverlayEditor(
+      vi.fn(() => true),
+      vi.fn(),
+    );
+    expect(() => controls.assertIdle()).not.toThrow();
+    const draft = (await invoke(OVERLAY_EDIT_BEGIN, main.event, "planner")) as OverlayEditState;
+    expect(() => controls.assertIdle()).toThrow(
+      "Close the overlay editor before importing layouts",
+    );
+    await invoke(OVERLAY_EDIT_END, main.event, draft.sessionId, false);
+    expect(() => controls.assertIdle()).not.toThrow();
+  });
+
+  it("refreshes all six live windows from saved layouts and repositions each", () => {
+    const windows = OVERLAY_LAYOUT_KINDS.map((_kind, index) =>
+      windowStub(index + 2, "overlay.html"),
+    );
+    ctx.overlayWindow = windows[0]!.window;
+    ctx.plannerOverlayWindow = windows[1]!.window;
+    ctx.rivenOverlayLeftWindow = windows[2]!.window;
+    ctx.rivenOverlayRightWindow = windows[3]!.window;
+    ctx.arbiSummaryWindow = windows[4]!.window;
+    ctx.tradeNotificationWindow = windows[5]!.window;
+    const reposition = vi.fn();
+    const persist = vi.fn(() => true);
+    const controls = registerOverlayEditor(persist, reposition);
+    ctx.overlaySettings.overlayLayouts = Object.fromEntries(
+      OVERLAY_LAYOUT_KINDS.map((kind) => [
+        kind,
+        {
+          version: 1,
+          fields: {
+            [getOverlayDescriptor(kind).fields[0]!]: {
+              ...DEFAULT_OVERLAY_FIELD_STYLE,
+              color: "#123456",
+              hidden: true,
+            },
+          },
+        },
+      ]),
+    );
+    ctx.overlaySettings.rewardLayout = ctx.overlaySettings.overlayLayouts.reward;
+    controls.refresh();
+    for (const [index, kind] of OVERLAY_LAYOUT_KINDS.entries()) {
+      const field = getOverlayDescriptor(kind).fields[0]!;
+      expect(windows[index]!.contents.send).toHaveBeenCalledExactlyOnceWith(
+        OVERLAY_EDIT_STATE,
+        expect.objectContaining({
+          kind,
+          sessionId: null,
+          layout: expect.objectContaining({
+            fields: expect.objectContaining({
+              [field]: expect.objectContaining({ hidden: true, color: "#123456" }),
+            }),
+          }),
+        }),
+      );
+      expect(reposition).toHaveBeenCalledWith(kind);
+    }
+    expect(reposition).toHaveBeenCalledTimes(6);
+    expect(persist).not.toHaveBeenCalled();
   });
 
   it("rejects native mutation, main-window layout reads and iframe sender impersonation", async () => {

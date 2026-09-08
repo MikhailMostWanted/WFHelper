@@ -11,9 +11,11 @@ import { overlayMessages } from "../overlayI18n";
 import { createOverlayEditor } from "./rewardEditor";
 import {
   DEFAULT_OVERLAY_FIELD_STYLE,
+  OVERLAY_LAYOUT_KINDS,
   getOverlayDescriptor,
   isOverlayLayoutKind,
   type OverlayLayoutKind,
+  type OverlayEditState,
 } from "../../config/shared/overlayLayout";
 import {
   OVERLAY_EDIT_BEGIN,
@@ -44,15 +46,16 @@ function liveWindow(kind: OverlayLayoutKind) {
 export function registerOverlayEditor(
   persist: () => boolean,
   reposition: (kind: OverlayLayoutKind) => void,
-): void {
+) {
+  function applySaved(state: OverlayEditState): void {
+    const win = liveWindow(state.kind);
+    if (win && !win.isDestroyed()) win.webContents.send(OVERLAY_EDIT_STATE, state);
+    reposition(state.kind);
+  }
   const editor = createOverlayEditor({
     ctx,
     persist,
-    applySaved(state) {
-      const win = liveWindow(state.kind);
-      if (win && !win.isDestroyed()) win.webContents.send(OVERLAY_EDIT_STATE, state);
-      reposition(state.kind);
-    },
+    applySaved,
   });
   const kindFrom = (raw: unknown): OverlayLayoutKind => {
     if (!isOverlayLayoutKind(raw)) throw new Error("Invalid overlay kind");
@@ -87,4 +90,13 @@ export function registerOverlayEditor(
     }
     throw new Error("Unknown overlay sender");
   });
+  return {
+    assertIdle() {
+      if (editor.state().sessionId)
+        throw new Error("Close the overlay editor before importing layouts");
+    },
+    refresh() {
+      for (const kind of OVERLAY_LAYOUT_KINDS) applySaved(editor.savedState(kind));
+    },
+  };
 }

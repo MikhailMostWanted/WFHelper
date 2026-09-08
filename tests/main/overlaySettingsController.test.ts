@@ -40,6 +40,7 @@ function buildController() {
     },
     onRelicRewardTrigger: vi.fn(),
     onToggleOverlayInteractionMode: vi.fn(),
+    configureWarframeLifecycle: vi.fn(async (_enabled: boolean) => {}),
   };
 
   const controller = createOverlaySettingsController(
@@ -344,6 +345,95 @@ describe("overlay settings controller", () => {
     expect(next.hotkey).toBe("Alt+P");
     expect(next.worldNotificationsEnabled).toBe(false);
     expect(deps.writeFileAtomic).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the previous settings and throws when an atomic write fails", () => {
+    const { controller, deps, ctx } = buildController();
+    controller.setOverlaySettings({
+      uiScale: 1.15,
+      rewardLayout: { version: 1, fields: { rarity: { hidden: true } } },
+    });
+    const previous = ctx.overlaySettings;
+    deps.writeFileAtomic.mockImplementationOnce(() => {
+      throw new Error("disk full");
+    });
+    expect(() =>
+      controller.setOverlaySettings({ uiScale: 1.4, rewardLayout: { version: 1, fields: {} } }),
+    ).toThrow("Could not save overlay settings");
+    expect(ctx.overlaySettings).toBe(previous);
+    expect(deps.log.error).toHaveBeenCalledWith(
+      "[OverlaySettings] Failed to save settings:",
+      "disk full",
+    );
+    const recovered = controller.setOverlaySettings({ notificationSoundEnabled: false });
+    expect(recovered.uiScale).toBe(1.15);
+    expect(recovered.rewardLayout?.fields.rarity?.hidden).toBe(true);
+    expect(recovered.notificationSoundEnabled).toBe(false);
+  });
+
+  it("rolls back lifecycle on a failed save before accepting the next update", async () => {
+    const { controller, deps, ctx } = buildController();
+    const calls: boolean[] = [];
+    let enabled = false;
+    deps.configureWarframeLifecycle.mockImplementation(async (next) => {
+      calls.push(next);
+      enabled = next;
+    });
+    deps.writeFileAtomic.mockImplementationOnce(() => {
+      throw new Error("disk full");
+    });
+    const failed = controller.setOverlaySettingsWithLifecycle({ warframeLifecycleEnabled: true });
+    const next = controller.setOverlaySettingsWithLifecycle({ warframeLifecycleEnabled: true });
+    await expect(failed).rejects.toThrow("Could not save overlay settings");
+    await expect(next).resolves.toMatchObject({ warframeLifecycleEnabled: true });
+    expect(calls).toEqual([true, false, true]);
+    expect(enabled).toBe(true);
+    expect(ctx.overlaySettings.warframeLifecycleEnabled).toBe(true);
+    expect(JSON.parse(deps.writeFileAtomic.mock.calls.at(-1)![1]).warframeLifecycleEnabled).toBe(
+      true,
+    );
+  });
+
+  it("rechecks the save guard after awaiting lifecycle and rolls back when it changed", async () => {
+    const { controller, deps, ctx } = buildController();
+    const previous = ctx.overlaySettings;
+    let finishEnable: (() => void) | undefined;
+    const enabling = new Promise<void>((resolve) => {
+      finishEnable = resolve;
+    });
+    let enabled = false;
+    deps.configureWarframeLifecycle.mockImplementation(async (next) => {
+      if (next) await enabling;
+      enabled = next;
+    });
+    let editorOpen = false;
+    const guard = vi.fn(() => {
+      if (editorOpen) throw new Error("Close the overlay editor before importing layouts");
+    });
+    const pending = controller.setOverlaySettingsWithLifecycle(
+      { warframeLifecycleEnabled: true, rewardLayout: { version: 1, fields: {} } },
+      guard,
+    );
+    await Promise.resolve();
+    expect(deps.configureWarframeLifecycle).toHaveBeenCalledWith(true);
+    expect(guard).not.toHaveBeenCalled();
+    editorOpen = true;
+    finishEnable!();
+    await expect(pending).rejects.toThrow("Close the overlay editor before importing layouts");
+    expect(deps.configureWarframeLifecycle.mock.calls).toEqual([[true], [false]]);
+    expect(enabled).toBe(false);
+    expect(ctx.overlaySettings).toBe(previous);
+    expect(deps.writeFileAtomic).not.toHaveBeenCalled();
+  });
+
+  it("does not save settings when lifecycle configuration fails", async () => {
+    const { controller, deps, ctx } = buildController();
+    deps.configureWarframeLifecycle.mockRejectedValueOnce(new Error("login registration failed"));
+    await expect(
+      controller.setOverlaySettingsWithLifecycle({ warframeLifecycleEnabled: true }),
+    ).rejects.toThrow("login registration failed");
+    expect(ctx.overlaySettings.warframeLifecycleEnabled).toBe(false);
+    expect(deps.writeFileAtomic).not.toHaveBeenCalled();
   });
 
   it("registers hotkeys and dispatches trigger callbacks", () => {
