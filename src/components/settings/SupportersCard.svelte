@@ -92,13 +92,13 @@
   /* The settings content is capped at 1120px inside the .settings-shell
      container; with enough dead space beside it the panel floats there
      instead of joining the grid. Below that it flows underneath. */
-  @container (min-width: 1680px) {
+  @container (min-width: 1520px) {
     .supporters-panel {
       position: absolute;
       left: 100%;
       top: 0.75rem;
       margin-top: 0;
-      width: 260px;
+      width: min(260px, calc((100cqw - 1120px) / 2 - 0.85rem));
       margin-left: 0.85rem;
     }
   }
