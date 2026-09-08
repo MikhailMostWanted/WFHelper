@@ -83,6 +83,31 @@ describe("profitTakerTracker", () => {
     expect(tracker.getPtRuns()).toHaveLength(1);
   });
 
+  it("does not classify a run without player telemetry as solo", async () => {
+    const tracker = await freshTracker();
+    for (const line of fixtureLines().filter(
+      (entry) => !entry.includes("loadout loader finished"),
+    )) {
+      tracker.processProfitTakerLine(line, "file");
+    }
+    await tracker.awaitPendingPtSaves();
+    const [run] = tracker.getPtRuns();
+    expect(run.complete).toBe(true);
+    expect(run.players).toEqual([]);
+    expect(run.solo).toBe(false);
+  });
+
+  it("keeps a recorded single-player run eligible for the solo group", async () => {
+    const tracker = await freshTracker();
+    for (const line of fixtureLines().filter((entry) => !entry.includes("ClientOne"))) {
+      tracker.processProfitTakerLine(line, "file");
+    }
+    await tracker.awaitPendingPtSaves();
+    const [run] = tracker.getPtRuns();
+    expect(run.players).toEqual(["HostPlayer"]);
+    expect(run.solo).toBe(true);
+  });
+
   it("ignores dbwin-sourced lines", async () => {
     const tracker = await freshTracker();
     for (const line of fixtureLines()) tracker.processProfitTakerLine(line, "dbwin");
