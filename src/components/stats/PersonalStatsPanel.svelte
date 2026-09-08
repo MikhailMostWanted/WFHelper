@@ -266,7 +266,7 @@
 >
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div>
-      <h3 class="m-0 font-display text-2xl text-text-heading" data-profile-name>
+      <h3 class="m-0 font-body text-2xl font-semibold text-text-heading" data-profile-name>
         {profile?.displayName || $t("profile.personal")}
       </h3>
       <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">

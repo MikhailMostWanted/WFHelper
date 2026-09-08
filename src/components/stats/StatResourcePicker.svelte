@@ -26,7 +26,8 @@
 
 <ModalShell ariaLabel={$tr("stats.chartResources")} {onClose}>
   <div
-    class="relative z-10 flex max-h-[80vh] w-[min(46rem,90vw)] flex-col gap-3 overflow-hidden rounded-[var(--radius-xl)] border border-border-strong bg-bg-surface p-4 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+    data-stat-resource-picker
+    class="relative z-10 flex max-h-[80vh] w-[min(46rem,90vw)] flex-col gap-3 overflow-hidden rounded-[var(--radius-xl)] border border-border-strong bg-bg-surface p-4"
   >
     <div class="flex shrink-0 items-center justify-between gap-3">
       <div class="flex flex-col gap-1">

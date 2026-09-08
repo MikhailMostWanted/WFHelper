@@ -84,7 +84,13 @@ test("personal profile renders cached data and follows refresh failures and acco
     const stats = page.locator("#content .view.active");
     await expect(stats.locator('[data-tour-tab="tracking"][data-active]')).toBeVisible();
     await expect(page.locator("[data-personal-profile]")).toHaveCount(0);
+    const header = stats.locator("[data-stats-header]");
+    const trackingTitle = await header.locator("h2").boundingBox();
+    const trackingTabs = await header.locator('[data-tour-tab="personal"]').boundingBox();
+    await page.screenshot({ path: testInfo.outputPath("stats-tracking-header.png") });
     await stats.locator('[data-tour-tab="personal"]').click();
+    expect(await header.locator("h2").boundingBox()).toEqual(trackingTitle);
+    expect(await header.locator('[data-tour-tab="personal"]').boundingBox()).toEqual(trackingTabs);
     const panel = page.locator("[data-personal-profile]");
     await expect(panel.locator("[data-profile-name]")).toHaveText(fixture.displayName!);
     const income = panel.locator('[data-profile-career="Income"]');
@@ -92,7 +98,64 @@ test("personal profile renders cached data and follows refresh failures and acco
     await expect(income.locator("span").last()).toHaveText("0");
     await expect(deaths.locator("span").last()).toHaveText("Not reported");
     await expect(panel.locator('[data-profile-career="TimePlayedSec"]')).toContainText("2 h");
+    await expect(panel.locator("[data-profile-name]")).toHaveCSS(
+      "font-family",
+      "Barlow, sans-serif",
+    );
+    const strip = panel.locator('[data-summary-strip="grid"]');
+    const inspectGrid = () =>
+      strip.evaluate((grid) => {
+        const bounds = grid.getBoundingClientRect();
+        const cells = Array.from(grid.querySelectorAll<HTMLElement>("[data-summary-item]"));
+        return {
+          overflow: getComputedStyle(grid).overflow,
+          rowGap: Number.parseFloat(getComputedStyle(grid).rowGap),
+          rows: new Set(cells.map((cell) => cell.offsetTop)).size,
+          withinWidth: cells.every(
+            (cell) => cell.getBoundingClientRect().right <= bounds.right + 1,
+          ),
+          dividers: cells.map((cell) => {
+            const before = getComputedStyle(cell, "::before");
+            const after = getComputedStyle(cell, "::after");
+            return {
+              width: before.width,
+              left: before.left,
+              color: before.backgroundColor,
+              alignment: getComputedStyle(cell).textAlign,
+              paddingLeft: getComputedStyle(cell).paddingLeft,
+              paddingRight: getComputedStyle(cell).paddingRight,
+              height: after.height,
+              top: after.top,
+            };
+          }),
+        };
+      });
+    const wideGrid = await inspectGrid();
+    expect(wideGrid.rows).toBe(1);
+    expect(wideGrid.overflow).toBe("hidden");
+    expect(wideGrid.withinWidth).toBe(true);
+    for (const divider of wideGrid.dividers) {
+      expect(divider.alignment).toBe("center");
+      expect(divider.paddingLeft).toBe(divider.paddingRight);
+      expect(divider.width).toBe("1px");
+      expect(divider.left).toBe("-1px");
+      expect(divider.color).not.toBe("rgba(0, 0, 0, 0)");
+      expect(divider.height).toBe("1px");
+      expect(Number.parseFloat(divider.top)).toBeCloseTo(-wideGrid.rowGap / 2, 1);
+    }
     await page.screenshot({ path: testInfo.outputPath("personal-career.png") });
+    await setLayoutViewport(page, 800, 1000);
+    await expect.poll(async () => (await inspectGrid()).rows).toBeGreaterThan(1);
+    expect((await inspectGrid()).withinWidth).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath("personal-career-narrow.png") });
+    const narrowTitle = await header.locator("h2").boundingBox();
+    const narrowTabs = await header.locator('[data-tour-tab="personal"]').boundingBox();
+    await stats.locator('[data-tour-tab="tracking"]').click();
+    expect(await header.locator("h2").boundingBox()).toEqual(narrowTitle);
+    expect(await header.locator('[data-tour-tab="personal"]').boundingBox()).toEqual(narrowTabs);
+    await page.screenshot({ path: testInfo.outputPath("stats-tracking-header-narrow.png") });
+    await stats.locator('[data-tour-tab="personal"]').click();
+    await setLayoutViewport(page, 1440, 1000);
 
     await panel.locator('[data-profile-section="equipment"]').click();
     const table = panel.locator('[data-profile-table="equipment"]');

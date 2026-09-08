@@ -661,59 +661,63 @@
 {/if}
 
 <section class="view active">
-  <div class="view-header">
-    <h2>{$tr("common.stats")}</h2>
-    <HeaderTabs
-      options={statsTabs}
-      activeKey={$statsTab}
-      onSelect={(key) => {
-        statsTab.set(key === "personal" ? "personal" : "tracking");
-        expandedKey = null;
-        tooltip = null;
-        showResourcePicker = false;
-      }}
-    />
-    {#if $statsTab === "tracking"}
-      <div class="ml-auto flex flex-wrap items-center gap-2">
-        <ThemedButton
-          active={showValue}
-          onClick={() => {
-            showValue = !showValue;
-          }}
-          title={$tr("stats.toggleValueTitle")}>{$tr("stats.valueLabel")}</ThemedButton
-        >
-        <ThemedButton
-          active={showChange}
-          onClick={() => {
-            showChange = !showChange;
-          }}
-          title={$tr("stats.toggleChangeTitle")}>{$tr("common.change")}</ThemedButton
-        >
-        <ThemedButton
-          onClick={() => {
-            showResourcePicker = true;
-          }}
-          title={$tr("stats.chartResourcesHint")}>{$tr("stats.chartResources")}</ThemedButton
-        >
-        <label class="flex items-center gap-1.5 whitespace-nowrap text-xs text-text-muted">
-          {$tr("stats.timeframe")}:
-          <ThemedSelect bind:value={chartDays}>
-            {#each TIMEFRAME_OPTIONS as days}
-              <option value={days}>{days}d</option>
-            {/each}
-          </ThemedSelect>
-        </label>
-        <ThemedButton onClick={handleSaveStats} title={$tr("stats.saveJsonTitle")}>
-          {$tr("stats.saveJsonButton")}
-        </ThemedButton>
-        <ThemedButton as="label" title={$tr("stats.importAlecaTitle")}>
-          {$tr("stats.importAlecaButton")}
-          <input type="file" accept=".json" class="hidden" on:change={handleImportFile} />
-        </ThemedButton>
-        <EditLayoutBar view="stats" />
-      </div>
-    {/if}
+  <div class="mb-4 shrink-0" data-stats-header>
+    <h2 class="m-0 mb-2 font-display text-3xl font-semibold tracking-[0.03em] text-text-primary">
+      {$tr("common.stats")}
+    </h2>
+    <div class="flex items-end border-b border-border-subtle">
+      <HeaderTabs
+        options={statsTabs}
+        activeKey={$statsTab}
+        onSelect={(key) => {
+          statsTab.set(key === "personal" ? "personal" : "tracking");
+          expandedKey = null;
+          tooltip = null;
+          showResourcePicker = false;
+        }}
+      />
+    </div>
   </div>
+  {#if $statsTab === "tracking"}
+    <div class="mb-4 flex shrink-0 flex-wrap items-center justify-end gap-2" data-stats-controls>
+      <ThemedButton
+        active={showValue}
+        onClick={() => {
+          showValue = !showValue;
+        }}
+        title={$tr("stats.toggleValueTitle")}>{$tr("stats.valueLabel")}</ThemedButton
+      >
+      <ThemedButton
+        active={showChange}
+        onClick={() => {
+          showChange = !showChange;
+        }}
+        title={$tr("stats.toggleChangeTitle")}>{$tr("common.change")}</ThemedButton
+      >
+      <ThemedButton
+        onClick={() => {
+          showResourcePicker = true;
+        }}
+        title={$tr("stats.chartResourcesHint")}>{$tr("stats.chartResources")}</ThemedButton
+      >
+      <label class="flex items-center gap-1.5 whitespace-nowrap text-xs text-text-muted">
+        {$tr("stats.timeframe")}:
+        <ThemedSelect bind:value={chartDays}>
+          {#each TIMEFRAME_OPTIONS as days}
+            <option value={days}>{days}d</option>
+          {/each}
+        </ThemedSelect>
+      </label>
+      <ThemedButton onClick={handleSaveStats} title={$tr("stats.saveJsonTitle")}>
+        {$tr("stats.saveJsonButton")}
+      </ThemedButton>
+      <ThemedButton as="label" title={$tr("stats.importAlecaTitle")}>
+        {$tr("stats.importAlecaButton")}
+        <input type="file" accept=".json" class="hidden" on:change={handleImportFile} />
+      </ThemedButton>
+      <EditLayoutBar view="stats" />
+    </div>
+  {/if}
 
   {#if $statsTab === "personal"}
     <PersonalStatsPanel />

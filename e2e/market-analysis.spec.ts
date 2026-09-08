@@ -8,6 +8,7 @@ import {
   evaluateInMain,
   launchElectronTestHarness,
   openView,
+  setLayoutViewport,
   type ElectronTestHarness,
 } from "./electronTestHarness";
 
@@ -149,4 +150,48 @@ test.describe("Market analysis", () => {
     );
     await expect(page.locator("[data-analysis-row]")).toHaveCount(3);
   });
+});
+
+test("analytics summary keeps a long best seller name inside its divided cell", async () => {
+  test.setTimeout(180_000);
+  const name = "ExtremelyLongUnbrokenBestSellerNameForSummaryWrapping Prime Neuroptics Blueprint";
+  const harness = await launchElectronTestHarness("wfh-analysis-long-name-", {
+    userDataFiles: {
+      "trade-log.json": [
+        {
+          ...LEDGER_ROWS[0],
+          items: [{ internalName: "", displayName: name, count: 1, direction: "given" }],
+        },
+      ],
+    },
+  });
+  try {
+    const { page } = harness;
+    await openView(page, "analytics");
+    const best = page.locator('[data-analysis-summary] [data-summary-item="best"]');
+    await expect(best).toContainText(name);
+    for (const width of [1440, 800]) {
+      await setLayoutViewport(page, width, 1000);
+      const geometry = await best.evaluate((element) => {
+        const value = element.querySelectorAll("span")[1];
+        const rect = value.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(value);
+        const lines = Array.from(range.getClientRects());
+        return {
+          wraps: lines.length > 1,
+          fits: lines.every((line) => line.left >= rect.left - 1 && line.right <= rect.right + 1),
+          divider: getComputedStyle(element, "::before").width,
+          alignment: getComputedStyle(element).textAlign,
+        };
+      });
+      expect(geometry.wraps).toBe(true);
+      expect(geometry.fits).toBe(true);
+      expect(geometry.divider).toBe("1px");
+      expect(geometry.alignment).toBe("center");
+      await page.screenshot({ path: test.info().outputPath(`analytics-long-name-${width}.png`) });
+    }
+  } finally {
+    await closeElectronTestHarness(harness);
+  }
 });
