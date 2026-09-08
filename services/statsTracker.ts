@@ -36,7 +36,7 @@ let _todayDailyTrades = 0;
 let _todayDateForTrades = "";
 
 let _history: DailyStatEntry[] = [];
-const HISTORY_MAX_DAYS = 90;
+const HISTORY_MAX_DAYS = 365;
 
 // Schema marker for the persisted history file. v2 = day keys are in the
 // user's LOCAL timezone. v1 (and unversioned legacy files) used UTC.

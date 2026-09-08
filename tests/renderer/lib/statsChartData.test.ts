@@ -4,7 +4,9 @@ import {
   barsForKey,
   formatAbsolute,
   formatters,
+  labelStep,
   shortDate,
+  TIMEFRAME_OPTIONS,
 } from "../../../src/lib/stats/chartData.js";
 import type { DailyStatEntry } from "../../../src/types/ipc.js";
 
@@ -74,5 +76,23 @@ describe("stats formatting", () => {
     expect(formatAbsolute(1_250_000, "en")).toBe("1.25M");
     expect(formatters.creditsDelta(125_000, "en")).toBe("125.0k");
     expect(shortDate("2026-08-20", "en")).toBe("8/20");
+  });
+});
+
+describe("long timeframes", () => {
+  it("offers a year and keeps every bar inside the canvas without a gap", () => {
+    expect(TIMEFRAME_OPTIONS).toEqual([7, 14, 30, 90, 180, 365]);
+    const res = barsForKey("ducatsDelta", [entry(dayStr(0), 10)], 365);
+    // The window is the day count plus today.
+    expect(res.bars).toHaveLength(366);
+    const last = res.bars[res.bars.length - 1];
+    expect(last.x + res.bw).toBeLessThanOrEqual(800);
+    expect(res.bars[1].x - res.bars[0].x).toBeCloseTo(res.bw);
+  });
+
+  it("thins the date labels as the window grows", () => {
+    expect(labelStep(90)).toBe(10);
+    expect(labelStep(180)).toBe(20);
+    expect(labelStep(365)).toBe(30);
   });
 });

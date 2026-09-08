@@ -704,7 +704,10 @@
         title={$tr("stats.chartResourcesHint")}
         ><span data-stats-resource-picker>{$tr("stats.chartResources")}</span></ThemedButton
       >
-      <label class="flex items-center gap-1.5 whitespace-nowrap text-xs text-text-muted">
+      <label
+        class="flex items-center gap-1.5 whitespace-nowrap text-xs text-text-muted"
+        data-stats-timeframe
+      >
         {$tr("stats.timeframe")}:
         <ThemedSelect bind:value={chartDays}>
           {#each TIMEFRAME_OPTIONS as days}
@@ -805,6 +808,7 @@
                           {/if}
                           <div class="flex-1 min-h-0 min-w-0 relative">
                             <svg
+                              data-stats-chart={key}
                               class="w-full h-full cursor-default"
                               viewBox="0 0 {SVG_W} {BAR_H}"
                               preserveAspectRatio="none"
@@ -843,6 +847,8 @@
                               {#if showChange}
                                 {#each cd.bars as bar}
                                   <rect
+                                    data-stats-date={bar.date}
+                                    data-stats-value={bar.value}
                                     x={bar.x}
                                     y={bar.y}
                                     width={cd.bw}

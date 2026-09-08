@@ -46,7 +46,7 @@ export const BAR_H_EXPAND = 300;
 const BAR_GAP = 2;
 export const SVG_W = 800;
 
-export const TIMEFRAME_OPTIONS = [7, 14, 30, 90] as const;
+export const TIMEFRAME_OPTIONS = [7, 14, 30, 90, 180, 365] as const;
 
 /** Map chart keys to the stored absolute value field on DailyStatEntry. */
 const ABS_FIELD_MAP: Partial<Record<ChartKey, keyof DailyStatEntry>> = {
@@ -252,7 +252,9 @@ export function barsForKey(
   const maxAbs = Math.max(1, ...values.map(Math.abs));
   const n = calendarDays.length;
   // Always fill the full SVG width so bars align with the date labels below
-  const bw = Math.max(2, (SVG_W - BAR_GAP * (n - 1)) / n);
+  // Past 120 bars a 2px gap alone would overflow the 800px canvas.
+  const gap = n > 120 ? 0 : BAR_GAP;
+  const bw = Math.max(2, (SVG_W - gap * (n - 1)) / n);
   const hasNeg = values.some((v) => v < 0);
   const hasPos = values.some((v) => v > 0);
   const hasBaseline = hasNeg && hasPos;
@@ -279,7 +281,7 @@ export function barsForKey(
       // Bar-only: scale from 0 (bottom) to niceMax (top) with PAD
       const ratio = Math.abs(val) / earlyNiceMax;
       const drawH = val === 0 ? 0 : Math.max(1, ratio * barH * (1 - 2 * PAD));
-      const x = i * (bw + BAR_GAP);
+      const x = i * (bw + gap);
       const bottomY = barH * (1 - PAD);
       const y = val >= 0 ? bottomY - drawH : bottomY;
       return { x, y, h: drawH, value: val, date: day, positive: val >= 0 };
@@ -287,7 +289,7 @@ export function barsForKey(
     // Delta charts: scale bars independently
     const ratio = Math.abs(val) / barScale;
     const h = val === 0 ? 0 : Math.max(1, ratio * availH);
-    const x = i * (bw + BAR_GAP);
+    const x = i * (bw + gap);
     const y = val >= 0 ? baseline - h : baseline;
     return { x, y, h, value: val, date: day, positive: val >= 0 };
   });
@@ -327,7 +329,7 @@ export function barsForKey(
         // Scale: 0 -> bottom (1-PAD), niceMax -> top (PAD)
         const yFrac = PAD + (1 - v / niceMax) * (1 - 2 * PAD);
         absLine.push({
-          x: i * (bw + BAR_GAP) + bw / 2,
+          x: i * (bw + gap) + bw / 2,
           y: yFrac * barH,
           idx: i,
         });
@@ -350,7 +352,9 @@ export function labelStep(days: number): number {
   if (days <= 7) return 1;
   if (days <= 14) return 2;
   if (days <= 30) return 5;
-  return 10;
+  if (days <= 90) return 10;
+  if (days <= 180) return 20;
+  return 30;
 }
 
 /** Divergent bar geometry for the analysis flow panels. The month and the day
