@@ -2,10 +2,15 @@
 !include LogicLib.nsh
 
 !macro customHeader
+  !define MUI_LANGDLL_REGISTRY_ROOT "HKCU"
+  !define MUI_LANGDLL_REGISTRY_KEY "Software\WFHelper"
+  !define MUI_LANGDLL_REGISTRY_VALUENAME "InstallerLanguage"
 !macroend
 
 !macro customUnInstall
   ${IfNot} ${isUpdated}
+    DeleteRegValue HKCU "Software\WFHelper" "InstallerLanguage"
+    DeleteRegKey /ifempty HKCU "Software\WFHelper"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WFHelperWarframeWatcher"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "WFHelperWarframeWatcher"
     Delete "$APPDATA\WFHelper\warframe-watcher.json"

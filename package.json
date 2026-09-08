@@ -210,6 +210,12 @@
     },
     "nsis": {
       "oneClick": false,
+      "displayLanguageSelector": true,
+      "installerLanguages": [
+        "en_US",
+        "de_DE",
+        "zh_CN"
+      ],
       "perMachine": false,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
