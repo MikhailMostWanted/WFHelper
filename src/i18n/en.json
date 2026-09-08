@@ -15,7 +15,7 @@
   "feedback.currentView": "Current page",
   "feedback.logFile": "Log file",
   "feedback.logTail": "main.log, last {kb} KB",
-  "feedback.diagnosticsHint": "The details shown here and the last {kb} KB of main.log are included. The log holds file paths and technical events, no account details or inventory.",
+  "feedback.diagnosticsHint": "The details shown here and the last {kb} KB of main.log are included. The log can contain file paths, account and player names, and technical events.",
   "feedback.screenshot": "Attach a screenshot (optional)",
   "feedback.screenshotHint": "PNG, JPEG or WebP, up to 1 MiB. Review it for personal information before sending.",
   "feedback.screenshotInvalid": "Choose a valid PNG, JPEG or WebP image no larger than 1 MiB.",

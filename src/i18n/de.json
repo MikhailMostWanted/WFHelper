@@ -15,7 +15,7 @@
   "feedback.currentView": "Aktuelle Seite",
   "feedback.logFile": "Protokolldatei",
   "feedback.logTail": "main.log, letzte {kb} KB",
-  "feedback.diagnosticsHint": "Beigefügt werden die hier angezeigten Angaben und die letzten {kb} KB von main.log. Das Protokoll enthält Dateipfade und technische Ereignisse, keine Kontodaten und kein Inventar.",
+  "feedback.diagnosticsHint": "Beigefügt werden die hier angezeigten Angaben und die letzten {kb} KB von main.log. Das Protokoll kann Dateipfade, Konto- und Spielernamen sowie technische Ereignisse enthalten.",
   "feedback.screenshot": "Screenshot anhängen (optional)",
   "feedback.screenshotHint": "PNG, JPEG oder WebP, bis zu 1 MiB. Prüfe das Bild vor dem Senden auf persönliche Informationen.",
   "feedback.screenshotInvalid": "Wähle ein gültiges PNG-, JPEG- oder WebP-Bild mit höchstens 1 MiB.",

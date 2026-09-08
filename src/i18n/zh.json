@@ -15,7 +15,7 @@
   "feedback.currentView": "当前页面",
   "feedback.logFile": "日志文件",
   "feedback.logTail": "main.log，最后 {kb} KB",
-  "feedback.diagnosticsHint": "将附加此处显示的信息以及 main.log 的最后 {kb} KB。日志包含文件路径和技术事件，不含账户信息或库存。",
+  "feedback.diagnosticsHint": "将附加此处显示的信息以及 main.log 的最后 {kb} KB。日志可能包含文件路径、账户和玩家名称以及技术事件。",
   "feedback.screenshot": "附加截图（可选）",
   "feedback.screenshotHint": "支持 PNG、JPEG 或 WebP，最大 1 MiB。发送前请检查是否包含个人信息。",
   "feedback.screenshotInvalid": "请选择不超过 1 MiB 的有效 PNG、JPEG 或 WebP 图片。",

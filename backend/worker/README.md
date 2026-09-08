@@ -88,11 +88,13 @@ secret and limiter are configured. Rotate the webhook in Discord and replace the
 it leaks. Tests mock delivery and never send feedback to the channel.
 
 Reports include the user-entered category, title, description, optional contact, app version
-and platform. Diagnostics and one screenshot are opt-in and reviewed in the desktop modal.
+and platform. Diagnostics and one screenshot are opt-in. The modal previews the screenshot
+and lists the diagnostic fields and log size; it does not preview the log contents.
 Diagnostics contain OS version, architecture, language, current view, UI scale and the last
-256 KB of `main.log`, which holds file paths under the user's profile and technical events.
+256 KiB of `main.log`, which can contain file paths, account and player names, and technical events.
 The desktop re-encodes screenshot pixels to discard the original file's embedded metadata.
-No account token, inventory or machine identifier is collected.
+The relay reads no separate account, inventory or machine-identifier files. The log is sent
+as recorded and is not redacted by the feedback relay.
 Screenshots and free text can contain personal information; restrict channel membership and
 delete reports when they are no longer needed. Discord retains the messages until deleted;
 the Worker does not store feedback in KV or print report content in its request logs.
