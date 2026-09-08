@@ -33,11 +33,12 @@
 
   let width = 0;
 
-  // Zero width means "not measured yet"; starting wide avoids a narrow first
-  // paint that immediately reflows on a normal-size window.
-  let breakpoint: LayoutBreakpoint;
-  $: breakpoint = width > 0 && width <= LAYOUT_NARROW_MAX_PX ? "narrow" : "wide";
-  $: layoutBreakpoint.set(breakpoint);
+  // Hidden grids report zero width; retain their last layout until visible.
+  let breakpoint: LayoutBreakpoint = "wide";
+  $: if (width > 0) {
+    breakpoint = width <= LAYOUT_NARROW_MAX_PX ? "narrow" : "wide";
+    layoutBreakpoint.set(breakpoint);
+  }
   $: sections = layoutFor(view, breakpoint);
   $: scoped = only ? $sections.filter((section) => only.includes(section.id)) : $sections;
   $: order = scoped.map((section) => section.id);

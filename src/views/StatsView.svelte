@@ -80,6 +80,9 @@
     { key: "personal", label: $tr("profile.personal") },
   ];
 
+  let trackingMounted = false;
+  $: if ($statsTab === "tracking") trackingMounted = true;
+
   let session: SessionStats | null = null;
   let history: DailyStatEntry[] = [];
   let trades: TradeEvent[] = [];
@@ -698,7 +701,8 @@
         onClick={() => {
           showResourcePicker = true;
         }}
-        title={$tr("stats.chartResourcesHint")}>{$tr("stats.chartResources")}</ThemedButton
+        title={$tr("stats.chartResourcesHint")}
+        ><span data-stats-resource-picker>{$tr("stats.chartResources")}</span></ThemedButton
       >
       <label class="flex items-center gap-1.5 whitespace-nowrap text-xs text-text-muted">
         {$tr("stats.timeframe")}:
@@ -721,218 +725,227 @@
 
   {#if $statsTab === "personal"}
     <PersonalStatsPanel />
-  {:else if loading}
-    <div class="empty-state"><p>{$tr("common.loading")}</p></div>
-  {:else}
-    <div class="flex flex-1 min-h-0 overflow-hidden">
-      <!-- LEFT: session stats + charts -->
-      <div
-        class="@container flex flex-1 min-w-0 flex-col gap-4 overflow-y-auto overflow-x-hidden p-4"
-      >
-        {#if importStatus}
-          <p class="mb-3 text-xs {importError ? 'text-danger' : 'text-success'}">{importStatus}</p>
-        {/if}
+  {/if}
+  {#if trackingMounted}
+    <div
+      class="flex flex-1 min-h-0 overflow-hidden"
+      style:display={$statsTab === "tracking" ? undefined : "none"}
+      data-stats-tracking
+    >
+      {#if loading}
+        <div class="empty-state"><p>{$tr("common.loading")}</p></div>
+      {:else}
+        <!-- LEFT: session stats + charts -->
+        <div
+          class="@container flex flex-1 min-w-0 flex-col gap-4 overflow-y-auto overflow-x-hidden p-4"
+        >
+          {#if importStatus}
+            <p class="mb-3 text-xs {importError ? 'text-danger' : 'text-success'}">
+              {importStatus}
+            </p>
+          {/if}
 
-        <LayoutGrid view="stats" only={STATS_MAIN_SECTIONS} gapClass="gap-4" let:sectionId>
-          {#if sectionId === "stats.summary"}
-            {#if !session?.hasData}
-              <p class="m-0 text-sm text-text-muted">{$tr("stats.noData")}</p>
-            {:else}
-              <SummaryStrip items={sessionSummaryItems} />
-            {/if}
-          {:else if sectionId === "stats.charts"}
-            {#if history.length === 0}
-              <p class="m-0 text-sm text-text-muted">{$tr("stats.noDays")}</p>
-            {:else}
-              <!-- Container query: charts need ~300px each; stack when the column is narrow. -->
-              <div class="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
-                {#each chartSections as { key, labelKey } (key)}
-                  {@const cd = chartDataMap[key]}
-                  {@const icon = iconMap[key]}
-                  {@const empty = chartIsEmpty(cd)}
-                  <ThemedPanel
-                    className="relative flex h-[240px] min-w-0 flex-col overflow-hidden px-[13px] py-[6px] pb-2 group/chart"
-                  >
-                    <div class="flex items-center justify-between mb-1">
-                      <span class="flex items-center gap-1.5 text-sm text-text-secondary">
-                        {#if icon}<img
-                            src={icon}
-                            alt=""
-                            class="w-5 h-5 object-contain align-middle opacity-85"
-                          />{/if}
-                        {$tr(labelKey)}
-                      </span>
-                      <button
-                        class="bg-transparent border-0 text-text-muted cursor-pointer text-lg py-1 px-2 leading-none opacity-50 transition-[opacity,color] duration-150 rounded-[var(--radius-md)] hover:!opacity-100 hover:text-accent hover:bg-bg-raised group-hover/chart:opacity-70"
-                        title={$tr("stats.expandChartTitle")}
-                        on:click={() => {
-                          expandedKey = key;
-                          tooltip = null;
-                        }}
-                        aria-label={$tr("stats.expandChartAria", { label: $tr(labelKey) })}
-                        >⛶</button
-                      >
-                    </div>
-                    {#if empty}
-                      <div
-                        class="flex-1 min-h-0 flex items-center justify-center text-sm text-text-muted"
-                      >
-                        {$tr("stats.noDataTimeframe")}
+          <LayoutGrid view="stats" only={STATS_MAIN_SECTIONS} gapClass="gap-4" let:sectionId>
+            {#if sectionId === "stats.summary"}
+              {#if !session?.hasData}
+                <p class="m-0 text-sm text-text-muted">{$tr("stats.noData")}</p>
+              {:else}
+                <SummaryStrip items={sessionSummaryItems} />
+              {/if}
+            {:else if sectionId === "stats.charts"}
+              {#if history.length === 0}
+                <p class="m-0 text-sm text-text-muted">{$tr("stats.noDays")}</p>
+              {:else}
+                <!-- Container query: charts need ~300px each; stack when the column is narrow. -->
+                <div class="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
+                  {#each chartSections as { key, labelKey } (key)}
+                    {@const cd = chartDataMap[key]}
+                    {@const icon = iconMap[key]}
+                    {@const empty = chartIsEmpty(cd)}
+                    <ThemedPanel
+                      className="relative flex h-[240px] min-w-0 flex-col overflow-hidden px-[13px] py-[6px] pb-2 group/chart"
+                    >
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="flex items-center gap-1.5 text-sm text-text-secondary">
+                          {#if icon}<img
+                              src={icon}
+                              alt=""
+                              class="w-5 h-5 object-contain align-middle opacity-85"
+                            />{/if}
+                          {$tr(labelKey)}
+                        </span>
+                        <button
+                          class="bg-transparent border-0 text-text-muted cursor-pointer text-lg py-1 px-2 leading-none opacity-50 transition-[opacity,color] duration-150 rounded-[var(--radius-md)] hover:!opacity-100 hover:text-accent hover:bg-bg-raised group-hover/chart:opacity-70"
+                          title={$tr("stats.expandChartTitle")}
+                          on:click={() => {
+                            expandedKey = key;
+                            tooltip = null;
+                          }}
+                          aria-label={$tr("stats.expandChartAria", { label: $tr(labelKey) })}
+                          >⛶</button
+                        >
                       </div>
-                    {:else}
-                      <div class="flex-1 min-h-0 flex">
-                        {#if cd.yTicks.length > 0}
-                          <div class="relative w-[55px] shrink-0">
-                            {#each cd.yTicks as tick}
-                              <span
-                                class="absolute right-1 text-xs text-text-muted -translate-y-1/2 whitespace-nowrap"
-                                style="top:{tick.yFrac * 100}%">{tick.label}</span
-                              >
-                            {/each}
-                          </div>
-                        {/if}
-                        <div class="flex-1 min-h-0 min-w-0 relative">
-                          <svg
-                            class="w-full h-full cursor-default"
-                            viewBox="0 0 {SVG_W} {BAR_H}"
-                            preserveAspectRatio="none"
-                            aria-hidden="true"
-                          >
-                            {#each cd.yTicks as tick}
-                              <line
-                                x1="0"
-                                y1={tick.yFrac * BAR_H}
-                                x2={SVG_W}
-                                y2={tick.yFrac * BAR_H}
-                                stroke="rgba(255,255,255,0.12)"
-                                stroke-width="1"
-                              />
-                            {/each}
-                            {#each cd.bars as bar, i}
-                              {#if i > 0 && i % labelStep(chartDays) === 0}
-                                <line
-                                  x1={bar.x}
-                                  y1="0"
-                                  x2={bar.x}
-                                  y2={BAR_H}
-                                  stroke="rgba(255,255,255,0.06)"
-                                  stroke-width="1"
-                                />
-                              {/if}
-                            {/each}
-                            <line
-                              x1="0"
-                              y1={cd.hasBaseline ? BAR_H / 2 : BAR_H}
-                              x2={SVG_W}
-                              y2={cd.hasBaseline ? BAR_H / 2 : BAR_H}
-                              stroke="var(--border)"
-                              stroke-width="0.5"
-                            />
-                            {#if showChange}
-                              {#each cd.bars as bar}
-                                <rect
-                                  x={bar.x}
-                                  y={bar.y}
-                                  width={cd.bw}
-                                  height={bar.h}
-                                  class={bar.positive
-                                    ? "fill-success opacity-75"
-                                    : "fill-danger opacity-75"}
-                                  rx="1"
-                                />
-                              {/each}
-                            {/if}
-                            {#if showValue && cd.absLine}
-                              <polyline
-                                points={cd.absLine.map((p) => `${p.x},${p.y}`).join(" ")}
-                                fill="none"
-                                stroke="rgba(255,255,255,0.7)"
-                                stroke-width="1.5"
-                                stroke-linejoin="round"
-                                stroke-linecap="round"
-                                vector-effect="non-scaling-stroke"
-                              />
-                            {/if}
-                          </svg>
-                          {#if showValue && cd.absLine}
-                            <div class="absolute inset-0 pointer-events-none">
-                              {#each cd.absLine as pt}
-                                {@const bar = cd.bars[pt.idx]}
-                                {@const absVal = cd.absValues[pt.idx] ?? NaN}
-                                {#if bar && cd.realData[pt.idx] && (bar.value !== 0 || cd.absLine.length === 1)}
-                                  <button
-                                    type="button"
-                                    class="absolute w-3 h-3 p-0 rounded-full bg-bg-surface border-2 border-text-primary/80 -translate-x-1/2 -translate-y-1/2 pointer-events-auto transition-[transform,box-shadow,border-color,background] duration-[0.12s] cursor-pointer hover:scale-[1.35] hover:border-text-heading hover:bg-surface-hover hover:shadow-[0_0_6px_rgba(255,255,255,0.35)]"
-                                    style="left:{(pt.x / SVG_W) * 100}%; top:{(pt.y / BAR_H) *
-                                      100}%"
-                                    aria-label={dotLabel(key, bar, absVal)}
-                                    title={dotLabel(key, bar, absVal)}
-                                    on:mouseenter={(e) => onDotEnter(e, key, pt.idx, absVal)}
-                                    on:mouseleave={() => {
-                                      tooltip = null;
-                                    }}
-                                  ></button>
-                                  {#if cd.absLine.length === 1 && !Number.isNaN(absVal)}
-                                    <!-- A lone dot in an empty grid reads as noise;
-                                     with no neighbour to compare it to, print it.
-                                     Flips side past the midpoint so it stays in. -->
-                                    {@const flip = pt.x / SVG_W > 0.5}
-                                    <span
-                                      class="absolute -translate-y-1/2 whitespace-nowrap text-xs text-text-secondary {flip
-                                        ? '-translate-x-full -ml-2'
-                                        : 'ml-2'}"
-                                      style="left:{(pt.x / SVG_W) * 100}%; top:{(pt.y / BAR_H) *
-                                        100}%"
-                                      data-stats-single-point
-                                    >
-                                      {formatterFor(key)(absVal, $locale)}
-                                    </span>
-                                  {/if}
-                                {/if}
+                      {#if empty}
+                        <div
+                          class="flex-1 min-h-0 flex items-center justify-center text-sm text-text-muted"
+                        >
+                          {$tr("stats.noDataTimeframe")}
+                        </div>
+                      {:else}
+                        <div class="flex-1 min-h-0 flex">
+                          {#if cd.yTicks.length > 0}
+                            <div class="relative w-[55px] shrink-0">
+                              {#each cd.yTicks as tick}
+                                <span
+                                  class="absolute right-1 text-xs text-text-muted -translate-y-1/2 whitespace-nowrap"
+                                  style="top:{tick.yFrac * 100}%">{tick.label}</span
+                                >
                               {/each}
                             </div>
                           {/if}
-                        </div>
-                      </div>
-                      {#if cd.bars.length > 0}
-                        {@const dateStep = labelStep(chartDays)}
-                        <div
-                          class="flex text-xs text-text-muted mt-0.5 overflow-visible shrink-0 h-[18px]"
-                          style={cd.yTicks.length > 0 ? "margin-left:55px" : ""}
-                        >
-                          {#each cd.bars as bar, i}
-                            <span
-                              class="text-center overflow-visible whitespace-nowrap shrink-0 text-xs"
-                              style="width:{100 / cd.bars.length}%"
+                          <div class="flex-1 min-h-0 min-w-0 relative">
+                            <svg
+                              class="w-full h-full cursor-default"
+                              viewBox="0 0 {SVG_W} {BAR_H}"
+                              preserveAspectRatio="none"
+                              aria-hidden="true"
                             >
-                              {i % dateStep === 0 ? shortDate(bar.date, $locale) : ""}
-                            </span>
-                          {/each}
+                              {#each cd.yTicks as tick}
+                                <line
+                                  x1="0"
+                                  y1={tick.yFrac * BAR_H}
+                                  x2={SVG_W}
+                                  y2={tick.yFrac * BAR_H}
+                                  stroke="rgba(255,255,255,0.12)"
+                                  stroke-width="1"
+                                />
+                              {/each}
+                              {#each cd.bars as bar, i}
+                                {#if i > 0 && i % labelStep(chartDays) === 0}
+                                  <line
+                                    x1={bar.x}
+                                    y1="0"
+                                    x2={bar.x}
+                                    y2={BAR_H}
+                                    stroke="rgba(255,255,255,0.06)"
+                                    stroke-width="1"
+                                  />
+                                {/if}
+                              {/each}
+                              <line
+                                x1="0"
+                                y1={cd.hasBaseline ? BAR_H / 2 : BAR_H}
+                                x2={SVG_W}
+                                y2={cd.hasBaseline ? BAR_H / 2 : BAR_H}
+                                stroke="var(--border)"
+                                stroke-width="0.5"
+                              />
+                              {#if showChange}
+                                {#each cd.bars as bar}
+                                  <rect
+                                    x={bar.x}
+                                    y={bar.y}
+                                    width={cd.bw}
+                                    height={bar.h}
+                                    class={bar.positive
+                                      ? "fill-success opacity-75"
+                                      : "fill-danger opacity-75"}
+                                    rx="1"
+                                  />
+                                {/each}
+                              {/if}
+                              {#if showValue && cd.absLine}
+                                <polyline
+                                  points={cd.absLine.map((p) => `${p.x},${p.y}`).join(" ")}
+                                  fill="none"
+                                  stroke="rgba(255,255,255,0.7)"
+                                  stroke-width="1.5"
+                                  stroke-linejoin="round"
+                                  stroke-linecap="round"
+                                  vector-effect="non-scaling-stroke"
+                                />
+                              {/if}
+                            </svg>
+                            {#if showValue && cd.absLine}
+                              <div class="absolute inset-0 pointer-events-none">
+                                {#each cd.absLine as pt}
+                                  {@const bar = cd.bars[pt.idx]}
+                                  {@const absVal = cd.absValues[pt.idx] ?? NaN}
+                                  {#if bar && cd.realData[pt.idx] && (bar.value !== 0 || cd.absLine.length === 1)}
+                                    <button
+                                      type="button"
+                                      class="absolute w-3 h-3 p-0 rounded-full bg-bg-surface border-2 border-text-primary/80 -translate-x-1/2 -translate-y-1/2 pointer-events-auto transition-[transform,box-shadow,border-color,background] duration-[0.12s] cursor-pointer hover:scale-[1.35] hover:border-text-heading hover:bg-surface-hover hover:shadow-[0_0_6px_rgba(255,255,255,0.35)]"
+                                      style="left:{(pt.x / SVG_W) * 100}%; top:{(pt.y / BAR_H) *
+                                        100}%"
+                                      aria-label={dotLabel(key, bar, absVal)}
+                                      title={dotLabel(key, bar, absVal)}
+                                      on:mouseenter={(e) => onDotEnter(e, key, pt.idx, absVal)}
+                                      on:mouseleave={() => {
+                                        tooltip = null;
+                                      }}
+                                    ></button>
+                                    {#if cd.absLine.length === 1 && !Number.isNaN(absVal)}
+                                      <!-- A lone dot in an empty grid reads as noise;
+                                     with no neighbour to compare it to, print it.
+                                     Flips side past the midpoint so it stays in. -->
+                                      {@const flip = pt.x / SVG_W > 0.5}
+                                      <span
+                                        class="absolute -translate-y-1/2 whitespace-nowrap text-xs text-text-secondary {flip
+                                          ? '-translate-x-full -ml-2'
+                                          : 'ml-2'}"
+                                        style="left:{(pt.x / SVG_W) * 100}%; top:{(pt.y / BAR_H) *
+                                          100}%"
+                                        data-stats-single-point
+                                      >
+                                        {formatterFor(key)(absVal, $locale)}
+                                      </span>
+                                    {/if}
+                                  {/if}
+                                {/each}
+                              </div>
+                            {/if}
+                          </div>
                         </div>
+                        {#if cd.bars.length > 0}
+                          {@const dateStep = labelStep(chartDays)}
+                          <div
+                            class="flex text-xs text-text-muted mt-0.5 overflow-visible shrink-0 h-[18px]"
+                            style={cd.yTicks.length > 0 ? "margin-left:55px" : ""}
+                          >
+                            {#each cd.bars as bar, i}
+                              <span
+                                class="text-center overflow-visible whitespace-nowrap shrink-0 text-xs"
+                                style="width:{100 / cd.bars.length}%"
+                              >
+                                {i % dateStep === 0 ? shortDate(bar.date, $locale) : ""}
+                              </span>
+                            {/each}
+                          </div>
+                        {/if}
                       {/if}
-                    {/if}
-                  </ThemedPanel>
-                {/each}
-              </div>
+                    </ThemedPanel>
+                  {/each}
+                </div>
+              {/if}
             {/if}
-          {/if}
-        </LayoutGrid>
-      </div>
-      <!-- /stats-left -->
+          </LayoutGrid>
+        </div>
+        <!-- /stats-left -->
 
-      {#each tradeRailSections as section (section.id)}
-        <LayoutSection
-          view="stats"
-          breakpoint={$layoutBreakpoint}
-          order={statsOrder}
-          id={section.id}
-          span={section.span}
-          collapsed={section.collapsed}
-          className="flex min-h-0 shrink-0 flex-col"
-        >
-          <StatsTradePanel {trades} />
-        </LayoutSection>
-      {/each}
+        {#each tradeRailSections as section (section.id)}
+          <LayoutSection
+            view="stats"
+            breakpoint={$layoutBreakpoint}
+            order={statsOrder}
+            id={section.id}
+            span={section.span}
+            collapsed={section.collapsed}
+            className="flex min-h-0 shrink-0 flex-col"
+          >
+            <StatsTradePanel {trades} />
+          </LayoutSection>
+        {/each}
+      {/if}
     </div>
     <!-- /stats-layout -->
   {/if}
