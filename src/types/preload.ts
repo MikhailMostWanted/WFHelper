@@ -7,6 +7,17 @@ import type {
 import type { WfmStatus } from "./market.js";
 
 export interface PreloadAPI {
+  getRewardOverlayPreview: () => Promise<IpcInvokeMap["getRewardOverlayPreview"]["return"]>;
+  beginRewardOverlayEdit: () => Promise<IpcInvokeMap["beginRewardOverlayEdit"]["return"]>;
+  updateRewardOverlayEdit: (
+    ...args: IpcInvokeMap["updateRewardOverlayEdit"]["args"]
+  ) => Promise<IpcInvokeMap["updateRewardOverlayEdit"]["return"]>;
+  endRewardOverlayEdit: (
+    ...args: IpcInvokeMap["endRewardOverlayEdit"]["args"]
+  ) => Promise<IpcInvokeMap["endRewardOverlayEdit"]["return"]>;
+  onRewardOverlayEditState: (
+    cb: (state: IpcEventMap["reward-overlay-edit-state"]) => void,
+  ) => () => void;
   platform: string;
   getInventory: () => Promise<IpcInvokeMap["getInventory"]["return"]>;
   openInventoryFile: (

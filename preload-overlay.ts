@@ -16,6 +16,8 @@ import {
   OVERLAY_INTERACTION_MODE,
   OVERLAY_DRAG_MOVE,
   OVERLAY_READY,
+  REWARD_LAYOUT_GET,
+  REWARD_EDIT_STATE,
 } from "./config/shared/ipcChannels";
 
 const onOverlayIpc = (channel: string, listener: Parameters<typeof onIpc>[2]): (() => void) =>
@@ -24,6 +26,9 @@ const onOverlayIpc = (channel: string, listener: Parameters<typeof onIpc>[2]): (
 installOverlayContentVisibility(ipcRenderer);
 
 contextBridge.exposeInMainWorld("overlay", {
+  getRewardLayout: () => ipcRenderer.invoke(REWARD_LAYOUT_GET),
+  onRewardLayout: (cb: (state: unknown) => void) =>
+    onOverlayIpc(REWARD_EDIT_STATE, (_event: unknown, state: unknown) => cb(state)),
   close: () => ipcRenderer.send(OVERLAY_CLOSE),
   getPrice: (slug: string) => ipcRenderer.invoke(OVERLAY_GET_PRICE, slug),
   getThemeVars: () => ipcRenderer.invoke(OVERLAY_GET_THEME_VARS),

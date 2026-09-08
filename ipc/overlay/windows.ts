@@ -2,6 +2,7 @@ import path from "node:path";
 import { clampNumber } from "../../config/shared/numeric";
 import { baseZoomForDisplay } from "../../config/runtime/uiScale";
 import { OVERLAY_CONTENT_VISIBLE } from "../../config/shared/ipcChannels";
+import { REWARD_OVERLAY_CANVAS } from "../../config/shared/rewardOverlayLayout";
 import {
   isNativeWayland as linuxIsNativeWayland,
   isTilingCompositor as linuxIsTilingCompositor,
@@ -26,7 +27,7 @@ import type {
 export const HIDE_IMMINENT_MS = 3_000;
 
 const OVERLAY_WINDOW_BOUNDS = Object.freeze({
-  width: 980,
+  width: REWARD_OVERLAY_CANVAS.width,
   height: 140,
   horizontalMargin: 16,
   bottomMargin: 18,

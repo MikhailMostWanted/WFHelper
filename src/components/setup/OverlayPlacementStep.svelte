@@ -4,6 +4,7 @@
   import type { MessageKey } from "../../lib/i18n.js";
   import { invoke } from "../../lib/ipc.js";
   import { SETUP_OVERLAY_BG_URLS } from "../../lib/assetUrls.js";
+  import RewardOverlayEditor from "../RewardOverlayEditor.svelte";
 
   interface Props {
     onFinish: () => void;
@@ -64,6 +65,12 @@
   };
 
   let overlayStepIndex = $state(0);
+  let rewardEditorOpen = $state(false);
+
+  function closeRewardEditor(): void {
+    rewardEditorOpen = false;
+    void loadLayout();
+  }
   let placementArea = $state({ width: 1920, height: 1080 });
   let placementPos: Record<PlacementKey, PlacementRect> | null = $state(null);
   let placementScales: Record<PlacementKey, number> = $state(
@@ -333,6 +340,13 @@
           >{Math.round(stepScale * 100)}%</span
         >
       </div>
+      {#if placementStep.key === "reward"}
+        <button
+          class="btn-secondary btn-sm mt-3"
+          data-reward-editor-open
+          onclick={() => (rewardEditorOpen = true)}>{$tr("rewardEditor.customize")}</button
+        >
+      {/if}
       <div class="mt-3 flex items-center justify-between">
         <button class="btn-secondary btn-sm" onclick={finishOverlaysStep}
           >{$tr("setup.skip")}</button
@@ -350,4 +364,8 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if rewardEditorOpen}
+  <RewardOverlayEditor onClose={closeRewardEditor} />
 {/if}

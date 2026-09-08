@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { app, BrowserWindow, crashReporter, globalShortcut, powerMonitor } from "electron";
 
@@ -55,6 +56,7 @@ import * as windowSecurity from "./services/windowSecurity";
 const log = withScope("Main");
 
 const MAIN_WINDOW_ENTRY_FILE = path.join(app.getAppPath(), "renderer", "dist", "index.html");
+const REWARD_EDITOR_FRAME_URL = `${pathToFileURL(path.join(app.getAppPath(), "renderer", "overlay.html")).href}?mode=editor`;
 
 // Safe mode drops every user-authored layer (custom CSS, stored layouts) for one
 // load, so a broken customisation cannot lock the user out of Settings. The env
@@ -240,6 +242,7 @@ function createWindow(): void {
   windowSecurity.hardenBrowserWindowNavigation(ctx.mainWindow, {
     label: "main renderer",
     allowedFilePaths: [MAIN_WINDOW_ENTRY_FILE],
+    allowedSubframeFilePaths: [path.join(app.getAppPath(), "renderer", "overlay.html")],
     log,
   });
 
@@ -328,13 +331,17 @@ function createWindow(): void {
 
   ctx.mainWindow.webContents.session.webRequest.onHeadersReceived(
     (
-      details: { responseHeaders?: Record<string, string[]> },
+      details: { responseHeaders?: Record<string, string[]>; url: string; resourceType: string },
       callback: (arg0: { responseHeaders: Record<string, string[]> }) => void,
     ) => {
       callback({
         responseHeaders: {
           ...details.responseHeaders,
-          "Content-Security-Policy": [MAIN_WINDOW_CSP],
+          "Content-Security-Policy": [
+            details.resourceType === "subFrame" && details.url === REWARD_EDITOR_FRAME_URL
+              ? MAIN_WINDOW_CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'")
+              : MAIN_WINDOW_CSP,
+          ],
           "Permissions-Policy": [PERMISSIONS_POLICY],
         },
       });

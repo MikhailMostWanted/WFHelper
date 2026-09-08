@@ -18,6 +18,7 @@
   import ProtonLaunchOption from "../components/ProtonLaunchOption.svelte";
   import LinuxDisplayBackend from "../components/LinuxDisplayBackend.svelte";
   import SegmentedControl from "../components/SegmentedControl.svelte";
+  import RewardOverlayEditor from "../components/RewardOverlayEditor.svelte";
   import { invoke, send, getPlatform } from "../lib/ipc.js";
   import { onInventoryLoaded } from "../lib/actions.js";
   import {
@@ -157,6 +158,20 @@
     { key: "arbiSummary", labelKey: "settings.overlayScaleArbiSummary" },
   ];
   let windowScales: Partial<Record<OverlayWindowKey, number>> = {};
+  let rewardEditorOpen = false;
+
+  async function closeRewardEditor(): Promise<void> {
+    rewardEditorOpen = false;
+    try {
+      const saved = await invoke("getOverlaySettings");
+      if (saved) {
+        applyOverlaySettingsResponse(saved);
+        applyToForm($overlaySettings);
+      }
+    } catch {
+      flashStatus($tr("settings.saveFailed"), true);
+    }
+  }
 
   // Same channel the setup wizard uses: persists overlayWindowScales + live-applies.
   async function saveWindowScale(key: OverlayWindowKey, value: number): Promise<void> {
@@ -1020,6 +1035,14 @@
               </SettingsRow>
             {/each}
 
+            <SettingsRow label={$tr("rewardEditor.title")} as="div">
+              <button
+                class="btn-secondary btn-sm"
+                data-reward-editor-open
+                on:click={() => (rewardEditorOpen = true)}>{$tr("rewardEditor.customize")}</button
+              >
+            </SettingsRow>
+
             <SettingsRow label={$tr("settings.hotkeyFallback")}>
               <input type="checkbox" bind:checked={form.hotkeyEnabled} on:change={autoSave} />
             </SettingsRow>
@@ -1079,6 +1102,10 @@
     {/if}
   </div>
 </section>
+
+{#if rewardEditorOpen}
+  <RewardOverlayEditor onClose={() => void closeRewardEditor()} />
+{/if}
 
 <style>
   /* Size container so the supporters panel can query the real content width

@@ -29,6 +29,7 @@ const OVERLAY_MESSAGE_KEYS = [
   "overlay.arbi.totalKills",
   "overlay.arbi.unknownNode",
   "overlay.hint.dragToMove",
+  "overlay.hint.editReward",
   "overlay.hint.interact",
   "overlay.hint.interactPanel",
   "overlay.hint.rightClickDrag",

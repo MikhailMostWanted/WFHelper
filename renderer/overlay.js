@@ -16,6 +16,7 @@ let scanningKey = "overlay.reward.scanning";
 let bestPlaceholderKey = "overlay.reward.detecting";
 let bannerMessage = null;
 let plannerPayload = null;
+let rewardLayoutEditor = null;
 
 const t = window.overlayI18n.t;
 
@@ -84,7 +85,10 @@ function appendCurrencyValue(container, className, iconSrc, value, label) {
   const icon = document.createElement("img");
   icon.src = iconSrc;
   icon.alt = "";
-  wrapper.appendChild(icon);
+  const iconBox = document.createElement("span");
+  iconBox.className = "currency-icon";
+  iconBox.appendChild(icon);
+  wrapper.appendChild(iconBox);
 
   const text = document.createElement("span");
   text.textContent = value;
@@ -102,7 +106,10 @@ function renderSlotValues(container, price, ducats) {
   const hasDucats = Number.isFinite(ducatCount) && ducatCount > 0;
 
   if (!hasPrice && !hasDucats) {
-    container.textContent = price == null ? "..." : "N/A";
+    const placeholder = document.createElement("span");
+    placeholder.className = "slot-price-placeholder";
+    placeholder.textContent = price == null ? "..." : "N/A";
+    container.appendChild(placeholder);
     container.classList.add("muted");
     return;
   }
@@ -155,19 +162,22 @@ function appendSetParts(container, parts) {
     }`;
     chip.title = partTooltip(part);
 
+    const iconBox = document.createElement("span");
+    iconBox.className = "slot-set-part-icon";
     if (part.imageUrl) {
       const img = document.createElement("img");
       img.src = part.imageUrl;
       img.alt = "";
-      chip.appendChild(img);
+      iconBox.appendChild(img);
     } else {
       const fallback = document.createElement("span");
       fallback.className = "slot-set-part-fallback";
       fallback.textContent = String(part.name || "?")
         .charAt(0)
         .toUpperCase();
-      chip.appendChild(fallback);
+      iconBox.appendChild(fallback);
     }
+    chip.appendChild(iconBox);
 
     const count = document.createElement("span");
     count.className = "slot-set-part-count";
@@ -313,7 +323,10 @@ function updateBestPick() {
       t("common.platinum"),
     );
   } else {
-    bestEl.textContent = t(bestPlaceholderKey);
+    const placeholder = document.createElement("span");
+    placeholder.className = "best-placeholder";
+    placeholder.textContent = t(bestPlaceholderKey);
+    bestEl.appendChild(placeholder);
   }
 }
 
@@ -379,7 +392,9 @@ function updateDragHint() {
   const hotkeyLabel = prettyHotkey(dragHintInfo.hotkey);
 
   let text = "";
-  if (!dragHintInfo.dismissed) {
+  if (rewardLayoutEditor?.isEditing()) {
+    text = t("overlay.hint.editReward");
+  } else if (!dragHintInfo.dismissed) {
     text = overlayInteractiveMode
       ? t("overlay.hint.dragToMove")
       : hotkeyLabel
@@ -648,7 +663,70 @@ function startOverlay() {
     showRewardModeScanning();
   }
   setOverlayInteractiveMode(false);
+  if (mode !== "planner") {
+    rewardLayoutEditor = window.installRewardLayout({
+      ...(mode === "editor" ? { defaultFieldStyle: window.overlay.defaultFieldStyle } : {}),
+      renderPreview: renderRewardPreview,
+      resetPreview: () => {
+        showRewardModeScanning();
+        updateDragHint();
+      },
+    });
+    if (mode === "editor") window.flushRewardEditor = rewardLayoutEditor.flush;
+  }
   window.overlay.ready();
+}
+
+function renderRewardPreview(state) {
+  showRewardModeScanning();
+  setOverlayInteractiveMode(true);
+  updateDragHint();
+  if (state.previewVariant === "scanning") return;
+  if (state.previewVariant === "error") {
+    showDetectionError();
+    return;
+  }
+  hideScanning();
+  document.getElementById("slots-grid").classList.remove("is-hidden");
+  const names = [
+    "Braton Prime Receiver",
+    "Forma Blueprint",
+    "Lex Prime Barrel",
+    "Paris Prime String",
+  ];
+  for (let index = 0; index < state.previewCount; index += 1) {
+    const missing = state.previewVariant === "missing";
+    slotState[index] = {
+      item: {
+        name: names[index],
+        rarity: ["rare", "common", "uncommon", "common"][index],
+        ducats: missing ? 0 : [100, 15, 45, 15][index],
+        ...(missing
+          ? {}
+          : {
+              partOwnedCount: index,
+              partRequiredCount: 2,
+              mastered: index % 2 === 0,
+              building: true,
+              setOwnedCount: 2,
+              setRequiredCount: 6,
+              setUrlName: "preview",
+              setParts: Array.from({ length: 6 }, (_, part) => ({
+                name: ["Blueprint", "Barrel", "Receiver", "Stock", "Blade", "Handle"][part],
+                ownedCount: part % 2,
+                requiredCount: 1,
+                isReward: part === index,
+                building: part === 2,
+              })),
+            }),
+      },
+      price: missing ? 0 : [42, 0, 18, 9][index],
+      setPrice: missing ? 0 : 120,
+    };
+    renderSlot(index);
+  }
+  bestPlaceholderKey = "overlay.reward.noPricedRewards";
+  updateBestPick();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -660,9 +738,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   window.overlayTheme.bootstrapOverlayTheme(() => window.overlay.getThemeVars());
 
-  document.getElementById("btn-close").addEventListener("click", () => window.overlay.close());
+  document.getElementById("btn-close").addEventListener("click", () => {
+    if (!rewardLayoutEditor?.isEditing()) window.overlay.close();
+  });
   window.installOverlayDrag({
-    isInteractive: () => overlayInteractiveMode,
+    isInteractive: () => overlayInteractiveMode && !rewardLayoutEditor?.isEditing(),
     moveBy: (dx, dy) => {
       window.overlay.moveBy(dx, dy);
       markOverlayMoved();
@@ -670,12 +750,17 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      window.overlay.close();
+      if (rewardLayoutEditor?.isEditing()) rewardLayoutEditor.cancel();
+      else window.overlay.close();
     }
   });
 
-  window.overlay.onTrigger(showRewardModeScanning);
-  window.overlay.onPlannerTrigger(showPlannerModeScanning);
+  window.overlay.onTrigger(() => {
+    showRewardModeScanning();
+  });
+  window.overlay.onPlannerTrigger(() => {
+    showPlannerModeScanning();
+  });
   window.overlay.onItems((items) => {
     void applyRewardItems(items);
   });
@@ -685,10 +770,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   window.overlay.onThemeVars((vars) => {
     window.overlayTheme.applyThemeVars(vars);
+    rewardLayoutEditor?.refresh();
   });
   window.overlay.onMessages((messages) => finishBootstrap(window.overlayI18n.apply(messages)));
   window.overlay.onInteractionMode((payload) => {
-    setOverlayInteractiveMode(Boolean(payload?.interactive));
+    setOverlayInteractiveMode(rewardLayoutEditor?.isEditing() || Boolean(payload?.interactive));
     showPlannerHint(
       !overlayInteractiveMode && !plannerGridElement().classList.contains("is-hidden"),
     );

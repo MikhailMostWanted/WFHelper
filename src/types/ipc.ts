@@ -190,7 +190,28 @@ import type {
 } from "../../config/shared/rivenGoodRolls.js";
 export type { RivenGoodRollAttribute, RivenGoodRollGroup };
 
+import type {
+  RewardOverlayEditState,
+  RewardOverlayEditCommand,
+  RewardOverlayFieldStyle,
+} from "../../config/shared/rewardOverlayLayout.js";
+
 export interface IpcInvokeMap {
+  getRewardOverlayPreview: {
+    args: [];
+    return: {
+      url: string;
+      theme: Record<string, string>;
+      messages: { locale: string; messages: Record<string, string> };
+      defaultFieldStyle: RewardOverlayFieldStyle;
+    };
+  };
+  beginRewardOverlayEdit: { args: []; return: RewardOverlayEditState };
+  updateRewardOverlayEdit: {
+    args: [sessionId: string, command: RewardOverlayEditCommand];
+    return: RewardOverlayEditState;
+  };
+  endRewardOverlayEdit: { args: [sessionId: string, save: boolean]; return: { ok: true } };
   getInventory: {
     args: [];
     return: RawInventoryData | null;
@@ -793,6 +814,7 @@ interface TradeRecordedEvent {
 }
 
 export interface IpcEventMap {
+  "reward-overlay-edit-state": RewardOverlayEditState;
   "inventory-updated": RawInventoryData;
   "inventory-status-updated": InventoryStatus;
   "item-db-updated": undefined;

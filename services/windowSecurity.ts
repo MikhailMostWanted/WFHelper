@@ -10,6 +10,7 @@ interface SecurityLogger {
 interface HardenOptions {
   label?: string;
   allowedFilePaths?: string[];
+  allowedSubframeFilePaths?: string[];
   log?: SecurityLogger;
 }
 
@@ -39,6 +40,7 @@ export function hardenBrowserWindowNavigation(
 
   const label = String(options.label || "window");
   const allowedFiles = normalizeAllowedFiles(options.allowedFilePaths || []);
+  const allowedSubframes = normalizeAllowedFiles(options.allowedSubframeFilePaths || []);
   const logger = options.log;
 
   browserWindow.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
@@ -56,14 +58,10 @@ export function hardenBrowserWindowNavigation(
   /* eslint-disable @typescript-eslint/no-explicit-any -- Electron event listener overloads */
   browserWindow.webContents.on("will-navigate", blockUnexpectedNavigation as any);
 
-  browserWindow.webContents.on("will-frame-navigate", ((
-    event: Electron.Event,
-    details: Record<string, unknown>,
-  ) => {
-    const targetUrl =
-      details && typeof details === "object" && typeof details.url === "string" ? details.url : "";
-    blockUnexpectedNavigation(event, targetUrl);
-  }) as any);
+  browserWindow.webContents.on("will-frame-navigate", (event) => {
+    if (!event.isMainFrame && isAllowedFileNavigation(event.url, allowedSubframes)) return;
+    blockUnexpectedNavigation(event, event.url);
+  });
 
   browserWindow.webContents.on("will-attach-webview", ((event: Electron.Event) => {
     event.preventDefault();

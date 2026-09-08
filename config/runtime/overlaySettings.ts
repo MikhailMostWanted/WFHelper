@@ -1,5 +1,7 @@
 import { WFM_AWAY_IDLE_MINUTES_DEFAULT } from "../shared/wfm";
 
+import type { RewardOverlayLayout } from "../shared/rewardOverlayLayout";
+
 interface CycleAlerts {
   earth: boolean;
   cetus: boolean;
@@ -25,6 +27,7 @@ export interface OverlaySavedWindowBounds {
 }
 
 export interface OverlaySettings {
+  rewardLayout?: RewardOverlayLayout;
   [key: string]: unknown;
   autoTriggerEnabled: boolean;
   hotkeyEnabled: boolean;
@@ -101,6 +104,7 @@ export const OVERLAY_SETTINGS_FILE_NAME = "overlay-settings.json";
 export const REFERENCE_WARFRAME_UI_SCALE = 0.99;
 
 export const OVERLAY_SETTINGS_DEFAULTS = Object.freeze({
+  rewardLayout: Object.freeze({ version: 1 as const, fields: Object.freeze({}) }),
   autoTriggerEnabled: true,
   hotkeyEnabled: true,
   hotkey: "F8",

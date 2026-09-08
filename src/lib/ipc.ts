@@ -75,6 +75,10 @@ const eventApiMap: Record<
   EventChannel,
   (cb: (payload: IpcEventMap[EventChannel]) => void) => () => void
 > = {
+  "reward-overlay-edit-state": (cb) =>
+    window.api.onRewardOverlayEditState(
+      cb as (state: IpcEventMap["reward-overlay-edit-state"]) => void,
+    ),
   "inventory-updated": (cb) =>
     window.api.onInventoryUpdated(cb as (data: IpcEventMap["inventory-updated"]) => void),
   "inventory-status-updated": (cb) =>

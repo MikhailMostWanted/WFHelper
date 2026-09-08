@@ -18,6 +18,12 @@ export const DB_GET_WFM_ITEMS = "get-wfm-items";
 export const DB_GET_MASTERY = "get-mastery-progress";
 export const DB_GET_CODEX_SCANS = "get-codex-scans";
 export const DROP_SEARCH = "drop-search";
+export const REWARD_EDIT_BEGIN = "reward-overlay-edit:begin";
+export const REWARD_EDIT_PREVIEW = "reward-overlay-edit:preview";
+export const REWARD_EDIT_UPDATE = "reward-overlay-edit:update";
+export const REWARD_EDIT_END = "reward-overlay-edit:end";
+export const REWARD_EDIT_STATE = "reward-overlay-edit-state";
+export const REWARD_LAYOUT_GET = "reward-overlay-layout:get";
 
 export const WFM_SIGNIN = "wfm:signin";
 export const WFM_SIGNOUT = "wfm:signout";

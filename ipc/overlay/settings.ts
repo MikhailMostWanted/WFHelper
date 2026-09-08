@@ -1,5 +1,6 @@
 import { normalizeErrorMessage } from "../../config/shared/errors";
 import { clampNumber } from "../../config/shared/numeric";
+import { normalizeRewardOverlayLayout } from "../../config/shared/rewardOverlayLayout";
 import { normalizeWfmAwayIdleMinutes, normalizeWfmHoldMinutes } from "../../config/shared/wfm";
 import { asRecord } from "../ipcValidators";
 import {
@@ -279,6 +280,7 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
       overlayScale: normalizeOverlayScale(candidate.overlayScale, defaults.overlayScale),
       overlayWindowScales: normalizeWindowScales(candidate.overlayWindowScales),
       overlayWindowBounds: normalizeSavedBounds(candidate.overlayWindowBounds),
+      rewardLayout: normalizeRewardOverlayLayout(candidate.rewardLayout),
       overlayDragHintDismissed: booleanSetting("overlayDragHintDismissed"),
     };
   }
