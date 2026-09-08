@@ -17,7 +17,10 @@ const mocks = vi.hoisted(() => ({
   broadcast: vi.fn(),
   hash: "a".repeat(64) as string | null,
   source: "helper",
-  inventory: { LoreFragmentScans: [{ ItemType: "/Lotus/Fragment", Progress: 4 }] },
+  inventory: { LoreFragmentScans: [{ ItemType: "/Lotus/Fragment", Progress: 4 }] } as Record<
+    string,
+    unknown
+  >,
 }));
 vi.mock("electron", () => ({ app: {}, BrowserWindow: {}, dialog: {}, shell: {} }));
 vi.mock("../../ipc/context", () => ({
@@ -73,6 +76,7 @@ beforeEach(() => {
   mocks.generation = 1;
   mocks.hash = "a".repeat(64);
   mocks.source = "helper";
+  mocks.inventory = { LoreFragmentScans: [{ ItemType: "/Lotus/Fragment", Progress: 4 }] };
   mocks.handlers.clear();
   mocks.binding.mockReturnValue(true);
   mocks.subscribe.mockReturnValue(() => undefined);
@@ -90,6 +94,66 @@ beforeEach(() => {
   });
 });
 
+describe("personal saved loadout inventory isolation", () => {
+  const loadoutInventory = {
+    Suits: [
+      {
+        ItemId: { $oid: "fixture-item" },
+        ItemType: "/Lotus/Suits/Fixture",
+        Configs: [{ Upgrades: [] }],
+      },
+    ],
+    LoadOutPresets: {
+      NORMAL: [{ n: "Fixture preset", s: { ItemId: { $oid: "fixture-item" }, cus: 0, mod: 0 } }],
+    },
+  };
+
+  it("attaches normalized loadouts only for a bound helper snapshot, including before a public refresh", async () => {
+    mocks.inventory = loadoutInventory;
+    mocks.getPersonalProfile.mockResolvedValue({
+      profile: null,
+      status: "no-data",
+      fetchedAt: null,
+      nextRefreshAt: 0,
+    });
+    expect(await invoke(PERSONAL_PROFILE_GET)).toMatchObject({
+      status: "no-data",
+      savedLoadouts: [{ name: "Fixture preset" }],
+    });
+    mocks.binding.mockReturnValue(false);
+    expect(await invoke(PERSONAL_PROFILE_GET)).toMatchObject({ savedLoadouts: [] });
+    mocks.binding.mockReturnValue(true);
+    mocks.hash = null;
+    expect(await invoke(PERSONAL_PROFILE_GET)).toMatchObject({ savedLoadouts: [] });
+  });
+
+  it.each(["none", "manual", "aleca"])(
+    "never attaches helper loadouts for source %s",
+    async (source) => {
+      mocks.source = source;
+      mocks.inventory = loadoutInventory;
+      expect(await invoke(PERSONAL_PROFILE_GET)).toMatchObject({
+        inventorySource: source,
+        savedLoadouts: [],
+      });
+      expect(mocks.binding).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["no-data", "no-account", "fetch-failed"])(
+    "does not mix inventory rows into Codex error %s",
+    async (error) => {
+      mocks.getCodexScans.mockResolvedValue({ error, nextRefreshAt: 0 });
+      expect(await invoke(DB_GET_CODEX_SCANS)).toEqual({
+        error,
+        nextRefreshAt: 0,
+        inventorySource: "helper",
+      });
+      expect(mocks.binding).not.toHaveBeenCalled();
+    },
+  );
+});
+
 async function invoke(channel: string): Promise<unknown> {
   const { register } = await import("../../ipc/systemIpc");
   register();
@@ -97,6 +161,36 @@ async function invoke(channel: string): Promise<unknown> {
 }
 
 describe("profile IPC account isolation", () => {
+  it("keeps bound inventory fragments beside cached scans after a transient fetch failure", async () => {
+    mocks.getCodexScans.mockResolvedValue({
+      scans: [{ type: "/Lotus/Enemy", count: 2 }],
+      fetchedAt: 123,
+      error: "fetch-failed",
+      nextRefreshAt: 456,
+    });
+    expect(await invoke(DB_GET_CODEX_SCANS)).toMatchObject({
+      scans: [
+        { type: "/Lotus/Enemy", count: 2 },
+        { type: "/Lotus/Fragment", count: 4 },
+      ],
+      error: "fetch-failed",
+      nextRefreshAt: 456,
+    });
+    mocks.binding.mockReturnValue(false);
+    expect(await invoke(DB_GET_CODEX_SCANS)).toMatchObject({
+      scans: [{ type: "/Lotus/Enemy", count: 2 }],
+    });
+  });
+
+  it.each(["no-account", "account-changed"])(
+    "never merges local fragments into %s results even when scans are present",
+    async (error) => {
+      mocks.getCodexScans.mockResolvedValue({ scans: [], error, nextRefreshAt: 0 });
+      expect(await invoke(DB_GET_CODEX_SCANS)).toMatchObject({ scans: [], error });
+      expect(mocks.binding).not.toHaveBeenCalled();
+    },
+  );
+
   it("discards Codex output if account changes after service resolution but before IPC continuation", async () => {
     mocks.getCodexScans.mockImplementation(() => {
       queueMicrotask(() => {

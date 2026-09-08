@@ -33,6 +33,7 @@
   let inventorySource: CodexScansResult["inventorySource"];
   let nextRefreshAt = 0;
   let now = Date.now();
+  let refreshTimer: ReturnType<typeof setInterval> | undefined;
   let disposed = false;
   let generation = 0;
   let reloadPending = false;
@@ -95,18 +96,27 @@
     const unsubscribeInventory = on("inventory-updated", () => invalidate());
     const unsubscribeStatus = on("inventory-status-updated", () => invalidate());
     const unsubscribeAccount = on("profile-account-changed", () => invalidate(true));
-    const timer = setInterval(() => {
-      now = Date.now();
-    }, 1000);
     return () => {
       disposed = true;
       generation += 1;
       unsubscribeInventory();
       unsubscribeStatus();
       unsubscribeAccount();
-      clearInterval(timer);
+      clearInterval(refreshTimer);
     };
   });
+
+  function updateRefreshClock(deadline: number): void {
+    clearInterval(refreshTimer);
+    now = Date.now();
+    if (deadline <= now) return;
+    refreshTimer = setInterval(() => {
+      now = Date.now();
+      if (now >= deadline) clearInterval(refreshTimer);
+    }, 1000);
+  }
+
+  $: updateRefreshClock(nextRefreshAt);
 
   // Legacy mode: only an instance-level assignment invalidates the markup, so the
   // module-scoped Sets publish a tick every reader takes as an argument. A reader

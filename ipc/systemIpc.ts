@@ -49,6 +49,7 @@ import { getScanDebugDir } from "../services/rewardScanDebug";
 import * as linuxDisplay from "../services/linuxDisplayBackend";
 import { isObject } from "./ipcValidators";
 import { toNonEmptyString } from "../config/shared/stringValidation";
+import { parsePersonalLoadouts } from "../services/personalLoadouts";
 
 const log = withScope("systemIpc");
 let stopProfileAccountListener: (() => void) | null = null;
@@ -106,7 +107,15 @@ function register(): void {
       const result = await codexProfile.getPersonalProfile(refresh === true);
       if (generation !== codexProfile.getProfileAccountGeneration())
         return { profile: null, fetchedAt: null, status: "account-changed", nextRefreshAt: 0 };
-      return { ...result, inventorySource: getInventorySource() };
+      const inventorySource = getInventorySource();
+      const hash = getLoadedInventoryHash();
+      const savedLoadouts =
+        inventorySource === "helper" &&
+        hash &&
+        codexProfile.isInventorySnapshotForCurrentAccount(hash)
+          ? parsePersonalLoadouts(ctx.currentInventoryData)
+          : [];
+      return { ...result, inventorySource, savedLoadouts };
     },
   );
 
@@ -117,7 +126,9 @@ function register(): void {
       return { error: "account-changed", nextRefreshAt: 0 };
     const hash = getLoadedInventoryHash();
     const scans =
-      hash && codexProfile.isInventorySnapshotForCurrentAccount(hash)
+      (!result.error || (result.error === "fetch-failed" && result.scans)) &&
+      hash &&
+      codexProfile.isInventorySnapshotForCurrentAccount(hash)
         ? mergeCodexInventoryScans(result.scans ?? [], ctx.currentInventoryData)
         : result.scans;
     return { ...result, ...(scans ? { scans } : {}), inventorySource: getInventorySource() };

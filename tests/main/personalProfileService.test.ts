@@ -60,6 +60,20 @@ afterEach(() => {
 });
 
 describe("personal profile service", () => {
+  it("rejects account query substrings and suffixes consistently", async () => {
+    const service = await load();
+    const bytes = Buffer.from('{"Suits":[]}');
+    for (const authz of [
+      `?otheraccountId=${accountA}`,
+      `?accountId=${accountA}a`,
+      `?accountId=${accountA}-suffix`,
+    ]) {
+      service.noteAuthz(authz);
+      service.noteInventorySnapshot(authz, bytes);
+      expect((await service.getPersonalProfile()).status).toBe("no-account");
+    }
+    expect(mocks.requests).toHaveLength(0);
+  });
   it("waits for a known account and a manual refresh", async () => {
     const service = await load();
     expect((await service.getPersonalProfile()).status).toBe("no-account");

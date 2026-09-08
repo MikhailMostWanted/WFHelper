@@ -181,6 +181,9 @@ test("personal profile renders cached data and follows refresh failures and acco
     await page.screenshot({ path: testInfo.outputPath("personal-equipment.png") });
 
     await panel.locator('[data-profile-section="appearance"]').click();
+    await expect(panel.locator('[data-profile-section="appearance"]')).toHaveClass(/active/);
+    await expect(panel.locator("[data-profile-mods]")).toHaveCount(0);
+    await expect(panel.locator('[data-profile-section="career"]')).not.toHaveClass(/active/);
     await expect(panel.locator('[data-profile-config="1"]')).toHaveAttribute(
       "aria-pressed",
       "true",

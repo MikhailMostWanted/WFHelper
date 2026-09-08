@@ -41,7 +41,7 @@
     enemies: "profile.enemies",
     abilities: "profile.abilities",
     missions: "enemy.missions",
-    appearance: "common.appearance",
+    appearance: "profile.loadouts",
   };
   const CAREER_KEYS: Record<ProfileCareerKey, MessageKey> = {
     TimePlayedSec: "profile.timePlayed",
@@ -301,17 +301,22 @@
     >
       {profile ? $t("profile.stale") : $t("profile.fetchFailed")}
     </p>{/if}
-  {#if result?.inventorySource && result.inventorySource !== "helper"}<p
+  {#if result?.inventorySource === "manual" || result?.inventorySource === "aleca"}<p
       class="m-0 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-warning"
       role="status"
       data-profile-source-warning
     >
       {$t("profile.importSourceWarning")}
     </p>{/if}
-  {#if busy && !profile}
+  {#if busy && !profile && !result?.savedLoadouts?.length}
     <div class="empty-state"><p>{$t("common.loading")}</p></div>
   {:else if !profile}
-    {#if !hasError}<div class="empty-state"><p>{$t(unavailableKey)}</p></div>{/if}
+    {#if result?.savedLoadouts?.length}
+      {#if !hasError}<p class="m-0 text-sm text-text-muted">{$t(unavailableKey)}</p>{/if}
+      <ProfileAppearance items={[]} loadouts={result.savedLoadouts} />
+    {:else if !hasError}
+      <div class="empty-state"><p>{$t(unavailableKey)}</p></div>
+    {/if}
   {:else}
     <SummaryStrip items={summary} variant="grid" />
     <div class="filter-tabs flex-wrap" data-profile-sections>
@@ -361,7 +366,7 @@
         {/if}
       </ThemedPanel>
     {:else if section === "appearance"}
-      <ProfileAppearance items={profile.appearance} />
+      <ProfileAppearance items={profile.appearance} loadouts={result?.savedLoadouts ?? []} />
     {:else}
       <ThemedPanel className="flex min-w-0 flex-col gap-3 p-3">
         <div class="flex flex-wrap items-center justify-between gap-3">

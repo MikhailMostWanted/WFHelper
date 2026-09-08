@@ -84,7 +84,7 @@ function notifyProfileListeners(listeners: Set<() => void>, failureMessage: stri
 
 // Keep the helper account available while the game is closed.
 export function noteAuthz(authz: string): void {
-  const id = /accountId=([a-f0-9]{24})/.exec(authz)?.[1];
+  const id = accountIdFromAuthz(authz);
   if (!id || id === _loadAccountId()) return;
   _accountId = id;
   accountGeneration++;
@@ -119,8 +119,12 @@ const inventoryBindingCache = createJsonCache<{ accountId: string; hash: string 
   },
 );
 
+function accountIdFromAuthz(authz: string): string | undefined {
+  return /(?:^|[?&])accountId=([a-f0-9]{24})(?=&|$)/.exec(authz)?.[1];
+}
+
 export function noteInventorySnapshot(authz: string, raw: Uint8Array): void {
-  const accountId = /(?:^|[?&])accountId=([a-f0-9]{24})(?=&|$)/.exec(authz)?.[1];
+  const accountId = accountIdFromAuthz(authz);
   if (!accountId || accountId !== _loadAccountId()) return;
   try {
     const hash = createHash("sha256").update(raw).digest("hex");

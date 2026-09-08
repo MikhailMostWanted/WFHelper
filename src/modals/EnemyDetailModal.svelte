@@ -15,6 +15,8 @@
   import { isPopoutWindow } from "../stores/popout.js";
   import type { EnemyInfo } from "../lib/enemies/enemyInfo.js";
   import type { DropRow } from "../../config/shared/dropTypes.js";
+  import type { CodexScanEntry } from "../../config/shared/codexTypes.js";
+  import type { CodexRow } from "../lib/codexScans.js";
 
   const MAX_DROP_ROWS = 40;
 
@@ -44,6 +46,8 @@
   let importedSource = $state(false);
 
   let token = 0;
+  let previousScans: CodexScanEntry[] | null = null;
+  let scanRows: CodexRow[] = [];
 
   function reset(): void {
     info = null;
@@ -77,10 +81,20 @@
     scansFailed = result.error !== undefined;
     importedSource = result.inventorySource === "manual" || result.inventorySource === "aleca";
     if (!result.scans) return;
-    const rows = codex.buildCodexRows(result.scans);
+    if (
+      previousScans?.length !== result.scans.length ||
+      result.scans.some(
+        (entry, index) =>
+          entry.type !== previousScans?.[index].type ||
+          entry.count !== previousScans?.[index].count,
+      )
+    ) {
+      previousScans = result.scans;
+      scanRows = codex.buildCodexRows(result.scans);
+    }
     const match = key
-      ? rows.find((row) => row.type === key)
-      : rows.find((row) => normalizeEnemyName(row.name) === name);
+      ? scanRows.find((row) => row.type === key)
+      : scanRows.find((row) => normalizeEnemyName(row.name) === name);
     if (!match) return;
     scanned = match.scanned;
     required = match.required;

@@ -1,3 +1,5 @@
+import type { InventorySource } from "./inventorySource";
+
 export interface CodexScanEntry {
   /** Enemy type path as the profile reports it (e.g. /Lotus/Types/Enemies/...). */
   type: string;
@@ -35,5 +37,5 @@ export interface CodexScansResult {
   scans?: CodexScanEntry[];
   error?: "no-account" | "fetch-failed" | "no-data" | "account-changed";
   nextRefreshAt?: number;
-  inventorySource?: "helper" | "manual" | "aleca";
+  inventorySource?: InventorySource;
 }

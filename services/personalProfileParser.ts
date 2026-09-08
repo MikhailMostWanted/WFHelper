@@ -10,7 +10,7 @@ import {
 } from "../config/shared/personalProfile";
 
 const MAX_ROWS = 10_000;
-const MAX_CONFIGS = 12;
+export const MAX_CONFIGS = 12;
 const MAX_SKINS = 128;
 const EQUIPMENT_FIELDS = ["equipTime", "kills", "headshots", "assists", "xp"] as const;
 const ENEMY_FIELDS = ["kills", "headshots", "assists", "finishers", "deaths", "scans"] as const;
@@ -79,7 +79,11 @@ function color(value: unknown): string | undefined {
   return `#${packed.slice(2)}${packed.slice(0, 2)}`;
 }
 
-function appearanceConfig(value: unknown, normalized: boolean): ProfileAppearanceConfig {
+export function parseProfileAppearanceConfig(
+  value: unknown,
+  normalized: boolean,
+  resolveSkin?: (type: string) => string | null,
+): ProfileAppearanceConfig {
   const source = record(value) ?? {};
   const result: ProfileAppearanceConfig = { skins: [], colors: {} };
   const name = text(source[normalized ? "name" : "Name"], 120);
@@ -88,7 +92,8 @@ function appearanceConfig(value: unknown, normalized: boolean): ProfileAppearanc
   if (Array.isArray(skins)) {
     for (let index = 0; index < Math.min(skins.length, MAX_SKINS); index++) {
       const entry = record(skins[index]);
-      const type = text(normalized ? entry?.type : skins[index], 512);
+      const raw = text(normalized ? entry?.type : skins[index], 512);
+      const type = raw && resolveSkin ? resolveSkin(raw) : raw;
       const slot = normalized ? entry?.slot : index;
       if (
         type &&
@@ -136,7 +141,9 @@ function appearance(source: Record<string, unknown>): ProfileAppearanceItem[] {
       const type = text(item?.ItemType, 512);
       if (!item || !type) continue;
       const configs = Array.isArray(item.Configs)
-        ? item.Configs.slice(0, MAX_CONFIGS).map((config) => appearanceConfig(config, false))
+        ? item.Configs.slice(0, MAX_CONFIGS).map((config) =>
+            parseProfileAppearanceConfig(config, false),
+          )
         : [];
       const selected = selectedId
         ? text(record(item.ItemId)?.$oid, 512) === selectedId
@@ -304,7 +311,7 @@ export function revivePersonalProfile(value: unknown): PersonalProfile | null {
       category,
       type,
       activeConfig: index,
-      configs: item.configs.map((config) => appearanceConfig(config, true)),
+      configs: item.configs.map((config) => parseProfileAppearanceConfig(config, true)),
     };
     if ("hiddenWhenHolstered" in item) {
       if (typeof item.hiddenWhenHolstered !== "boolean") return null;

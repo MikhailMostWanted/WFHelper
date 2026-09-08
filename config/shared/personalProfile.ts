@@ -1,3 +1,5 @@
+import type { InventorySource } from "./inventorySource";
+
 export const PROFILE_CAREER_KEYS = [
   "TimePlayedSec",
   "Income",
@@ -70,9 +72,23 @@ export interface PersonalProfile {
 }
 
 export interface PersonalProfileResult {
-  inventorySource?: "helper" | "manual" | "aleca";
+  inventorySource?: InventorySource;
+  savedLoadouts?: ProfileSavedLoadout[];
   profile: PersonalProfile | null;
   fetchedAt: number | null;
   status: "ready" | "no-data" | "no-account" | "fetch-failed" | "account-changed";
   nextRefreshAt: number;
+}
+
+export interface ProfileLoadoutItem extends ProfileAppearanceItem {
+  activeModConfig: number | null;
+  modConfigs: Array<{
+    name?: string;
+    upgrades: Array<{ slot: number; type: string | null; rank: number | null }> | null;
+  }>;
+}
+
+export interface ProfileSavedLoadout {
+  name?: string;
+  slots: Array<{ category: ProfileAppearanceItem["category"]; item: ProfileLoadoutItem | null }>;
 }
