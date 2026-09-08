@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
+  import { bestOrderPrice, WFM_MOD_VARIANTS } from "../../../config/shared/wfmOrders.js";
+  import { fetchItemOrderBookBySlug } from "../../lib/wfm/orderBook.js";
   import { PLATINUM_ICON_URL } from "../../lib/assetUrls.js";
   import MarketOrderSummary from "./MarketOrderSummary.svelte";
   import MarketRowBase from "./MarketRowBase.svelte";
@@ -29,6 +32,39 @@
   let syncedPlatinum: number | undefined;
   let syncedQuantity: number | undefined;
   let savingInline = false;
+  let variantPrices: { wts: number | null; wtb: number | null } | null = null;
+  let variantRequest = 0;
+
+  $: modVariant = WFM_MOD_VARIANTS.some((variant) => variant === order.subtype);
+  $: void loadVariantPrices(order.itemUrlName, order.modRank, modVariant ? order.subtype : null);
+
+  async function loadVariantPrices(
+    slug: string | null,
+    rank: number | null,
+    subtype: string | null | undefined,
+  ): Promise<void> {
+    const token = ++variantRequest;
+    variantPrices = null;
+    if (!slug || !subtype) return;
+    try {
+      const result = await fetchItemOrderBookBySlug(slug, {
+        rank,
+        subtype,
+        priority: "background",
+      });
+      if (token !== variantRequest || result.status !== "ok") return;
+      variantPrices = {
+        wts: bestOrderPrice(result.data.sell, "sell", true),
+        wtb: bestOrderPrice(result.data.buy, "buy", true),
+      };
+    } catch {
+      // Unavailable variant prices stay blank instead of falling back to regular.
+    }
+  }
+
+  onDestroy(() => {
+    variantRequest += 1;
+  });
 
   $: syncDrafts(order.platinum, order.quantity);
   $: dirty = draftPlatinum !== order.platinum || draftQuantity !== order.quantity;
@@ -70,8 +106,13 @@
     : order.modRank != null;
   $: rankCap = item?.maxRank && item.maxRank > 0 ? Math.floor(item.maxRank) : 0;
   $: listedRank = order.modRank != null ? Math.max(0, Math.floor(order.modRank)) : null;
-  $: summaryRank =
-    isRankedListing && listedRank != null ? (listedRank === rankCap ? rankCap : 0) : null;
+  $: summaryRank = modVariant
+    ? listedRank
+    : isRankedListing && listedRank != null
+      ? listedRank === rankCap
+        ? rankCap
+        : 0
+      : null;
   $: summaryWts =
     summaryRank === rankCap && summaryRank !== 0
       ? (item?.wtsRmax ?? null)
@@ -84,9 +125,11 @@
       : summaryRank === 0
         ? (item?.wtbR0 ?? null)
         : null;
-  $: medianLabel = item?.platinum != null ? `~${item.platinum}p` : "-";
-  $: wtsLabel = summaryWts != null ? `${summaryWts}p` : "-";
-  $: wtbLabel = summaryWtb != null ? `${summaryWtb}p` : "-";
+  $: medianLabel = !modVariant && item?.platinum != null ? `~${item.platinum}p` : "-";
+  $: wts = modVariant ? variantPrices?.wts : summaryWts;
+  $: wtb = modVariant ? variantPrices?.wtb : summaryWtb;
+  $: wtsLabel = wts != null ? `${wts}p` : "-";
+  $: wtbLabel = wtb != null ? `${wtb}p` : "-";
 
   function handleCheckbox(event: Event): void {
     onSelectChange(order.id, (event.currentTarget as HTMLInputElement).checked);
@@ -102,6 +145,19 @@
     onDelete(order.id);
   }
 </script>
+
+{#snippet subtypeChip()}
+  {#if order.subtype}
+    <span
+      class="shrink-0 rounded-sm bg-accent/20 px-1 py-0.5 text-xs font-bold text-accent"
+      data-order-subtype-chip
+    >
+      {order.subtype === "regular"
+        ? $tr("orderModal.regular")
+        : order.subtype.charAt(0).toUpperCase() + order.subtype.slice(1)}
+    </span>
+  {/if}
+{/snippet}
 
 {#if compact}
   <MarketRowBase
@@ -127,14 +183,7 @@
       >
     </svelte:fragment>
     <svelte:fragment slot="headerEnd">
-      {#if order.subtype}
-        <span
-          class="shrink-0 rounded-sm bg-accent/20 px-1 py-0.5 text-xs font-bold text-accent"
-          data-order-subtype-chip
-        >
-          {order.subtype.charAt(0).toUpperCase() + order.subtype.slice(1)}
-        </span>
-      {/if}
+      {@render subtypeChip()}
       {#if order.modRank != null}
         <span class="shrink-0 rounded-sm bg-accent/20 px-1 py-0.5 text-xs font-bold text-accent">
           R{order.modRank}
@@ -174,7 +223,14 @@
             />
           </span>
         </div>
-        <MarketOrderSummary {isRankedListing} {summaryRank} {wtsLabel} {wtbLabel} {medianLabel} />
+        <MarketOrderSummary
+          {modVariant}
+          {isRankedListing}
+          {summaryRank}
+          {wtsLabel}
+          {wtbLabel}
+          {medianLabel}
+        />
         {#if warning}
           <span class="listing-warning self-start" data-order-warning title={warning.title}
             >{warning.label}</span
@@ -196,7 +252,7 @@
         <button
           class="btn-sm btn-secondary h-7 px-2 text-xs"
           title={$tr("market.edit")}
-          data-order-edit
+          data-order-edit={order.id}
           on:click={stopAndEdit}>{$tr("market.edit")}</button
         >
         <button
@@ -236,7 +292,14 @@
     <svelte:fragment slot="fullBody">
       <!-- fullContentClass is "contents", so this wrapper is the single grid cell. -->
       <div class="flex min-w-0 flex-col gap-1">
-        <MarketOrderSummary {isRankedListing} {summaryRank} {wtsLabel} {wtbLabel} {medianLabel} />
+        <MarketOrderSummary
+          {modVariant}
+          {isRankedListing}
+          {summaryRank}
+          {wtsLabel}
+          {wtbLabel}
+          {medianLabel}
+        />
         {#if warning}
           <span class="listing-warning self-start" data-order-warning title={warning.title}
             >{warning.label}</span
@@ -246,6 +309,7 @@
     </svelte:fragment>
     <svelte:fragment slot="fullActions">
       <div class="flex shrink-0 items-center gap-2">
+        {@render subtypeChip()}
         {#if order.modRank != null}
           <span class="shrink-0 rounded-sm bg-accent/20 px-1 py-0.5 text-xs font-bold text-accent">
             R{order.modRank}
@@ -292,8 +356,10 @@
             on:click={stopAndApply}>&check;</button
           >
         {/if}
-        <button class="btn-sm btn-secondary h-7 px-2 text-xs" data-order-edit on:click={stopAndEdit}
-          >{$tr("market.edit")}</button
+        <button
+          class="btn-sm btn-secondary h-7 px-2 text-xs"
+          data-order-edit={order.id}
+          on:click={stopAndEdit}>{$tr("market.edit")}</button
         >
         <button
           class="btn-sm btn-danger h-7 w-7 px-0 text-sm font-black"

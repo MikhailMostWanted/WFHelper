@@ -9,6 +9,7 @@ import {
   type WfmOrderBookEntry,
 } from "../../../config/shared/wfmOrders.js";
 import { fetchWithTimeout } from "../../../config/shared/fetchWithTimeout.js";
+import { createPriorityRequestQueue } from "./requestPolicy.js";
 
 export type OrderBookEntry = WfmOrderBookEntry;
 
@@ -27,6 +28,11 @@ type ItemOrderBookResult =
 const ORDERBOOK_TTL_MS = 45_000;
 const ORDERBOOK_NO_DATA_TTL_MS = 3 * 60 * 1000;
 const DIRECT_ORDER_BOOK_FETCH_TIMEOUT_MS = 10_000;
+const orderBookQueue = createPriorityRequestQueue({
+  priorities: ["interactive", "background"] as const,
+  maxConcurrent: 4,
+  maxDepth: Number.MAX_SAFE_INTEGER,
+});
 
 interface OrderBookDebugCounters {
   requests: number;
@@ -201,7 +207,11 @@ export function clearOrderBookCache(
 
 export async function fetchItemOrderBookBySlug(
   slug: string | null | undefined,
-  options?: { rank?: number | null; subtype?: string | null },
+  options?: {
+    rank?: number | null;
+    subtype?: string | null;
+    priority?: "interactive" | "background";
+  },
 ): Promise<ItemOrderBookResult> {
   const normalizedSlug = normalizeWfmSlug(slug);
   bumpCounter("requests");
@@ -225,7 +235,11 @@ export async function fetchItemOrderBookBySlug(
   }
 
   const inFlight = inFlightBySlug.get(key);
-  if (inFlight) return inFlight.promise;
+  const priority = options?.priority ?? "interactive";
+  if (inFlight) {
+    orderBookQueue.promote(inFlight.owner, priority);
+    return inFlight.promise;
+  }
 
   const requestClearGeneration = clearGeneration;
   const requestKeyGeneration = generationBySlug.get(key) ?? 0;
@@ -234,29 +248,39 @@ export async function fetchItemOrderBookBySlug(
     requestKeyGeneration === (generationBySlug.get(key) ?? 0);
 
   const requestOwner = Symbol(key);
-  const request = (async (): Promise<ItemOrderBookResult> => {
-    try {
-      const result = await fetchDirectOrderBook(normalizedSlug, normalizedRank, normalizedSubtype);
-      if (result.status === "ok") {
-        const data: ItemOrderBook = result.data;
-        if (isCurrentRequest()) {
-          cacheBySlug.set(key, { status: "ok", data, cachedAt: Date.now() });
+  const request = orderBookQueue
+    .enqueue(
+      async (): Promise<ItemOrderBookResult> => {
+        // Cache invalidation must also retire work that has not reached the network.
+        if (!isCurrentRequest()) return { status: "error", slug: normalizedSlug };
+        const result = await fetchDirectOrderBook(
+          normalizedSlug,
+          normalizedRank,
+          normalizedSubtype,
+        );
+        if (result.status === "ok") {
+          const data: ItemOrderBook = result.data;
+          if (isCurrentRequest()) {
+            cacheBySlug.set(key, { status: "ok", data, cachedAt: Date.now() });
+          }
+          return { status: "ok", data };
         }
-        return { status: "ok", data };
-      }
 
-      if (result.status === "not_found") {
-        if (isCurrentRequest()) {
-          cacheBySlug.set(key, { status: "not_found", cachedAt: Date.now() });
+        if (result.status === "not_found") {
+          if (isCurrentRequest()) {
+            cacheBySlug.set(key, { status: "not_found", cachedAt: Date.now() });
+          }
+          return { status: "not_found", slug: normalizedSlug };
         }
-        return { status: "not_found", slug: normalizedSlug };
-      }
 
-      return { status: "error", slug: normalizedSlug };
-    } finally {
+        return { status: "error", slug: normalizedSlug };
+      },
+      priority,
+      requestOwner,
+    )
+    .finally(() => {
       if (inFlightBySlug.get(key)?.owner === requestOwner) inFlightBySlug.delete(key);
-    }
-  })();
+    });
 
   inFlightBySlug.set(key, { owner: requestOwner, promise: request });
   return request;

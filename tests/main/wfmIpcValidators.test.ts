@@ -26,7 +26,7 @@ describe("wfmIpc payload validators", () => {
     expect(parsed).toBeNull();
   });
 
-  it("accepts a relic refinement subtype and rejects everything else", () => {
+  it("accepts supported relic and mod variants and rejects unknown subtypes", () => {
     const base = {
       itemId: "a".repeat(24),
       orderType: "sell",
@@ -38,6 +38,18 @@ describe("wfmIpc payload validators", () => {
       subtype: "radiant",
     });
     expect(__test__.parseCreateOrderParams({ ...base, subtype: "shiny" })).toBeNull();
+    for (const subtype of ["regular", "atragraph"]) {
+      expect(__test__.parseCreateOrderParams({ ...base, subtype, modRank: 10 })).toMatchObject({
+        subtype,
+        modRank: 10,
+      });
+      expect(
+        __test__.parseUpdateOrderPayload({
+          orderId: base.itemId,
+          updates: { subtype, modRank: 10 },
+        })?.updates,
+      ).toEqual({ subtype, modRank: 10 });
+    }
     // Absent subtype stays absent instead of defaulting.
     expect(__test__.parseCreateOrderParams(base)).not.toHaveProperty("subtype");
 

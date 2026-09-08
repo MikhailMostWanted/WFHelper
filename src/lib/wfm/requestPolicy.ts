@@ -79,6 +79,7 @@ export function createSingleFlightMap<K, V>() {
 }
 
 interface QueueTask<T> {
+  owner?: symbol;
   fn: () => Promise<T>;
   resolve: (value: T) => void;
   reject: (reason?: unknown) => void;
@@ -126,6 +127,7 @@ export function createAdaptiveDelayController(options: {
 export function createPriorityRequestQueue<P extends string>(options: {
   priorities: readonly P[];
   maxDepth: number;
+  maxConcurrent?: number;
   beforeTask?: () => Promise<void>;
   onDrop?: () => void;
   dropError?: () => Error;
@@ -133,7 +135,7 @@ export function createPriorityRequestQueue<P extends string>(options: {
   const queues = Object.fromEntries(
     options.priorities.map((priority) => [priority, []]),
   ) as unknown as Record<P, QueueTask<unknown>[]>;
-  let runnerActive = false;
+  let activeRunners = 0;
 
   function queuedTaskCount(): number {
     return options.priorities.reduce((total, priority) => total + queues[priority].length, 0);
@@ -148,15 +150,15 @@ export function createPriorityRequestQueue<P extends string>(options: {
   }
 
   async function runQueueRunner(): Promise<void> {
-    if (runnerActive) return;
-    runnerActive = true;
+    if (activeRunners >= (options.maxConcurrent ?? 1)) return;
+    activeRunners += 1;
 
     try {
       for (;;) {
         const task = popNextTask();
         if (!task) break;
-        if (options.beforeTask) await options.beforeTask();
         try {
+          if (options.beforeTask) await options.beforeTask();
           const result = await task.fn();
           task.resolve(result);
         } catch (error) {
@@ -164,13 +166,13 @@ export function createPriorityRequestQueue<P extends string>(options: {
         }
       }
     } finally {
-      runnerActive = false;
+      activeRunners -= 1;
       if (queuedTaskCount() > 0) void runQueueRunner();
     }
   }
 
   return {
-    enqueue<T>(fn: () => Promise<T>, priority: P): Promise<T> {
+    enqueue<T>(fn: () => Promise<T>, priority: P, owner?: symbol): Promise<T> {
       if (queuedTaskCount() >= options.maxDepth) {
         options.onDrop?.();
         return Promise.reject(
@@ -180,6 +182,7 @@ export function createPriorityRequestQueue<P extends string>(options: {
 
       return new Promise<T>((resolve, reject) => {
         queues[priority].push({
+          ...(owner ? { owner } : {}),
           fn: fn as () => Promise<unknown>,
           resolve: resolve as (value: unknown) => void,
           reject,
@@ -187,13 +190,23 @@ export function createPriorityRequestQueue<P extends string>(options: {
         void runQueueRunner();
       });
     },
+    promote(owner: symbol, priority: P): void {
+      const target = options.priorities.indexOf(priority);
+      for (const lower of options.priorities.slice(target + 1)) {
+        const index = queues[lower].findIndex((task) => task.owner === owner);
+        if (index < 0) continue;
+        const [task] = queues[lower].splice(index, 1);
+        queues[priority].push(task);
+        return;
+      }
+    },
     lengths(): Record<P, number> {
       return Object.fromEntries(
         options.priorities.map((priority) => [priority, queues[priority].length]),
       ) as Record<P, number>;
     },
     isRunning(): boolean {
-      return runnerActive;
+      return activeRunners > 0;
     },
   };
 }

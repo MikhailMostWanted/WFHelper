@@ -255,12 +255,14 @@ function register(): void {
     }
 
     try {
-      const item = (await wfmCatalog.lookupBySlug(slug)) as {
+      const item = (await wfmCatalog.lookupItemDetails(slug)) as {
         id?: unknown;
         item_name?: unknown;
         url_name?: unknown;
         thumb?: unknown;
         icon?: unknown;
+        maxRank?: number | null;
+        subtypes?: string[];
       } | null;
 
       if (!item || typeof item.id !== "string" || typeof item.url_name !== "string") {
@@ -273,6 +275,8 @@ function register(): void {
         url_name: item.url_name,
         thumb: typeof item.thumb === "string" ? item.thumb : null,
         icon: typeof item.icon === "string" ? item.icon : null,
+        maxRank: item.maxRank ?? null,
+        subtypes: item.subtypes ?? [],
       };
     } catch (err) {
       return { error: normalizeErrorMessage(err, "Failed to look up item slug.") };

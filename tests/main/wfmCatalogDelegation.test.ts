@@ -13,6 +13,45 @@ function stubBackendCatalogOffline(): void {
 }
 
 describe("wfmCatalog item lookups", () => {
+  it("loads current item variants without relying on the catalog and shares concurrent lookups", async () => {
+    const wfmClient = await import("../../services/wfmClient");
+    const request = vi.spyOn(wfmClient, "requestV2").mockResolvedValue({
+      data: {
+        id: "675c61ff7b18977f6e645418",
+        slug: "spectral_serration",
+        maxRank: 10,
+        i18n: { en: { name: "Spectral Serration" } },
+        subtypes: ["regular", "atragraph", "regular", 3, ""],
+      },
+    });
+    const catalog = await import("../../services/wfmCatalog");
+    const [a, b] = await Promise.all([
+      catalog.lookupItemDetails("spectral_serration"),
+      catalog.lookupItemDetails("spectral_serration"),
+    ]);
+    expect(a).toMatchObject({
+      url_name: "spectral_serration",
+      maxRank: 10,
+      subtypes: ["regular", "atragraph"],
+    });
+    expect(b).toEqual(a);
+    expect(await catalog.lookupItemDetails("spectral_serration")).toEqual(a);
+    expect(request).toHaveBeenCalledExactlyOnceWith("GET", "/item/spectral_serration");
+  });
+
+  it("allows item details to retry after a temporary failure", async () => {
+    const wfmClient = await import("../../services/wfmClient");
+    vi.spyOn(wfmClient, "requestV2")
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({
+        data: { id: "item", slug: "spectral_serration", subtypes: ["regular", "atragraph"] },
+      });
+    const catalog = await import("../../services/wfmCatalog");
+    await expect(catalog.lookupItemDetails("spectral_serration")).rejects.toThrow("offline");
+    await expect(catalog.lookupItemDetails("spectral_serration")).resolves.toMatchObject({
+      subtypes: ["regular", "atragraph"],
+    });
+  });
   it("prefers the backend worker catalog and skips direct WFM", async () => {
     vi.stubGlobal(
       "fetch",

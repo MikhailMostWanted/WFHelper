@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
+  import { WFM_MOD_VARIANTS } from "../../../config/shared/wfmOrders.js";
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
 
   import ItemImage from "../ItemImage.svelte";
@@ -68,6 +69,9 @@
   // Default to in-game sellers - the only ones you can actually trade with.
   let statusFilter: StatusFilter = "ingame";
   let rankFilter: RankFilter = "all";
+  let subtype = "regular";
+  const modVariants = new SvelteMap<string, string[]>();
+  let subtypeOptions: string[] = [];
   let minPrice: number | null = null;
   let maxPrice: number | null = null;
   let tradingTax: number | null = null;
@@ -189,6 +193,8 @@
     query = item.name;
     showSuggestions = false;
     rankFilter = "all";
+    subtype = "regular";
+    subtypeOptions = modVariants.get(item.slug) ?? [];
     rowLimit = MAX_ROWS;
     contentView = "orders";
     void load(item.slug);
@@ -213,6 +219,14 @@
       });
       if (response.ok) {
         const body = (await response.json()) as { data?: Record<string, unknown> };
+        const subtypes = body.data?.subtypes;
+        if (
+          Array.isArray(subtypes) &&
+          WFM_MOD_VARIANTS.every((variant) => subtypes.includes(variant))
+        ) {
+          modVariants.set(slug, [...WFM_MOD_VARIANTS]);
+          if (selected?.slug === slug) subtypeOptions = [...WFM_MOD_VARIANTS];
+        }
         const tax = Number(body.data?.tradingTax ?? body.data?.trading_tax);
         if (Number.isFinite(tax) && tax >= 0) return tax;
       }
@@ -251,15 +265,17 @@
   async function load(slug: string): Promise<void> {
     const token = ++requestToken;
     const rank = currentFetchRank();
+    const requestedSubtype = subtype;
     orderBook = null;
     errorKey = null;
     noData = false;
     loading = true;
 
-    let result = await fetchItemOrderBookBySlug(slug, { rank });
+    let result = await fetchItemOrderBookBySlug(slug, { rank, subtype: requestedSubtype });
+    if (token !== requestToken) return;
     if (result.status === "error") {
-      clearOrderBookCache(slug, rank);
-      result = await fetchItemOrderBookBySlug(slug, { rank });
+      clearOrderBookCache(slug, rank, requestedSubtype);
+      result = await fetchItemOrderBookBySlug(slug, { rank, subtype: requestedSubtype });
     }
     if (token !== requestToken) return;
 
@@ -278,7 +294,7 @@
 
   function refresh(): void {
     if (!selected) return;
-    clearOrderBookCache(selected.slug, currentFetchRank());
+    clearOrderBookCache(selected.slug, currentFetchRank(), subtype);
     void load(selected.slug);
   }
 
@@ -286,7 +302,7 @@
     if (autoRefreshTimer) clearTimeout(autoRefreshTimer);
     autoRefreshTimer = setTimeout(() => {
       if (selected?.slug !== slug) return;
-      clearOrderBookCache(slug, currentFetchRank());
+      clearOrderBookCache(slug, currentFetchRank(), subtype);
       void load(slug);
     }, AUTO_REFRESH_MS);
   }
@@ -415,7 +431,8 @@
     if (!selected) return "";
     const quantitySuffix = entry.quantity > 1 ? ` x${entry.quantity}` : "";
     const rankSuffix = ranked && entry.rank != null ? ` (Rank ${entry.rank})` : "";
-    const itemText = `${selected.name}${rankSuffix}${quantitySuffix}`;
+    const variantSuffix = subtype === "atragraph" ? " (Atragraph)" : "";
+    const itemText = `${selected.name}${variantSuffix}${rankSuffix}${quantitySuffix}`;
     if (side === "sell") {
       return $translate("common.whisperBuy", {
         user: entry.userName,
@@ -487,6 +504,9 @@
 
   async function openPostOrder(orderType: BrowseSide): Promise<void> {
     if (!selected) return;
+    const target = selected;
+    const targetSubtype = subtype;
+    const targetRank = currentFetchRank();
 
     const session = await invoke("wfmGetSession");
     if (!session.loggedIn) {
@@ -494,7 +514,11 @@
       return;
     }
 
-    const lookup = await invoke("wfmLookupItemBySlug", selected.slug);
+    const lookup = await invoke("wfmLookupItemBySlug", target.slug);
+    if (selected !== target || subtype !== targetSubtype || currentFetchRank() !== targetRank) {
+      setFeedback("browse.orderSelectionChanged");
+      return;
+    }
     if (isIpcError(lookup) || !isLookupItem(lookup)) {
       setFeedback("browse.orderPrepFailed");
       return;
@@ -506,8 +530,9 @@
       draft: {
         item: lookup,
         orderType,
-        modRank: rankFilter === "maxed" && effectiveMaxRank > 0 ? effectiveMaxRank : null,
+        modRank: targetRank,
         maxRank: effectiveMaxRank > 0 ? effectiveMaxRank : null,
+        subtype: subtypeOptions.length > 0 ? targetSubtype : null,
       },
     });
   }
@@ -725,14 +750,38 @@
       <button
         class="filter-tab"
         class:active={contentView === "stats"}
+        disabled={subtype === "atragraph"}
         on:click={() => (contentView = "stats")}>{$translate("browse.tabStatistics")}</button
       >
     </div>
 
-    {#if contentView === "stats"}
+    {#if contentView === "stats" && subtype !== "atragraph"}
       <MarketBrowseStats slug={selected.slug} />
     {:else}
       <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
+        {#if subtypeOptions.length > 0}
+          <div class="grid gap-1">
+            <label for="browse-variant" class="text-xs uppercase tracking-[0.05em] text-text-muted"
+              >{$translate("orderModal.variant")}</label
+            >
+            <select
+              id="browse-variant"
+              class="shared-filter-select"
+              data-browse-variant
+              bind:value={subtype}
+              on:change={() => {
+                contentView = "orders";
+                if (selected) void load(selected.slug);
+              }}
+            >
+              {#each subtypeOptions as option}
+                <option value={option}
+                  >{option === "regular" ? $translate("orderModal.regular") : "Atragraph"}</option
+                >
+              {/each}
+            </select>
+          </div>
+        {/if}
         <div class="grid gap-1">
           <span class="text-xs uppercase tracking-[0.05em] text-text-muted"
             >{$translate("common.orderType")}</span

@@ -158,18 +158,13 @@ class WfmSubtypeRequiredError extends WfmApiError {
   }
 }
 
-// Atragraph mod variants gave plain mods a subtypes list, and v2 rejects a
-// bare create on any subtyped item ("subtype: app.field.required"). The local
-// catalog carries no subtypes, so ask the API which ones the item has.
 async function resolveSubtypeChoices(itemId: string): Promise<string[]> {
   try {
     const entry = await wfmCatalog.lookupById(itemId);
     if (!entry || !entry.url_name) return [];
-    const data = await requestV2("GET", `/item/${encodeURIComponent(entry.url_name)}`);
-    const unwrapped = unwrapWfmResponse<{ subtypes?: unknown }>(data);
-    return Array.isArray(unwrapped?.subtypes)
-      ? unwrapped.subtypes.filter((s): s is string => typeof s === "string")
-      : [];
+    // The catalogue omits Atragraph choices; v2 rejects missing subtypes with app.field.required.
+    const details = await wfmCatalog.lookupItemDetails(entry.url_name);
+    return details?.subtypes ?? [];
   } catch (err) {
     log.warn("[WFMOrders] subtype lookup failed:", normalizeErrorMessage(err));
     return [];

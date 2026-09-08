@@ -53,6 +53,8 @@ export interface WfmLookupItem {
   url_name: string;
   thumb: string | null;
   icon: string | null;
+  maxRank?: number | null;
+  subtypes?: string[];
 }
 
 export interface WfmMutationError {

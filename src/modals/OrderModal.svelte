@@ -50,9 +50,12 @@
   let visible = true;
   let modRank = 0;
   let showRankField = false;
-  let subtype = "intact";
+  let subtype = "";
   let showSubtypeField = false;
   let subtypeOptions: readonly string[] = RELIC_SUBTYPES;
+  let detailsRequest = 0;
+  let detailsLoading = false;
+  let detailsFailed = false;
   let submitting = false;
   let errorMsg = "";
   let platinumEl: HTMLInputElement | null = null;
@@ -62,7 +65,12 @@
   $: isEdit = state?.mode === "edit";
   $: order = (state?.order || null) as WfmOrder | null;
   $: draft = state?.draft || null;
-  $: hint = isEdit ? (state?.hint ?? null) : null;
+  $: hint =
+    isEdit &&
+    (!showSubtypeField || subtype === (order?.subtype ?? "")) &&
+    (!showRankField || modRank === order?.modRank)
+      ? (state?.hint ?? null)
+      : null;
 
   $: if (state) {
     resetForm();
@@ -81,6 +89,9 @@
   }
 
   function resetForm(): void {
+    detailsRequest += 1;
+    detailsLoading = false;
+    detailsFailed = false;
     errorMsg = "";
     itemSearchQuery = "";
     itemDropdown = [];
@@ -94,8 +105,8 @@
       visible = Boolean(order.visible);
       modRank = order.modRank ?? 0;
       showRankField = order.modRank != null;
-      subtype = typeof order.subtype === "string" && order.subtype ? order.subtype : "intact";
-      showSubtypeField = order.subtype != null || isRelicName(order.itemName);
+      setSubtypeOptions(order.itemName, order.subtype);
+      void loadItemDetails(order.itemUrlName);
     } else {
       const draftItem = (draft?.item || null) as WfmLookupItem | null;
       orderType = draft?.orderType === "buy" ? "buy" : "sell";
@@ -111,8 +122,7 @@
       showRankField =
         (typeof draft?.modRank === "number" && Number.isFinite(draft.modRank)) ||
         (typeof draft?.maxRank === "number" && draft.maxRank > 0);
-      subtype = typeof draft?.subtype === "string" && draft.subtype ? draft.subtype : "intact";
-      showSubtypeField = draft?.subtype != null || isRelicName(draftItem?.item_name);
+      setSubtypeOptions(draftItem?.item_name, draft?.subtype);
 
       if (draftItem && typeof draftItem.id === "string" && draftItem.id.trim()) {
         itemSelected = {
@@ -123,6 +133,7 @@
           icon: draftItem.icon || null,
           maxRank: typeof draft?.maxRank === "number" ? draft.maxRank : null,
         };
+        void loadItemDetails(draftItem.url_name);
       }
     }
   }
@@ -145,6 +156,7 @@
   }
 
   onDestroy(() => {
+    detailsRequest += 1;
     searchRequest += 1;
     if (searchTimer) {
       clearTimeout(searchTimer);
@@ -159,12 +171,47 @@
     // WFM v2 rejects rank-less orders for mods/arcanes (rank: app.field.required).
     showRankField = typeof item.maxRank === "number" && item.maxRank > 0;
     modRank = 0;
-    showSubtypeField = isRelicName(item.item_name);
-    subtypeOptions = RELIC_SUBTYPES;
-    subtype = "intact";
+    setSubtypeOptions(item.item_name);
+    void loadItemDetails(item.url_name);
+  }
+
+  function setSubtypeOptions(name: unknown, preferred?: string | null): void {
+    subtypeOptions = isRelicName(name) ? RELIC_SUBTYPES : preferred ? [preferred] : [];
+    subtype = preferred || "";
+    showSubtypeField = subtypeOptions.length > 0;
+  }
+
+  async function loadItemDetails(slug: string | null | undefined): Promise<void> {
+    const token = ++detailsRequest;
+    detailsFailed = false;
+    detailsLoading = !!slug;
+    if (!slug) return;
+    try {
+      const result = await invoke("wfmLookupItemBySlug", slug);
+      if (token !== detailsRequest) return;
+      if (isIpcError(result)) {
+        detailsFailed = true;
+        return;
+      }
+      const choices = result.subtypes ?? [];
+      subtypeOptions = isRelicName(result.item_name) ? RELIC_SUBTYPES : choices;
+      showSubtypeField = subtypeOptions.length > 0;
+      if (!subtypeOptions.includes(subtype)) {
+        if (!isEdit) subtype = subtypeOptions.includes("regular") ? "regular" : "";
+        else if (subtype) subtypeOptions = [...subtypeOptions, subtype];
+      }
+      if (!isEdit) showRankField = typeof result.maxRank === "number" && result.maxRank > 0;
+    } catch {
+      if (token === detailsRequest) detailsFailed = true;
+    } finally {
+      if (token === detailsRequest) detailsLoading = false;
+    }
   }
 
   function clearItem(): void {
+    detailsRequest += 1;
+    detailsLoading = false;
+    detailsFailed = false;
     itemSelected = null;
     showRankField = false;
     showSubtypeField = false;
@@ -173,6 +220,7 @@
 
   async function submit(e: SubmitEvent): Promise<void> {
     e.preventDefault();
+    if ((!isEdit && (detailsLoading || detailsFailed)) || submitting) return;
     errorMsg = "";
 
     const plat = parseInt(String(platinum), 10);
@@ -186,16 +234,20 @@
       errorMsg = $tr("orderModal.quantityMin");
       return;
     }
+    if (!isEdit && showSubtypeField && !subtype) {
+      errorMsg = $tr("orderModal.subtypeRequired");
+      return;
+    }
 
     submitting = true;
     try {
       let result;
       if (isEdit && order) {
         const updates: WfmUpdateOrderInput = { platinum: plat, quantity: qty, visible };
-        if (showRankField && !Number.isNaN(Number(modRank))) {
+        if (showRankField && modRank !== order.modRank && !Number.isNaN(Number(modRank))) {
           updates.modRank = Number(modRank);
         }
-        if (showSubtypeField && subtype) {
+        if (showSubtypeField && subtype && subtype !== (order.subtype ?? "")) {
           updates.subtype = subtype;
         }
         result = await tradeInvoke("wfmUpdateOrder", order.id, updates);
@@ -233,7 +285,7 @@
         const choices = subtypeChoicesOf(result);
         if (choices) {
           subtypeOptions = choices;
-          subtype = choices[0];
+          if (!isEdit) subtype = choices.includes("regular") ? "regular" : "";
           showSubtypeField = true;
           errorMsg = $tr("orderModal.subtypeRequired");
           return;
@@ -253,6 +305,7 @@
   }
 
   function close(): void {
+    detailsRequest += 1;
     orderModalState.set(null);
   }
 </script>
@@ -303,6 +356,7 @@
                   <button
                     type="button"
                     aria-label={$tr("orderModal.clearItem")}
+                    data-order-clear-item
                     class="ml-auto border-0 bg-transparent text-base leading-none text-text-muted hover:text-text-primary"
                     on:click={clearItem}>&times;</button
                   >
@@ -327,6 +381,7 @@
                       {#each itemDropdown as item}
                         <button
                           type="button"
+                          data-order-item={item.url_name}
                           class="flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-2.5 py-2 text-left text-sm text-text-primary hover:bg-bg-hover"
                           on:click={() => selectItem(item)}
                         >
@@ -461,10 +516,16 @@
                 id="order-subtype"
                 class="shared-filter-select w-full"
                 bind:value={subtype}
+                disabled={detailsLoading || submitting}
                 data-order-subtype
               >
+                <option value="" disabled>{$tr("orderModal.chooseVariant")}</option>
                 {#each subtypeOptions as option (option)}
-                  <option value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
+                  <option value={option}
+                    >{option === "regular"
+                      ? $tr("orderModal.regular")
+                      : option.charAt(0).toUpperCase() + option.slice(1)}</option
+                  >
                 {/each}
               </select>
             </div>
@@ -488,13 +549,33 @@
             </label>
           </div>
 
+          {#if detailsLoading}
+            <div class="text-text-secondary" data-order-details-loading>
+              {$tr("common.loading")}
+            </div>
+          {:else if detailsFailed}
+            <div class="text-danger" data-order-details-error>
+              {isEdit ? $tr("orderModal.editDetailsFailed") : $tr("orderModal.detailsFailed")}
+              <button
+                type="button"
+                class="btn-secondary btn-sm"
+                on:click={() =>
+                  loadItemDetails(isEdit ? order?.itemUrlName : itemSelected?.url_name)}
+                >{$tr("common.retry")}</button
+              >
+            </div>
+          {/if}
           {#if errorMsg}
-            <div class="text-danger">{errorMsg}</div>
+            <div class="text-danger" data-order-validation-error>{errorMsg}</div>
           {/if}
 
           <div class="mt-3 flex justify-end gap-2">
             <ThemedButton type="button" onClick={close}>{$tr("common.cancel")}</ThemedButton>
-            <button type="submit" class="btn-primary" disabled={submitting}>
+            <button
+              type="submit"
+              class="btn-primary"
+              disabled={submitting || (!isEdit && (detailsLoading || detailsFailed))}
+            >
               {submitting
                 ? isEdit
                   ? $tr("common.saving")

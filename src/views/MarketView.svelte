@@ -971,6 +971,7 @@
           {#if !isRivensTab}
             <button
               class="btn-primary btn-sm"
+              data-market-new-order
               on:click={() => orderModalState.set({ mode: "create", order: null })}
             >
               {$tr("market.newOrder")}

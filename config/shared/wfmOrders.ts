@@ -1,6 +1,6 @@
-// The relic refinements WFM prices through the order `subtype` field, and the
-// only subtypes the app places or filters on. Single source for all runtimes.
+// Relic refinements shared by order forms, order books and worker summaries.
 export const WFM_ORDER_SUBTYPES = ["intact", "exceptional", "flawless", "radiant"] as const;
+export const WFM_MOD_VARIANTS = ["regular", "atragraph"] as const;
 export type WfmOrderSubtype = (typeof WFM_ORDER_SUBTYPES)[number];
 
 const WFM_ORDER_SUBTYPE_SET = new Set<string>(WFM_ORDER_SUBTYPES);
@@ -141,6 +141,13 @@ export function normalizeWfmOrderBookSide(
 
       const rank = parseOrderRank(order);
       if (rankFilter != null && rank !== rankFilter) return null;
+
+      // Ordinary price views must not include cosmetic mod variants.
+      if (
+        subtypeFilter == null &&
+        normalizeSubtype(typeof order.subtype === "string" ? order.subtype : null) === "atragraph"
+      )
+        return null;
 
       // Relic orders carry a refinement subtype; a filtered book only shows
       // orders for that refinement (missing subtype counts as intact).

@@ -2,6 +2,7 @@
   import { tr } from "../../lib/i18n.js";
 
   export let isRankedListing = false;
+  export let modVariant = false;
   export let summaryRank: number | null = null;
   export let wtsLabel = "-";
   export let wtbLabel = "-";
@@ -9,13 +10,13 @@
 </script>
 
 <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5 font-display">
-  {#if isRankedListing && summaryRank != null}
+  {#if modVariant || (isRankedListing && summaryRank != null)}
     <span class="market-summary-line">
-      <small>WTS R{summaryRank}</small>
+      <small>WTS{summaryRank != null ? ` R${summaryRank}` : ""}</small>
       <strong>{wtsLabel}</strong>
     </span>
     <span class="market-summary-line">
-      <small>WTB R{summaryRank}</small>
+      <small>WTB{summaryRank != null ? ` R${summaryRank}` : ""}</small>
       <strong>{wtbLabel}</strong>
     </span>
   {:else}

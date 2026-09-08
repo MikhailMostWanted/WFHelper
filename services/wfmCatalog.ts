@@ -27,6 +27,7 @@ interface CatalogItem {
   icon: string | null;
   maxRank: number | null;
   gameRef: string | null;
+  subtypes?: string[];
 }
 
 let _items: CatalogItem[] = [];
@@ -349,4 +350,35 @@ export async function lookupById(id: string): Promise<CatalogItem | null> {
 export async function lookupBySlug(slug: string): Promise<CatalogItem | null> {
   await _load();
   return _bySlug.get(slug) || null;
+}
+
+const itemDetailsCache = new Map<string, { item: CatalogItem; at: number }>();
+const itemDetailsPending = new Map<string, Promise<CatalogItem | null>>();
+
+/** The cached catalog can predate newly added mod variants. */
+export function lookupItemDetails(slug: string): Promise<CatalogItem | null> {
+  const cached = itemDetailsCache.get(slug);
+  if (cached && Date.now() - cached.at < 5 * 60_000) return Promise.resolve(cached.item);
+  const pending = itemDetailsPending.get(slug);
+  if (pending) return pending;
+  const request = (async () => {
+    const raw = unwrapWfmResponse<Record<string, unknown>>(
+      await wfmClient.requestV2("GET", `/item/${encodeURIComponent(slug)}`),
+    );
+    if (!raw || typeof raw.id !== "string") return null;
+    const item = _normalise(raw);
+    item.subtypes = Array.isArray(raw.subtypes)
+      ? [
+          ...new Set(
+            raw.subtypes.filter(
+              (value): value is string => typeof value === "string" && !!value.trim(),
+            ),
+          ),
+        ]
+      : [];
+    itemDetailsCache.set(slug, { item, at: Date.now() });
+    return item;
+  })().finally(() => itemDetailsPending.delete(slug));
+  itemDetailsPending.set(slug, request);
+  return request;
 }

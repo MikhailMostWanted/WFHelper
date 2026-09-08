@@ -31,6 +31,7 @@ interface FixtureOrder {
   quantity: number;
   visible: boolean;
   modRank: number | null;
+  subtype?: string | null;
   itemId: string | null;
   itemName: string;
   itemUrlName: string | null;
@@ -119,6 +120,7 @@ export function registerWfmFixtures(): boolean {
     if (typeof parsed.updates.quantity === "number") order.quantity = parsed.updates.quantity;
     if (typeof parsed.updates.visible === "boolean") order.visible = parsed.updates.visible;
     if (typeof parsed.updates.modRank === "number") order.modRank = parsed.updates.modRank;
+    if (typeof parsed.updates.subtype === "string") order.subtype = parsed.updates.subtype;
     return { ok: true };
   });
   handleAuthorized(WFM_DELETE_ORDER, assertMainRendererSender, async (_event, payload) => {
@@ -136,9 +138,23 @@ export function registerWfmFixtures(): boolean {
     return { ok: true };
   });
   handleAuthorized(WFM_SEARCH_ITEMS, assertMainRendererSender, async () => []);
-  handleAuthorized(WFM_LOOKUP_ITEM, assertMainRendererSender, async () => ({
-    error: "Item lookup is not available in fixture mode.",
-  }));
+  handleAuthorized(WFM_LOOKUP_ITEM, assertMainRendererSender, async (_event, payload) => {
+    const slug = (payload as { slug?: unknown } | null)?.slug;
+    const order = allOrders().find((entry) => entry.itemUrlName === slug);
+    if (!order) return { error: "Item not found in fixture." };
+    return {
+      id: order.itemId,
+      item_name: order.itemName,
+      url_name: order.itemUrlName,
+      thumb: order.itemThumb,
+      icon: null,
+      maxRank: order.modRank == null ? null : Math.max(1, order.modRank),
+      subtypes:
+        order.subtype === "regular" || order.subtype === "atragraph"
+          ? ["regular", "atragraph"]
+          : [],
+    };
+  });
   handleAuthorized(WFM_GET_ME, assertMainRendererSender, async () => ({ status: "online" }));
   handleAuthorized(WFM_SET_STATUS, assertMainRendererSender, async () => ({ ok: true }));
   handleAuthorized(WFM_PRESENCE_STATE, assertMainRendererSender, async () => ({

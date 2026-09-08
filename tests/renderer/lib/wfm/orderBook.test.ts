@@ -51,6 +51,135 @@ afterEach(() => {
 });
 
 describe("fetchItemOrderBookBySlug", () => {
+  it.each([false, true])(
+    "runs interactive requests ahead of row backlog (already queued: %s)",
+    async (alreadyQueued) => {
+      const started: string[] = [];
+      const gates = new Map<string, ReturnType<typeof deferred<void>>>();
+      let released = false;
+      globalThis.fetch = vi.fn(async (input) => {
+        const slug = String(input).split("/").pop()!;
+        started.push(slug);
+        if (!released) {
+          const gate = deferred<void>();
+          gates.set(slug, gate);
+          await gate.promise;
+        }
+        return orderResponse(80);
+      });
+      const requests = Array.from({ length: 8 }, (_, index) =>
+        fetchItemOrderBookBySlug(`variant_${index}`, { priority: "background" }),
+      );
+      const clickedSlug = alreadyQueued ? "variant_7" : "clicked_item";
+      requests.push(fetchItemOrderBookBySlug(clickedSlug));
+      try {
+        await vi.waitFor(() => expect(started).toHaveLength(4));
+        gates.get("variant_0")!.resolve();
+        await vi.waitFor(() => expect(started).toHaveLength(5));
+        expect(started[4]).toBe(clickedSlug);
+      } finally {
+        released = true;
+        for (const gate of gates.values()) gate.resolve();
+        await Promise.all(requests);
+      }
+      expect(started.filter((slug) => slug === clickedSlug)).toHaveLength(1);
+    },
+  );
+
+  it.each([false, true])("skips invalidated queued requests (global clear: %s)", async (global) => {
+    const gate = deferred<void>();
+    const started: string[] = [];
+    globalThis.fetch = vi.fn(async (input) => {
+      started.push(String(input).split("/").pop()!);
+      await gate.promise;
+      return orderResponse(80);
+    });
+    const requests = Array.from({ length: 4 }, (_, index) =>
+      fetchItemOrderBookBySlug(`active_${index}`),
+    );
+    const old = fetchItemOrderBookBySlug("queued", { priority: "background" });
+    clearOrderBookCache(global ? undefined : "queued");
+    const fresh = fetchItemOrderBookBySlug("queued");
+    gate.resolve();
+    await Promise.all(requests);
+    expect(await old).toEqual({ status: "error", slug: "queued" });
+    expect((await fresh).status).toBe("ok");
+    expect(started.filter((slug) => slug === "queued")).toHaveLength(1);
+    expect((await fetchItemOrderBookBySlug("queued")).status).toBe("ok");
+    expect(started.filter((slug) => slug === "queued")).toHaveLength(1);
+  });
+
+  it("bounds concurrent cold order books across different slugs", async () => {
+    let active = 0;
+    let peak = 0;
+    globalThis.fetch = vi.fn(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return orderResponse(80);
+    });
+    const results = await Promise.all(
+      Array.from({ length: 12 }, (_, index) => fetchItemOrderBookBySlug(`variant_${index}`)),
+    );
+    expect(results.every((result) => result.status === "ok")).toBe(true);
+    expect(peak).toBeLessThanOrEqual(4);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(12);
+  });
+
+  it("separates regular and Atragraph mod prices at the requested rank", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      jsonResponse(200, {
+        data: [
+          {
+            type: "sell",
+            platinum: 80,
+            quantity: 2,
+            rank: 10,
+            subtype: "regular",
+            user: { ingameName: "regular", status: "ingame" },
+          },
+          {
+            type: "sell",
+            platinum: 75,
+            quantity: 1,
+            rank: 10,
+            user: { ingameName: "legacy", status: "ingame" },
+          },
+          {
+            type: "sell",
+            platinum: 150,
+            quantity: 1,
+            rank: 10,
+            subtype: "atragraph",
+            user: { ingameName: "foil", status: "ingame" },
+          },
+          {
+            type: "sell",
+            platinum: 15,
+            quantity: 1,
+            rank: 0,
+            subtype: "atragraph",
+            user: { ingameName: "unranked", status: "ingame" },
+          },
+        ],
+      }),
+    );
+    const regular = await fetchItemOrderBookBySlug("spectral_serration", {
+      rank: 10,
+      subtype: "regular",
+    });
+    const foil = await fetchItemOrderBookBySlug("spectral_serration", {
+      rank: 10,
+      subtype: "atragraph",
+    });
+    expect(regular.status).toBe("ok");
+    expect(foil.status).toBe("ok");
+    if (regular.status !== "ok" || foil.status !== "ok") throw new Error("Expected order books");
+    expect(regular.data.sell.map((row) => row.platinum)).toEqual([75, 80]);
+    expect(foil.data.sell.map((row) => row.platinum)).toEqual([150]);
+    expect(await fetchItemOrderBookBySlug("spectral_serration", { rank: 10 })).toEqual(regular);
+  });
   it("returns error for invalid slug input", async () => {
     const result = await fetchItemOrderBookBySlug("   ");
 
@@ -106,6 +235,7 @@ describe("fetchItemOrderBookBySlug", () => {
     const requestA = fetchItemOrderBookBySlug("burston_prime_receiver");
     const requestB = fetchItemOrderBookBySlug("burston_prime_receiver");
 
+    await Promise.resolve();
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     resolveRequest(

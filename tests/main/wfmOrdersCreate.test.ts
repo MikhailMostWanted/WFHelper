@@ -18,11 +18,13 @@ vi.mock("../../services/wfmSession", () => ({
 
 vi.mock("../../services/wfmCatalog", () => ({
   lookupById: vi.fn(),
+  lookupItemDetails: vi.fn(),
 }));
 
 const requestV2Mock = vi.mocked(requestV2);
 const getInGameNameMock = vi.mocked(wfmSession.getInGameName);
 const lookupByIdMock = vi.mocked(wfmCatalog.lookupById);
+const lookupItemDetailsMock = vi.mocked(wfmCatalog.lookupItemDetails);
 
 const ORDER_RESPONSE = {
   data: { order: { id: "o1", type: "sell", platinum: 85, quantity: 1, visible: true } },
@@ -189,13 +191,17 @@ describe("createOrder subtype adaptivity", () => {
   beforeEach(() => {
     requestV2Mock.mockReset();
     lookupByIdMock.mockReset();
+    lookupItemDetailsMock.mockReset();
     wfmOrders.__resetWfmOrdersForTest();
   });
 
   it("fetches the item's subtypes and retries with regular", async () => {
     lookupByIdMock.mockResolvedValueOnce(catalogEntry);
-    requestV2Mock.mockImplementation(async (method, _path, opts) => {
-      if (method === "GET") return { data: { subtypes: ["regular", "atragraph"] } };
+    lookupItemDetailsMock.mockResolvedValueOnce({
+      ...catalogEntry,
+      subtypes: ["regular", "atragraph"],
+    });
+    requestV2Mock.mockImplementation(async (_method, _path, opts) => {
       const body = (opts?.json ?? {}) as Record<string, unknown>;
       if (!("subtype" in body)) throw subtypeError();
       return ORDER_RESPONSE;
@@ -205,16 +211,19 @@ describe("createOrder subtype adaptivity", () => {
 
     const calls = requestV2Mock.mock.calls;
     const gets = calls.filter((call) => call[0] === "GET");
-    expect(gets).toHaveLength(1);
-    expect(gets[0][1]).toBe("/item/vitality");
+    expect(gets).toHaveLength(0);
+    expect(lookupItemDetailsMock).toHaveBeenCalledExactlyOnceWith("vitality");
     const finalBody = calls[calls.length - 1][2]?.json as Record<string, unknown>;
     expect(finalBody.subtype).toBe("regular");
   });
 
   it("refuses to guess a variant when regular is absent and creates nothing", async () => {
     lookupByIdMock.mockResolvedValueOnce(catalogEntry);
-    requestV2Mock.mockImplementation(async (method, _path, opts) => {
-      if (method === "GET") return { data: { subtypes: ["intact", "radiant"] } };
+    lookupItemDetailsMock.mockResolvedValueOnce({
+      ...catalogEntry,
+      subtypes: ["intact", "radiant"],
+    });
+    requestV2Mock.mockImplementation(async (_method, _path, opts) => {
       const body = (opts?.json ?? {}) as Record<string, unknown>;
       if (!("subtype" in body)) throw subtypeError();
       return ORDER_RESPONSE;
@@ -238,8 +247,11 @@ describe("createOrder subtype adaptivity", () => {
 
   it("exposes the choices structurally, so a late-required caller can read them", async () => {
     lookupByIdMock.mockResolvedValueOnce(catalogEntry);
-    requestV2Mock.mockImplementation(async (method) => {
-      if (method === "GET") return { data: { subtypes: ["intact", "radiant"] } };
+    lookupItemDetailsMock.mockResolvedValueOnce({
+      ...catalogEntry,
+      subtypes: ["intact", "radiant"],
+    });
+    requestV2Mock.mockImplementation(async () => {
       throw subtypeError();
     });
 
@@ -284,8 +296,8 @@ describe("createOrder subtype adaptivity", () => {
 
   it("rethrows when the item reports no subtypes", async () => {
     lookupByIdMock.mockResolvedValueOnce(catalogEntry);
-    requestV2Mock.mockImplementation(async (method) => {
-      if (method === "GET") return { data: { subtypes: [] } };
+    lookupItemDetailsMock.mockResolvedValueOnce({ ...catalogEntry, subtypes: [] });
+    requestV2Mock.mockImplementation(async () => {
       throw subtypeError();
     });
 

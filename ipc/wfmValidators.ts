@@ -1,12 +1,11 @@
 import { toFiniteNumber } from "../config/shared/numeric";
-import { WFM_ORDER_SUBTYPES } from "../config/shared/wfmOrders";
+import { WFM_MOD_VARIANTS, WFM_ORDER_SUBTYPES } from "../config/shared/wfmOrders";
 import { isObject } from "./ipcValidators";
 import { toNonEmptyString } from "../config/shared/stringValidation";
 
 const WFM_ID_RE = /^[a-f0-9]{24}$/i;
 const VALID_ORDER_TYPES = new Set(["sell", "buy"]);
-// Relic refinements are the only order subtypes the app places today.
-const VALID_ORDER_SUBTYPES = new Set<string>(WFM_ORDER_SUBTYPES);
+const VALID_ORDER_SUBTYPES = new Set<string>([...WFM_ORDER_SUBTYPES, ...WFM_MOD_VARIANTS]);
 const VALID_STATUSES = new Set(["online", "ingame", "invisible"]);
 
 const EMAIL_MAX_LENGTH = 254;
