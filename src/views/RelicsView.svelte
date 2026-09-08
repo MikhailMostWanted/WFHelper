@@ -696,6 +696,7 @@
           <span>{$tr("relics.qualityLabel")}</span>
           <select
             class="shared-filter-select w-32 min-w-32"
+            data-relic-quality
             value={$relicViewState.qualityMode}
             on:change={setRelicQualityMode}
           >
