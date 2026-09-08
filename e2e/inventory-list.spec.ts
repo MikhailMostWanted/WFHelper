@@ -50,6 +50,13 @@ test.describe("Inventory list view", () => {
     await closeElectronTestHarness(harness);
   });
 
+  test("hovering one card reveals only that card's details button", async () => {
+    const cards = page.locator(".item-card");
+    await cards.nth(0).hover();
+    await expect(cards.nth(0).locator(".expand-link")).toHaveCSS("opacity", "1");
+    await expect(cards.nth(1).locator(".expand-link")).toHaveCSS("opacity", "0");
+  });
+
   function modeButton(mode: "cards" | "list") {
     return page.locator(`[data-inventory-view-mode-option="${mode}"]`);
   }

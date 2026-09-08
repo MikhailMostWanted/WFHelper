@@ -97,7 +97,7 @@
 
 {#if !soloSectionId || soloSectionId === id}
   <div
-    class="group min-w-0 {className} {outlineClass}"
+    class="min-w-0 {className} {outlineClass}"
     data-layout-section={id}
     data-layout-dragging={dragging ? "true" : "false"}
     data-layout-span={String(span)}
