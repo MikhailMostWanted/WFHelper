@@ -56,6 +56,7 @@ function routeMetadata(req: Request): RouteMetadata {
 	if (pathname === '/v1/supporters') return { type: 'request', route: '/v1/supporters' };
 	if (pathname === '/v1/top-traded') return { type: 'request', route: '/v1/top-traded' };
 	if (pathname === '/v1/adversary-vendors') return { type: 'request', route: '/v1/adversary-vendors' };
+	if (pathname === '/v1/baro-history') return { type: 'request', route: '/v1/baro-history' };
 
 	const publicSlugRoutes = [
 		['/v1/prices/', '/v1/prices/:slug'],

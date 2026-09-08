@@ -63,3 +63,17 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 export function utcDate(now: number): string {
 	return new Date(now).toISOString().slice(0, 10);
 }
+
+export function byteLength(value: string): number {
+	return new TextEncoder().encode(value).length;
+}
+
+export function parseJsonRecord(raw: string | null): Record<string, unknown> | null {
+	if (!raw) return null;
+	try {
+		const value: unknown = JSON.parse(raw);
+		return isRecord(value) ? value : null;
+	} catch {
+		return null;
+	}
+}

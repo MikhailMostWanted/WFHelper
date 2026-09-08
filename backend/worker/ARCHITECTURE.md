@@ -44,7 +44,7 @@ Rate Limiting binding defaults in `wrangler.jsonc` are per IP:
 
 - health: 5 per minute
 - bootstrap and full orders: 60 per minute
-- prices, meta, order summaries, supporters, top traded, and adversary vendors: 200 per minute
+- prices, meta, order summaries, supporters, top traded, Baro history, and adversary vendors: 200 per minute
 - snapshot and item catalog: 2 per minute
 - admin: 60 per minute
 
@@ -215,7 +215,10 @@ Keys live in `ITEM_META`:
   missing from a day either had no priced auction or failed its request that day.
 - `archive:baro:{visitId}` holds one visit as node, activation, expiry, and manifest rows
   `[item uniqueName, ducats, credits]`. `visitId` is the world-state `_id.$oid`, or
-  `d{activationMs}` when DE omits it. Item names stay in raw `/Lotus/StoreItems/...` form.
+  `d{activationMs}` when DE omits it. Version 2 normalizes `/Lotus/StoreItems/...` to the
+  corresponding inventory item path and records unknown prices as `null`, preserving explicit zero.
+  Version 1 archives remain readable; their zero prices become unknown during migration because
+  the old collector also encoded missing prices as zero.
 
 `archive:index:{family}:v1` lists that family's ids, oldest first. Retention is the
 `HISTORY_RETENTION_DAYS` window (730 days) applied twice: every archive value is written with a
@@ -275,16 +278,64 @@ stops the seed before it starts, as does `HISTORY_ARCHIVE_ENABLED=0`.
 
 Baro comes from the DE world state (`VoidTraders`; `PrimeVaultTraders` is Varzia and is never read
 here). The response body is read through a byte cap rather than trusted by `content-length`, which
-a chunked response omits entirely; a body past 32MB is abandoned mid-stream and treated as
-unavailable. Only a live visit carrying a manifest is recorded, because an announced manifest can
-still change before activation. A visit runs for about 48 hours, so a daily check catches every one, and
-the write is skipped when the visit key already exists.
+a chunked response omits entirely. A body past 32MB is abandoned mid-stream, and a 15-second
+deadline covers headers and body. Only a live visit carrying a manifest is recorded, because an
+announced manifest can still change before activation. Daily checks normally cover a visit's
+roughly 48-hour window, but an upstream outage or missed cron can leave a gap. An existing archive
+is kept while the durable history and index are repaired on subsequent ticks.
 
 Failure policy matches the caches. An empty or failed upstream answer never replaces or deletes an
 existing archive, no negative markers are written, and each entry point catches its own errors so a
 failing archive cannot break prewarm or the supporter sync. `HISTORY_ARCHIVE_ENABLED=0` stops all
 three families. Every write logs its byte size on route `archive:prices`, `archive:rivens`,
 `archive:baro`, or `archive:price-seed`, and a value past 4MB is refused rather than stored.
+
+## Baro visit history
+
+`GET /v1/baro-history` returns `{ ok: true, data: { version, updatedAt, coverageStart, visits,
+lastSeen } }`. It uses the public API rate limiter (200 requests per minute per IP), shared CORS and daily-budget guards,
+and does not require bootstrap. The edge cache lasts one hour for recorded history and five
+minutes for an empty history. Body ETags support 304 on cold and cached requests. Missing, invalid or unreadable durable data returns 503 without caching a false empty result. A cold request reads one KV key and never reconstructs archives. Cache API failures fall back to that read.
+
+`services/baroHistory.ts` owns `ITEM_META` key `baro:history:v1`, which has no TTL. It stores at
+most 128 visit manifests and 5,000 per-item last-seen records. Visit details also obey
+`HISTORY_RETENTION_DAYS`; removing an old visit never removes its last-seen item records.
+`coverageStart` is the earliest visit actually recorded or recovered, not evidence that every
+visit since then is present. Missing items mean unknown history, not that Baro never sold them.
+History carries the observed ducat and credit prices, each nullable, and makes no next-visit
+predictions.
+
+The daily Baro stage reconciles retained archives on every tick, including while Baro is inactive
+or world state is unavailable. One prefix listing discovers manifests omitted from the index by
+a failed earlier durable write. A listing or index union exceeding 128 ids stops reconciliation with
+`baro_archive_scan_limit`; accepted archives are read in batches of eight. Unknown missing and failed archive reads retain recoverable data
+but keep reconciliation incomplete and prevent index pruning; the next daily tick retries them.
+The durable envelope also keeps up to 128 acknowledged archive ids in `archivedVisits`, omitted
+from public responses. An id is acknowledged after its complete parsed manifest was materialized
+or its malformed source was durably quarantined; valid pre-ledger durable visits also provide that proof. Missing or failed reads
+for acknowledged ids do not block after archive TTL expiry. The ledger survives visit-detail
+retention and is trimmed only when ids leave both the index and prefix listing. It is written
+atomically with the history document before index pruning.
+Readable malformed archives are copied into `baro:history:recovery:archives:v1` without a TTL before
+acknowledgement. That recovery document keeps at most 128 sources and 4MB; overflow or a failed
+quarantine write prevents acknowledgement and pruning. Future visits remain pending for retry.
+The operator must investigate persistent `baro_history_migration_incomplete`, `baro_archive_recovery_limit`
+or `baro_archive_scan_limit` errors rather than discard unknown archive entries automatically.
+
+The current raw manifest is written before reconciliation, so migration failure cannot lose the
+only live copy DE publishes. Index updates and pruning happen only after the durable write. Each
+tick writes the durable key once. Item last-seen dates never move backward. The stable visit id
+allows corrected expiry times; replaying an older archive cannot revert a corrected schedule.
+Treasure boxes are excluded consistently with the desktop.
+
+Before repairing a corrupt durable document, the stage saves its raw value in
+`baro:history:recovery:v1` without TTL and salvages individually valid per-item dates and visits.
+The recovery key retains the latest corrupt source for operator inspection. Surviving archives
+are merged with those records; a later valid tick does not touch the recovery key. Invalid index
+data, an incomplete listing, item-limit overflow and documents over 4MB stop pruning. The public
+route serves only validated materialized data. KV is eventually consistent and has no
+cross-isolate atomic merge, so keep this daily stage as the sole writer. Same-isolate writes are
+serialized; additional writers require a coordinator.
 
 ## Top traded (rolling volume sweep)
 

@@ -5,6 +5,7 @@ import { itemDb, parsedItems, wfmItems } from "../stores/data.js";
 import { recordSelectionCompleteness, savedSelections } from "../stores/inventorySelection.js";
 import { relicDb } from "../stores/relics.js";
 import { applyUpdateState } from "../stores/updates.js";
+import { watchBaroWishlistArrivals } from "../stores/baro.js";
 import { configureRelicRuntimeCacheFingerprint, warmupPrimeRewardPriceCache } from "./relic.js";
 import { exportRankedHotset, importRankedHotset } from "./wfm/rankedHotset.js";
 import { tryLoadSnapshot } from "./wfm/snapshotLoader.js";
@@ -194,11 +195,13 @@ export function initStartup(options: StartupOptions = {}): StartupHandle {
   // Pop-outs share the same saved selections, so only the owning window may
   // watch them; two subscribers would fire the notification twice.
   const stopSelectionAlerts = ownsSharedCaches ? watchSelectionAlerts() : null;
+  const stopBaroAlerts = ownsSharedCaches ? watchBaroWishlistArrivals() : null;
 
   return {
     dispose() {
       disposed = true;
       stopSelectionAlerts?.();
+      stopBaroAlerts?.();
       if (warmupTimer) {
         clearTimeout(warmupTimer);
         warmupTimer = null;

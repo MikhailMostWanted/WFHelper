@@ -141,6 +141,8 @@
   import { tr, type Translator } from "../lib/i18n.js";
   import InvasionItem from "../components/world/InvasionItem.svelte";
   import BaroInventoryCard from "../components/world/BaroInventoryCard.svelte";
+  import BaroPlanner from "../components/world/BaroPlanner.svelte";
+  import { loadBaroHistory } from "../stores/baro.js";
   import CycleRow from "../components/world/CycleRow.svelte";
   import IconButtonCard from "../components/world/IconButtonCard.svelte";
   import WorldToggleIcon from "../components/world/WorldToggleIcon.svelte";
@@ -161,7 +163,7 @@
     collapsed = toggleCollapsedSection(collapsed, key);
   }
 
-  const WORLD_TABS = ["world", "arbis", "dailies"] as const;
+  const WORLD_TABS = ["world", "arbis", "dailies", "baro"] as const;
   type WorldTab = (typeof WORLD_TABS)[number];
   const asWorldTab = (key: string | null): WorldTab =>
     WORLD_TABS.includes(key as WorldTab) ? (key as WorldTab) : "world";
@@ -179,6 +181,7 @@
     { key: "world", label: $tr("common.world") },
     { key: "arbis", label: $tr("common.arbitrations") },
     { key: "dailies", label: $tr("dailies.tab") },
+    { key: "baro", label: $tr("marketAlerts.kindBaro") },
   ];
 
   const nowClock = clockStore(1000);
@@ -187,6 +190,9 @@
   $: nowCoarseMs = $coarseClock;
 
   onMount(mountWorldView);
+  onMount(() => {
+    void loadBaroHistory();
+  });
 
   function openItemDetail(
     uniqueName: string,
@@ -389,7 +395,7 @@
             class="flex shrink-0 cursor-pointer items-center justify-center rounded border border-border bg-bg-raised/60 p-1.5 text-text-secondary transition-[border-color,color] duration-150 hover:border-border-strong hover:text-text-primary"
           />
         {/if}
-        <EditLayoutBar view="world" only={worldSectionScope} />
+        {#if worldTab !== "baro"}<EditLayoutBar view="world" only={worldSectionScope} />{/if}
       </div>
     </div>
     <div class="flex items-end border-b border-border-subtle">
@@ -414,7 +420,9 @@
     </div>
   </div>
 
-  {#if worldTab === "arbis"}
+  {#if worldTab === "baro"}
+    <BaroPlanner />
+  {:else if worldTab === "arbis"}
     <LayoutGrid view="world" only={WORLD_ARBI_SECTIONS} gapClass="gap-0" let:sectionId>
       {#if sectionId === "world.arbiSchedule"}
         <ArbiSchedule />

@@ -14,6 +14,7 @@ type PublicRateLimitRoute =
 	| 'wfm-items'
 	| 'supporters'
 	| 'top-traded'
+	| 'baro-history'
 	| 'adversary-vendors';
 
 function publicLimiter(env: Env, route: PublicRateLimitRoute): RateLimit {

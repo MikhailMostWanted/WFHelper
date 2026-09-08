@@ -12,6 +12,7 @@ import {
 	getOrHydratePrice,
 } from '../services/readThrough';
 import { readAdversaryVendorsDoc } from '../services/adversaryVendors';
+import { readBaroHistory } from '../services/baroHistory';
 import { isRelicSlug, normalizeOrderSubtype } from '../services/orderSubtype';
 import { readPublishedSupporters } from '../services/supporters';
 import { readTopTradedDoc } from '../services/topTraded';
@@ -42,6 +43,7 @@ const routeStats = {
 	supportersRequests: 0,
 	topTradedRequests: 0,
 	adversaryVendorsRequests: 0,
+	baroHistoryRequests: 0,
 };
 
 const PUBLIC_JSON_CACHE_HEADERS = { 'cache-control': 'public, max-age=60' };
@@ -388,6 +390,41 @@ export async function handlePublicRoutes(req: Request, url: URL, env: Env, ctx?:
 		}
 
 		return annotateResponse(response, { cacheHit: false });
+	}
+
+	if (req.method === 'GET' && url.pathname === '/v1/baro-history') {
+		const guardResponse = await guardPublicRequest(req, env, 'baro-history');
+		if (guardResponse) return guardResponse;
+		routeStats.baroHistoryRequests += 1;
+		const cacheKey = new Request(`${url.origin}/v1/baro-history?v=2`);
+		const cached = await caches.default.match(cacheKey).catch(() => undefined);
+		if (cached) {
+			const cacheControl = cached.headers.get('cache-control') || 'public, max-age=300';
+			const etag = cached.headers.get('etag');
+			if (etag && requestHasMatchingEtag(req, etag))
+				return annotateResponse(notModifiedResponse(etag, cacheControl, req, env), { cacheHit: true });
+			return annotateResponse(
+				streamJsonResponse(cached.body, req, env, cached.status, {
+					'cache-control': cacheControl,
+					...(etag ? { etag } : {}),
+				}),
+				{ cacheHit: true },
+			);
+		}
+		let history;
+		try {
+			history = await readBaroHistory(env);
+		} catch {
+			history = null;
+		}
+		if (!history) return jsonResponse({ ok: false, error: 'baro_history_unavailable' }, req, env, 503);
+		const body = JSON.stringify({ ok: true, data: history });
+		const cacheControl = history.lastSeen.length ? 'public, max-age=3600' : 'public, max-age=300';
+		const etag = await clientBodyEtag(body, 2);
+		const headers = { 'cache-control': cacheControl, etag };
+		if (ctx) ctx.waitUntil(caches.default.put(cacheKey, new Response(body, { headers })).catch(() => undefined));
+		if (requestHasMatchingEtag(req, etag)) return annotateResponse(notModifiedResponse(etag, cacheControl, req, env), { cacheHit: false });
+		return annotateResponse(rawJsonResponse(body, req, env, 200, headers), { cacheHit: false });
 	}
 
 	if (req.method === 'GET' && url.pathname === '/v1/supporters') {

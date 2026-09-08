@@ -14,6 +14,7 @@ Public:
 - `GET /v1/meta/:slug`
 - `GET /v1/order-summary/:slug`, with `?subtype=` for relic refinements
 - `GET /v1/supporters`
+- `GET /v1/baro-history`, recorded visits, last-seen dates and nullable historical prices
 - `POST /v1/feedback`, anonymous bug reports and feature requests
 - `GET /v1/orders/:slug`, disabled by default
 
@@ -46,8 +47,27 @@ ranked summary entries per tick, then advance one batch of the riven history swe
 trigger runs the Discord supporter sync and writes the daily price and Baro archives. Manual prewarm
 remains an operator tool, not a correctness requirement.
 
-History archives accrue from deploy day and cannot be backfilled. See
+History archives accrue from deploy day. The price seed can recover available WFM statistics;
+Baro history can recover only visit archives this Worker still retains. See
 [`ARCHITECTURE.md`](ARCHITECTURE.md) for their keys, cadence, and retention.
+
+### Baro history
+
+The daily archive stage maintains `ITEM_META` key `baro:history:v1` without a TTL. Its migration
+runs even when Baro is inactive and reads up to 128 retained visit archives. Visit details follow
+`HISTORY_RETENTION_DAYS` and a 128-visit bound, while up to 5,000 item last-seen records survive
+visit removal. Raw manifests are stored before durable reconciliation; unknown missing or failed archive reads are retried daily and block index pruning. A bounded acknowledgement ledger lets already-materialized archives expire without blocking later cron runs. Corrupt durable data is backed up to `baro:history:recovery:v1` before recoverable dates are salvaged. Persistent migration errors need operator investigation. Coverage is partial; an absent item or visit is unknown, not proof it never appeared.
+
+`GET /v1/baro-history` is public without bootstrap and uses the existing snapshot rate limiter (2/minute per IP). Valid
+history is edge-cached for one hour; an empty history for five minutes. Invalid durable data returns 503. The endpoint reads only the materialized key and supports ETag/304; it never reconstructs archives, fetches upstream history or writes KV. Missing history also returns 503 until the daily stage materializes it. No new binding or secret is needed.
+
+New version 2 archives use inventory item paths and keep missing ducat/credit costs as `null`.
+Migration reads version 1 too, treating legacy zeros as unknown because they may represent missing
+prices. Explicit zeros in version 2 stay zero. Dates reflect recorded visits, not predictions.
+
+Keep the existing daily cron as the only history writer. Its local queue does not provide atomic
+updates across Worker isolates; adding another writer requires coordination. Do not delete the
+durable key as routine cache cleanup because its last-seen records can outlive the source archives.
 
 ## Configuration
 

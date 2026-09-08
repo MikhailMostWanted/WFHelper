@@ -327,7 +327,7 @@ describe('Baro visit archive', () => {
 
 		const stored = await readArchive('archive:baro:baro_visit_1');
 		expect(stored).toMatchObject({
-			v: 1,
+			v: 2,
 			visitId: 'baro_visit_1',
 			node: 'TradeHUB1',
 			activation: new Date(NOW - 24 * 3600_000).toISOString(),
@@ -335,8 +335,8 @@ describe('Baro visit archive', () => {
 			columns: ['item', 'ducats', 'credits'],
 		});
 		expect(stored?.rows).toEqual([
-			['/Lotus/StoreItems/Types/Items/MiscItems/PrimeBucks', 0, 100000],
-			['/Lotus/StoreItems/Upgrades/Mods/Rifle/PrimedRifleAmmoMutation', 300, 175000],
+			['/Lotus/Types/Items/MiscItems/PrimeBucks', 0, 100000],
+			['/Lotus/Upgrades/Mods/Rifle/PrimedRifleAmmoMutation', 300, 175000],
 		]);
 
 		// The next daily tick still sees the same live visit.
@@ -372,7 +372,19 @@ describe('Baro visit archive', () => {
 
 	it('prunes visits past the retention bound', async () => {
 		const bound = Array.from({ length: 8 }, (_, index) => `old_visit_${index}`);
-		await env.ITEM_META.put('archive:baro:old_visit_0', JSON.stringify({ v: 1, rows: [] }));
+		for (const [offset, id] of bound.entries()) {
+			await env.ITEM_META.put(
+				`archive:baro:${id}`,
+				JSON.stringify({
+					v: 2,
+					visitId: id,
+					activation: new Date(NOW - (offset + 3) * 86400000).toISOString(),
+					expiry: new Date(NOW - (offset + 1) * 86400000).toISOString(),
+					node: 'TradeHUB1',
+					rows: [['/Lotus/Fixture/Old', 1, 1]],
+				}),
+			);
+		}
 		await env.ITEM_META.put('archive:index:baro:v1', JSON.stringify({ v: 1, updatedAt: NOW, entries: bound }));
 		globalThis.fetch = vi.fn(async () => jsonOk(baroPayload())) as unknown as typeof fetch;
 

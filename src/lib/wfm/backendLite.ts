@@ -5,6 +5,8 @@ import { normalizeWfmSlug } from "../../../config/shared/wfm.js";
 import { normalizeSubtype } from "../../../config/shared/wfmOrders.js";
 import type { RequestPriority } from "./wfmPrice.js";
 import { fetchWithTimeout, withAbortTimeout } from "../../../config/shared/fetchWithTimeout.js";
+import { normalizeBaroHistory, type BaroHistory } from "../../../config/shared/baroHistory.js";
+import { readResponseText } from "../../../config/shared/readResponseText.js";
 
 export type BackendRequestPriority = RequestPriority;
 
@@ -150,6 +152,8 @@ export type BackendFetchResult<T> =
   | { status: "error" };
 
 interface BackendRequestOptions {
+  signal?: AbortSignal;
+  bootstrap?: boolean;
   timeoutMs?: number;
   headers?: Record<string, string>;
   cache?: BackendRequestCache;
@@ -162,7 +166,7 @@ async function requestBackend(
 ): Promise<Response | null> {
   if (!isBackendLiteConfigured()) return null;
 
-  const bootstrapToken = await ensureBootstrapToken();
+  const bootstrapToken = options.bootstrap === false ? null : await ensureBootstrapToken();
   const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
 
   try {
@@ -173,12 +177,10 @@ async function requestBackend(
     const requestInit: BackendFetchInit = { headers };
     if (options.cache) requestInit.cache = options.cache;
 
-    // Callers read the body themselves, so the deadline ends at the headers.
-    const response = await fetchWithTimeout(
-      `${BACKEND_BASE_URL}${pathname}`,
-      timeoutMs,
-      requestInit,
-    );
+    // A supplied signal keeps the caller-owned deadline active through body reads.
+    const response = options.signal
+      ? await fetch(`${BACKEND_BASE_URL}${pathname}`, { ...requestInit, signal: options.signal })
+      : await fetchWithTimeout(`${BACKEND_BASE_URL}${pathname}`, timeoutMs, requestInit);
 
     if (response.status === 401) {
       invalidateBootstrapToken();
@@ -197,6 +199,31 @@ export async function fetchBackendRaw(
   options?: { timeoutMs?: number; headers?: Record<string, string>; cache?: BackendRequestCache },
 ): Promise<Response | null> {
   return requestBackend(pathname, { ...options, allowStatuses: [304] });
+}
+
+export async function fetchBackendBaroHistory(): Promise<BaroHistory | null> {
+  if (!isBackendLiteConfigured()) return null;
+  try {
+    return await withAbortTimeout(10_000, async (signal) => {
+      const response = await requestBackend("/v1/baro-history", {
+        signal,
+        bootstrap: false,
+      });
+      if (!response?.body) return null;
+      const body: unknown = JSON.parse(await readResponseText(response, 8 * 1024 * 1024));
+      if (
+        !body ||
+        typeof body !== "object" ||
+        !("ok" in body) ||
+        body.ok !== true ||
+        !("data" in body)
+      )
+        return null;
+      return normalizeBaroHistory(body.data);
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function fetchBackendJson(

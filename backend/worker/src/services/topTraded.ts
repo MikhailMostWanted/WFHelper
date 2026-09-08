@@ -1,6 +1,7 @@
+import { byteLength } from '../utils';
 import { ARCHIVE_PRICES_PREFIX, TOP_TRADED_DOC_KEY, TOP_TRADED_SWEEP_KEY } from '../constants';
 import { getWorkerConfig } from '../config';
-import { byteLength, MAX_PRICE_ROWS, mergeVolumes, type VolumeSample } from './history';
+import { MAX_PRICE_ROWS, mergeVolumes, type VolumeSample } from './history';
 import { logEvent } from './logging';
 import { barePriceFetchRank, fetchCatalogSlugs, readClientCatalogFromKv, readRankedSlugsFromKv } from './prewarmCatalog';
 import { isRecord, utcDate } from '../utils';

@@ -6,7 +6,10 @@ import * as parser from "../../services/worldStateParser";
 // parseRaw returns Record<string, unknown>; shape only what these tests read.
 interface ParsedWorldState {
   fissures: Array<{ tier: string; missionType: string; isStorm?: boolean }>;
-  voidTrader?: { location?: string };
+  voidTrader?: {
+    location?: string;
+    inventory: Array<{ uniqueName: string; ducats?: number; credits?: number }>;
+  };
   vaultTrader?: { location?: string };
   sortie?: { expiry?: string };
 }
@@ -74,6 +77,40 @@ function dateLong(ms: number) {
 }
 
 describe("worldStateParser.parseRaw", () => {
+  it("preserves unknown Baro costs and joins store paths to inventory identities", () => {
+    const parsed = parseRaw({
+      VoidTraders: {
+        Activation: dateLong(1_800_000_000_000),
+        Expiry: dateLong(1_800_100_000_000),
+        Node: "EarthHUB",
+        Manifest: [
+          { ItemType: "/Lotus/StoreItems/Weapons/MissingCosts" },
+          { ItemType: "/Lotus/StoreItems/Weapons/Free", PrimePrice: 0, RegularPrice: 0 },
+          { ItemType: "/Lotus/Weapons/KnownDucats", PrimePrice: 300 },
+          { ItemType: "/Lotus/StoreItems/Weapons/KnownCredits", RegularPrice: 150000 },
+          { ItemType: "/Lotus/StoreItems/Weapons/InvalidCosts", PrimePrice: -1, RegularPrice: NaN },
+        ],
+      },
+    });
+    const items = parsed.voidTrader!.inventory;
+    expect(items.map(({ uniqueName }) => uniqueName)).toEqual([
+      "/Lotus/Weapons/MissingCosts",
+      "/Lotus/Weapons/Free",
+      "/Lotus/Weapons/KnownDucats",
+      "/Lotus/Weapons/KnownCredits",
+      "/Lotus/Weapons/InvalidCosts",
+    ]);
+    expect(items[0]).not.toHaveProperty("ducats");
+    expect(items[0]).not.toHaveProperty("credits");
+    expect(items[1]).toMatchObject({ ducats: 0, credits: 0 });
+    expect(items[2]).toMatchObject({ ducats: 300 });
+    expect(items[2]).not.toHaveProperty("credits");
+    expect(items[3]).toMatchObject({ credits: 150000 });
+    expect(items[3]).not.toHaveProperty("ducats");
+    expect(items[4]).not.toHaveProperty("ducats");
+    expect(items[4]).not.toHaveProperty("credits");
+  });
+
   it("parses fissures and traders from raw world state", () => {
     const now = Date.now();
     const raw = {

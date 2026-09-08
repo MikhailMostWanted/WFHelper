@@ -119,8 +119,15 @@ export function buildBaroOwnedSet(inventoryData: RawInventoryData | null): Set<s
   for (const key of BARO_INV_KEYS) {
     const rows = inventoryData[key];
     if (!Array.isArray(rows)) continue;
-    for (const row of rows as Array<{ ItemType?: string }>) {
-      if (row.ItemType) owned.add(row.ItemType);
+    for (const row of rows as Array<{ ItemType?: unknown; ItemCount?: unknown; Count?: unknown }>) {
+      if (!row || typeof row.ItemType !== "string" || !row.ItemType) continue;
+      const count = "ItemCount" in row ? row.ItemCount : row.Count;
+      if (
+        count !== undefined &&
+        (typeof count !== "number" || !Number.isFinite(count) || count <= 0)
+      )
+        continue;
+      owned.add(row.ItemType);
     }
   }
   return owned;

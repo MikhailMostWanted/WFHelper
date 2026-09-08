@@ -1,5 +1,6 @@
 import {
 	ARCHIVE_BARO_PREFIX,
+	MAX_ARCHIVE_BYTES,
 	ARCHIVE_INDEX_PREFIX,
 	ARCHIVE_PRICES_PREFIX,
 	ARCHIVE_RIVENS_PREFIX,
@@ -9,16 +10,17 @@ import {
 } from '../constants';
 import { getWorkerConfig } from '../config';
 import { logEvent } from './logging';
-import { isRecord, utcDate } from '../utils';
+import { byteLength, parseJsonRecord, isRecord, utcDate } from '../utils';
 import type { Env } from '../types';
 import { clamp, getJsonFromKv } from '../utils';
 import { sanitizeWfmSlug } from '../../../../config/shared/textNormalize';
 import { WFM_HEADERS } from '../../../../config/shared/wfm';
+import { withAbortTimeout } from '../../../../config/shared/fetchWithTimeout';
+import { migrateBaroHistory } from './baroHistory';
+import { storeItemPath } from '../../../../config/shared/itemPath';
+import { readResponseText } from '../../../../config/shared/readResponseText';
 
 const DAY_SEC = 24 * 60 * 60;
-// Far below KV's 25MB per-value limit: an archive this large means the rows are
-// wrong, so the write is refused instead of silently storing garbage.
-export const MAX_ARCHIVE_BYTES = 4 * 1024 * 1024;
 const MAX_INDEX_ENTRIES = 4096;
 // Pruning drops one entry a day in steady state and the TTL reclaims the rest.
 const MAX_INDEX_DELETES_PER_RUN = 8;
@@ -35,7 +37,7 @@ type ArchiveFamily = 'prices' | 'rivens' | 'baro';
 
 export type PriceRow = [string, number] | [string, number, number];
 type RivenRow = [string, number, number, number];
-type BaroRow = [string, number, number];
+type BaroRow = [string, number | null, number | null];
 
 interface PriceArchiveResult {
 	status: 'written' | 'exists' | 'no_source' | 'too_large' | 'disabled' | 'error';
@@ -74,20 +76,6 @@ function numeric(value: unknown): number | null {
 function positive(value: unknown): number | null {
 	const parsed = numeric(value);
 	return parsed != null && parsed > 0 ? parsed : null;
-}
-
-function parseJsonRecord(raw: string | null): Record<string, unknown> | null {
-	if (!raw) return null;
-	try {
-		const value = JSON.parse(raw) as unknown;
-		return isRecord(value) ? value : null;
-	} catch {
-		return null;
-	}
-}
-
-export function byteLength(value: string): number {
-	return new TextEncoder().encode(value).length;
 }
 
 function archivePrefix(family: ArchiveFamily): string {
@@ -636,11 +624,18 @@ function visitIdOf(entry: Record<string, unknown>, activation: number): string {
 
 function manifestRows(manifest: unknown[]): BaroRow[] {
 	const rows: BaroRow[] = [];
+	const seen = new Set<string>();
+	const cost = (value: unknown): number | null => {
+		const parsed = numeric(value);
+		return parsed !== null && Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+	};
 	for (const item of manifest) {
 		if (!isRecord(item)) continue;
-		const uniqueName = typeof item.ItemType === 'string' ? item.ItemType.trim().slice(0, 200) : '';
-		if (!uniqueName) continue;
-		rows.push([uniqueName, numeric(item.PrimePrice) ?? 0, numeric(item.RegularPrice) ?? 0]);
+		const uniqueName = storeItemPath(typeof item.ItemType === 'string' ? item.ItemType.trim() : '');
+		if (!uniqueName.startsWith('/Lotus/') || uniqueName.length > 512 || uniqueName.includes('BaroTreasureBox') || seen.has(uniqueName))
+			continue;
+		seen.add(uniqueName);
+		rows.push([uniqueName, cost(item.PrimePrice), cost(item.RegularPrice)]);
 		if (rows.length >= MAX_BARO_ROWS) break;
 	}
 	return rows;
@@ -654,6 +649,8 @@ function activeBaroVisit(payload: unknown, now: number): BaroVisit | null {
 		const activation = deDateMs(entry.Activation);
 		const expiry = deDateMs(entry.Expiry);
 		if (activation == null || expiry == null) continue;
+		if (!Number.isSafeInteger(activation) || !Number.isSafeInteger(expiry) || activation <= 0 || expiry > 8.64e15 || expiry <= activation)
+			continue;
 		if (now < activation || now >= expiry) continue;
 
 		const rows = manifestRows(manifest);
@@ -669,62 +666,21 @@ function activeBaroVisit(payload: unknown, now: number): BaroVisit | null {
 	return null;
 }
 
-/** null once the body passes the cap: content-length is absent on a chunked response,
- *  so the only real bound is the number of bytes actually read. */
-async function readCappedText(response: Response, maxBytes: number): Promise<string | null> {
-	const stream = response.body;
-	if (!stream || typeof stream.getReader !== 'function') return null;
-	const reader = stream.getReader();
-	const chunks: Uint8Array[] = [];
-	let total = 0;
-	try {
-		for (;;) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			if (!value) continue;
-			total += value.byteLength;
-			if (total > maxBytes) {
-				await reader.cancel();
-				return null;
-			}
-			chunks.push(value);
-		}
-	} catch {
-		return null;
-	}
-
-	const merged = new Uint8Array(total);
-	let offset = 0;
-	for (const chunk of chunks) {
-		merged.set(chunk, offset);
-		offset += chunk.byteLength;
-	}
-	return new TextDecoder().decode(merged);
-}
-
 async function fetchWorldState(): Promise<unknown | null> {
-	let response: Response;
 	try {
-		response = await fetch(WORLD_STATE_URL, { headers: { accept: 'application/json' } });
-	} catch {
-		return null;
-	}
-	if (!response.ok) return null;
-	if ((numeric(response.headers.get('content-length')) ?? 0) > MAX_WORLD_STATE_BYTES) return null;
-
-	const text = await readCappedText(response, MAX_WORLD_STATE_BYTES);
-	if (text == null) return null;
-	try {
-		return JSON.parse(text) as unknown;
+		return await withAbortTimeout(15_000, async (signal) => {
+			const response = await fetch(WORLD_STATE_URL, { headers: { accept: 'application/json' }, signal });
+			if (!response.ok) return null;
+			if ((numeric(response.headers.get('content-length')) ?? 0) > MAX_WORLD_STATE_BYTES) return null;
+			const text = await readResponseText(response, MAX_WORLD_STATE_BYTES);
+			return JSON.parse(text) as unknown;
+		});
 	} catch {
 		return null;
 	}
 }
 
-/**
- * Records the running Baro visit once. Daily checks catch every visit because a
- * visit stays live for about 48 hours.
- */
+/** DE does not publish past manifests, so persist the live visit before reconciliation. */
 export async function archiveBaroVisit(env: Env, options: { now?: number } = {}): Promise<BaroArchiveResult> {
 	const now = options.now ?? Date.now();
 	const config = getWorkerConfig(env);
@@ -734,21 +690,22 @@ export async function archiveBaroVisit(env: Env, options: { now?: number } = {})
 	try {
 		const payload = await fetchWorldState();
 		if (payload == null) {
+			await migrateBaroHistory(env, now);
 			logEvent({ type: 'cron', route: 'archive:baro', status: 204, error: 'world_state_unavailable' });
 			return { ...base, status: 'unavailable' };
 		}
 
 		const visit = activeBaroVisit(payload, now);
-		if (!visit) return { ...base, status: 'inactive' };
+		if (!visit) {
+			await migrateBaroHistory(env, now);
+			return { ...base, status: 'inactive' };
+		}
 
 		const key = `${ARCHIVE_BARO_PREFIX}${visit.visitId}`;
 		const existing = await env.ITEM_META.get(key);
-		if (existing) {
-			return { ...base, status: 'exists', visitId: visit.visitId, bytes: byteLength(existing) };
-		}
 
 		const body = JSON.stringify({
-			v: 1,
+			v: 2,
 			visitId: visit.visitId,
 			node: visit.node,
 			activation: new Date(visit.activation).toISOString(),
@@ -763,11 +720,19 @@ export async function archiveBaroVisit(env: Env, options: { now?: number } = {})
 			return { ...base, status: 'too_large', visitId: visit.visitId, rows: visit.rows.length, bytes };
 		}
 
-		await env.ITEM_META.put(key, body, { expirationTtl: retentionTtlSec(env) });
+		if (!existing) await env.ITEM_META.put(key, body, { expirationTtl: retentionTtlSec(env) });
+		// Last-seen data must survive before the bounded archive index can prune visits.
+		await migrateBaroHistory(env, now, {
+			id: visit.visitId,
+			activation: visit.activation,
+			expiry: visit.expiry,
+			node: visit.node,
+			items: visit.rows.map(([uniqueName, ducats, credits]) => ({ uniqueName, ducats, credits })),
+		});
 		await recordArchiveEntry(env, 'baro', visit.visitId, baroIndexBound(config.historyRetentionDays));
 
 		logEvent({ type: 'cron', route: 'archive:baro', status: 200, count: visit.rows.length, bytes });
-		return { status: 'written', visitId: visit.visitId, rows: visit.rows.length, bytes };
+		return { status: existing ? 'exists' : 'written', visitId: visit.visitId, rows: visit.rows.length, bytes };
 	} catch (err) {
 		logEvent({
 			type: 'error',

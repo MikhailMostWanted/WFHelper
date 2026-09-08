@@ -1,4 +1,5 @@
 import { withScope } from "./logger";
+import { storeItemPath } from "../config/shared/itemPath";
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { fetchWithTimeout } from "../config/shared/fetchWithTimeout";
 import { MISSION_TYPE_LABELS } from "../config/shared/missionTypes";
@@ -1062,11 +1063,6 @@ export async function fetchAndParse(): Promise<Record<string, unknown>> {
   };
 }
 
-/** StoreItems paths mirror the real item path, one segment up. */
-function storeItemPath(itemPath: string | undefined): string {
-  return (itemPath || "").replace(/^\/Lotus\/StoreItems/, "/Lotus");
-}
-
 /** DE occasionally ships a scalar where an array belongs; one bad field must
  * not cost the whole world state. */
 function asList<T>(value: T[] | undefined): T[] {
@@ -1255,8 +1251,16 @@ export function parseRaw(raw: WorldStateRaw | null): Record<string, unknown> | n
             return {
               uniqueName: un,
               item: resolveItemName(un),
-              ducats: i.PrimePrice ?? 0,
-              credits: i.RegularPrice ?? 0,
+              ...(typeof i.PrimePrice === "number" &&
+              Number.isFinite(i.PrimePrice) &&
+              i.PrimePrice >= 0
+                ? { ducats: i.PrimePrice }
+                : {}),
+              ...(typeof i.RegularPrice === "number" &&
+              Number.isFinite(i.RegularPrice) &&
+              i.RegularPrice >= 0
+                ? { credits: i.RegularPrice }
+                : {}),
               imageOverride: resolveBaroIcon(un),
             };
           }),

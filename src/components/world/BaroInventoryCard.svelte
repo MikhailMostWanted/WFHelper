@@ -2,6 +2,7 @@
   import type { ItemDbLookup, WfmItemsLookup } from "../../types/ipc.js";
   import { getLookupByName } from "../../lib/inventoryMarket.js";
   import { locale, tr } from "../../lib/i18n.js";
+  import BaroLastSeen from "./BaroLastSeen.svelte";
 
   // Baro inventory entry - typed loosely to match the world-state shape.
   type BaroEntry = {
@@ -93,4 +94,7 @@
     class="overflow-hidden text-ellipsis whitespace-nowrap text-center text-xs
            text-text-secondary {labelMaxW}">{entry.item || $tr("common.unknown")}</span
   >
+  {#if entry.uniqueName}<span class="text-center {labelMaxW}"
+      ><BaroLastSeen uniqueName={entry.uniqueName} available={true} /></span
+    >{/if}
 </button>

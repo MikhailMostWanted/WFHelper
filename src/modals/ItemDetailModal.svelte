@@ -15,6 +15,8 @@
   import CraftingTree from "../components/CraftingTree.svelte";
   import ArchonShardPips from "../components/archon/ArchonShardPips.svelte";
   import PetGenetics from "../components/inventory/PetGenetics.svelte";
+  import BaroLastSeen from "../components/world/BaroLastSeen.svelte";
+  import { loadBaroHistory } from "../stores/baro.js";
   import {
     archonShardColorKey,
     archonShardDisplaySlots,
@@ -55,6 +57,7 @@
   $: item = $activeItem;
 
   $: itemKey = item?.uniqueName || item?.internalName || "";
+  $: if (itemKey) void loadBaroHistory();
   $: dbEntry = itemKey ? ($itemDb || {})[itemKey] : null;
   $: parentUniqueName = dbEntry?.isBuildComponent ? dbEntry.componentOf || null : null;
   $: parentEntry = parentUniqueName ? ($itemDb || {})[parentUniqueName] || null : null;
@@ -277,6 +280,10 @@
                 {$tr("common.partOf", { name: itemLabel(parentEntry) })}
               </button>
             {/if}
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <span class="text-xs text-text-muted">{$tr("marketAlerts.kindBaro")}:</span>
+            <BaroLastSeen uniqueName={itemKey} />
           </div>
           {#if item.description}
             <div class="detail-desc detail-desc-header">{item.description}</div>

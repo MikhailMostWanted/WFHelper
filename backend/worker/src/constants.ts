@@ -32,3 +32,6 @@ export const SUPPORTER_EXCLUSIONS_KEY = 'supporters:exclusions:v1';
 // Retired Patreon pipeline keys (profile names, OAuth tokens); every
 // successful sync deletes them.
 export const LEGACY_PATREON_KEYS = ['patreon:supporters:v1', 'patreon:tokens:v1', 'patreon:exclusions:v1'] as const;
+
+// Leave room below the KV value limit for malformed archive inputs.
+export const MAX_ARCHIVE_BYTES = 4 * 1024 * 1024;
