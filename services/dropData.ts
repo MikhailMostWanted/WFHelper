@@ -30,11 +30,22 @@ interface CachePayload {
   rows: DropRow[];
 }
 
-// Served rows: the upstream tables plus the bundled dojo research. Only the
-// upstream half is ever written to disk, so the cache stays a pure mirror.
+// Bundled acquisition sources stay out of the cached upstream mirror.
 let rows: DropRow[] = [];
 let loadedHash: string | null = null;
 let refreshPromise: Promise<{ changed: boolean }> | null = null;
+
+// Quest completion rewards are absent from the random drop tables.
+const ACQUISITION_ROWS: DropRow[] = [
+  {
+    item: "Helminth Archon Shard Segment Blueprint",
+    place: "Veilbreaker",
+    kind: "quest",
+    rarity: "",
+    chance: null,
+    sourceUrl: "https://www.warframe.com/en/patch-notes/pc/35-0-0",
+  },
+];
 
 const cache = createJsonCache<CachePayload>("drop-data-cache.json", (raw) => {
   const parsed = raw as Partial<CachePayload>;
@@ -263,7 +274,10 @@ function loadDojoRows(): DropRow[] {
 
 /** Rebuilds the served set from upstream rows, so the merge never doubles up. */
 function setServedRows(upstream: DropRow[]): void {
-  rows = [...upstream, ...loadDojoRows()];
+  const supplementary = ACQUISITION_ROWS.filter(
+    (source) => !upstream.some((row) => row.item === source.item && row.place === source.place),
+  );
+  rows = [...upstream, ...loadDojoRows(), ...supplementary];
 }
 
 export function loadFromDisk(): boolean {
@@ -313,6 +327,7 @@ export async function refreshFromUpstream(): Promise<{ changed: boolean }> {
 export async function ensureLoaded(): Promise<void> {
   if (loadedHash) return;
   if (loadFromDisk()) return;
+  if (rows.length === 0) setServedRows([]);
   await refreshFromUpstream();
 }
 
@@ -348,7 +363,7 @@ export function searchDrops(
   scored.sort(
     (a, b) =>
       a.score - b.score ||
-      b.row.chance - a.row.chance ||
+      (b.row.chance ?? 0) - (a.row.chance ?? 0) ||
       a.row.item.localeCompare(b.row.item) ||
       a.row.place.localeCompare(b.row.place),
   );

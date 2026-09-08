@@ -25,6 +25,7 @@ describe("formatDropChance", () => {
   });
 
   it("renders nothing for a non-finite chance", () => {
+    expect(formatDropChance(null)).toBe("");
     expect(formatDropChance(Number.NaN)).toBe("");
     expect(formatDropChance(Number.POSITIVE_INFINITY)).toBe("");
   });

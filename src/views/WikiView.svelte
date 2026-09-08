@@ -390,12 +390,27 @@
                   {#if liveBounty}
                     <span class="text-accent"> &middot; {liveBounty}</span>
                   {/if}
+                  {#if row.sourceUrl}
+                    <button
+                      type="button"
+                      data-acquisition-source
+                      class="ml-2 cursor-pointer border-0 bg-transparent p-0 text-xs text-accent hover:underline"
+                      on:click={() => window.api?.openExternal?.(row.sourceUrl ?? "")}
+                      >{$t("common.source")}</button
+                    >
+                  {/if}
                 </td>
                 <td class="px-3 py-1.5 text-right whitespace-nowrap">
-                  <span class="font-semibold" style="color:{dropRarityColour(row.rarity)}"
-                    >{row.rarity}</span
-                  >
-                  <span class="ml-1.5 text-accent">{formatDropChance(row.chance)}</span>
+                  {#if row.chance === null && row.kind === "quest"}
+                    <span class="text-text-secondary" data-acquisition-method="quest"
+                      >{$t("wiki.questReward")}</span
+                    >
+                  {:else}
+                    <span class="font-semibold" style="color:{dropRarityColour(row.rarity)}"
+                      >{row.rarity}</span
+                    >
+                    <span class="ml-1.5 text-accent">{formatDropChance(row.chance)}</span>
+                  {/if}
                 </td>
               </tr>
             {/each}

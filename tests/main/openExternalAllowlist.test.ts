@@ -24,6 +24,8 @@ describe("open-external allowlist", () => {
   });
 
   it("rejects unknown and lookalike hosts", () => {
+    expect(isAllowedExternalHost("www.warframe.com")).toBe(true);
+    expect(isAllowedExternalHost("www.warframe.com.evil.com")).toBe(false);
     expect(isAllowedExternalHost("evil.com")).toBe(false);
     expect(isAllowedExternalHost("patreon.com.evil.com")).toBe(false);
     expect(isAllowedExternalHost("")).toBe(false);

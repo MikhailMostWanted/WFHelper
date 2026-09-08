@@ -2429,6 +2429,7 @@
   "mastery.breakdownStyle": "Progress display",
   "mastery.breakdownBars": "Bars",
   "mastery.breakdownRings": "Rings",
+  "wiki.questReward": "Quest completion reward",
   "orderModal.chooseVariant": "Choose a variant",
   "orderModal.editDetailsFailed": "Item details are unavailable. You can still save this order.",
   "browse.orderSelectionChanged": "The selection changed. Post the order again.",

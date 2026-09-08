@@ -18,8 +18,9 @@ export interface DropRow {
   /** Where it drops (e.g. "Arbitrations, Rotation C"). */
   place: string;
   rarity: string;
-  chance: number;
+  chance: number | null;
   kind: DropKind;
+  sourceUrl?: string;
 }
 
 export type DropSearchMode = "item" | "place" | "enemy";

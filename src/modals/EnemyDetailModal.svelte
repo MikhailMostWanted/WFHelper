@@ -124,7 +124,7 @@
         .sort(
           (a, b) =>
             Number(normalizeEnemyName(b.place) === exact) -
-              Number(normalizeEnemyName(a.place) === exact) || b.chance - a.chance,
+              Number(normalizeEnemyName(a.place) === exact) || (b.chance ?? 0) - (a.chance ?? 0),
         )
         .slice(0, MAX_DROP_ROWS);
     } else dropsFailed = true;

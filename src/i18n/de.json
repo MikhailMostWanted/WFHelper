@@ -2412,6 +2412,7 @@
   "mastery.breakdownStyle": "Fortschrittsanzeige",
   "mastery.breakdownBars": "Balken",
   "mastery.breakdownRings": "Ringe",
+  "wiki.questReward": "Belohnung für Questabschluss",
   "orderModal.chooseVariant": "Variante auswählen",
   "orderModal.editDetailsFailed": "Artikeldetails sind nicht verfügbar. Du kannst diesen Auftrag trotzdem speichern.",
   "browse.orderSelectionChanged": "Die Auswahl hat sich geändert. Erstelle den Auftrag erneut.",

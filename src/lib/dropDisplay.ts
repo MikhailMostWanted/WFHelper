@@ -15,7 +15,7 @@ export function dropRarityColour(rarity: string): string {
 }
 
 /** Drop chances carry up to two decimals upstream; trailing zeroes are dropped. */
-export function formatDropChance(chance: number): string {
-  if (!Number.isFinite(chance)) return "";
+export function formatDropChance(chance: number | null): string {
+  if (chance === null || !Number.isFinite(chance)) return "";
   return `${Math.round(chance * 100) / 100}%`;
 }

@@ -301,6 +301,49 @@ describe("dropData dojo research", () => {
     expect(dd.searchDrops("vitus", "item").total).toBe(1);
   });
 
+  it("finds the Veilbreaker blueprint without inventing a random drop chance", async () => {
+    const dd = await freshDropData();
+    dd.loadFromDisk();
+    expect(dd.searchDrops("helminth archon", "item").rows).toEqual([
+      {
+        item: "Helminth Archon Shard Segment Blueprint",
+        place: "Veilbreaker",
+        kind: "quest",
+        rarity: "",
+        chance: null,
+        sourceUrl: "https://www.warframe.com/en/patch-notes/pc/35-0-0",
+      },
+    ]);
+    expect(dd.searchDrops("veilbreaker", "place").total).toBe(1);
+    expect(dd.searchDrops("veilbreaker", "enemy").total).toBe(0);
+  });
+
+  it("keeps bundled acquisition sources available when the upstream is offline", async () => {
+    fs.unlinkSync(path.join(tmpDir, "drop-data-cache.json"));
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    const dd = await freshDropData();
+    await dd.ensureLoaded();
+    expect(dd.searchDrops("helminth archon", "item").total).toBe(1);
+  });
+
+  it("retains a hashless response when the next load cannot read disk or upstream", async () => {
+    const fetch = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes("info.json")
+          ? {}
+          : { sortieRewards: [{ itemName: "Riven Mod", rarity: "Rare", chance: 3 }] },
+    }));
+    vi.stubGlobal("fetch", fetch);
+    const dd = await freshDropData();
+    await dd.refreshFromUpstream();
+    expect(dd.searchDrops("riven mod").total).toBe(1);
+    fs.unlinkSync(path.join(tmpDir, "drop-data-cache.json"));
+    fetch.mockRejectedValue(new Error("offline"));
+    await dd.ensureLoaded();
+    expect(dd.searchDrops("riven mod").total).toBe(1);
+  });
+
   it("merges the bundled table once after an upstream refresh, and never caches it", async () => {
     vi.stubGlobal("fetch", async (url: string) => ({
       ok: true,

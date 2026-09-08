@@ -2411,6 +2411,7 @@
   "mastery.breakdownStyle": "进度显示",
   "mastery.breakdownBars": "进度条",
   "mastery.breakdownRings": "进度环",
+  "wiki.questReward": "完成任务奖励",
   "orderModal.chooseVariant": "选择变体",
   "orderModal.editDetailsFailed": "物品详情暂不可用，你仍可保存此订单。",
   "browse.orderSelectionChanged": "所选内容已更改，请重新发布订单。",
