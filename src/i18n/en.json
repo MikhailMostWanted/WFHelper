@@ -1581,7 +1581,7 @@
   "titlebar.tooltip.notLoggedIn": "Warframe is running but not logged in. Data loads automatically about a minute after login.",
   "titlebar.tooltip.tokenNotFound": "Warframe is logged in but the login token was not found in game memory. Restart the game; if this keeps happening, report it on Discord.",
   "tour.done": "Done",
-  "tour.featureTour": "FEATURE TOUR",
+  "tour.featureTour": "Feature tour",
   "tour.interactiveHint": "You can use the highlighted area now.",
   "tour.skip": "Skip tour",
   "tour.step1.body": "Inventory shows your tradable items and current warframe.market prices. Click a card to view orders or list the item.",

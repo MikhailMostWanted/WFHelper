@@ -194,4 +194,23 @@ test.describe("Feature tour", () => {
 
     expect(cspErrors).toEqual([]);
   });
+
+  test("renders the German tour within the window", async () => {
+    await page.evaluate(() => localStorage.setItem("app-language", "de"));
+    await page.reload();
+    await page.locator('#sidebar [data-view="settings"]').click();
+    await page.locator("[data-tour-restart]").click();
+    const card = page.locator("[data-tour-card]");
+    await expect(card).toContainText("handelbaren Gegenstände");
+    const fits = await card.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return rect.top >= 0 && rect.bottom <= innerHeight && rect.right <= innerWidth;
+    });
+    expect(fits).toBe(true);
+    await page.screenshot({
+      path: test.info().outputPath("german-tour.png"),
+      animations: "disabled",
+    });
+    await page.keyboard.press("Escape");
+  });
 });

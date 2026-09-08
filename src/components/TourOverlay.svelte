@@ -407,7 +407,7 @@
     style="left: {cardX}px; top: {cardY}px; width: {CARD_W}px;"
   >
     <div class="flex items-center justify-between gap-3">
-      <span class="font-display text-xs font-bold tracking-widest text-accent"
+      <span class="font-display text-xs font-bold tracking-widest text-accent uppercase"
         >{$tr("tour.featureTour")}</span
       >
       <span class="text-xs text-text-muted">{index + 1} / {tourSteps.length}</span>
