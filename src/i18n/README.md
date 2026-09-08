@@ -3,8 +3,7 @@
 `en.json` is the source of truth. Missing entries fall back to English, so partial
 catalogues are supported.
 
-`zh.json` is a machine first pass awaiting a native-speaker review, so treat a
-correction to it as a fix, not a rewrite of someone's work.
+Corrections to Chinese terminology are welcome. Use the official client vocabulary.
 
 ## Adding a language
 
