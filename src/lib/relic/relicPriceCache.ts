@@ -86,8 +86,10 @@ function computeRelicDbFingerprint(db: RelicDatabase): string {
 
     for (const [quality, qData] of qualityEntries) {
       hash = fnv1aStep(hash, `q:${quality}|${qData.uniqueName || ""}`);
-      const rewardSlugs = (qData.rewards || []).map((reward) => reward?.urlName || "").sort();
-      hash = fnv1aStep(hash, `r:${rewardSlugs.join(",")}`);
+      const rewardChances = (qData.rewards || [])
+        .map((reward) => `${reward?.urlName || ""}:${reward.chance}`)
+        .sort();
+      hash = fnv1aStep(hash, `r:${rewardChances.join(",")}`);
     }
   }
 
