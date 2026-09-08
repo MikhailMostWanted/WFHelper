@@ -49,7 +49,7 @@ test("Archon Hunt names the boss and its shard reward", async () => {
     await page.locator("[data-tracker-search]").fill("Archon");
     const row = page.locator('[data-task="archonHunt"]').locator("xpath=ancestor::div[1]");
     await expect(row).toContainText("Nira");
-    await expect(row).toContainText("Amber (yellow) Archon Shard");
+    await expect(row).toContainText("Amber Archon Shard");
     await row.locator('[data-task-expand="archonHunt"]').click();
     await expect(page.locator(".dailies-sublist")).toContainText("Callisto (Jupiter)");
     await page.screenshot({

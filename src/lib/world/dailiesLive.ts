@@ -75,17 +75,16 @@ export function tenetRotatesAt(nowMs: number): number {
 /** Bird 3's weekly Archon Shard color; wiki formula anchored 2022-09-12T00:00Z. */
 const BIRD3_ANCHOR_MS = Date.UTC(2022, 8, 12);
 const BIRD3_SHARDS = ["Azure", "Amber", "Crimson"];
-/** Shard names are item names, so the plain colour is spelled out beside them. */
-const SHARD_PLAIN_KEYS: Record<string, MessageKey> = {
-  Azure: "dailies.shardBlue",
-  Amber: "dailies.shardYellow",
-  Crimson: "dailies.shardRed",
-};
 const ARCHON_SHARDS = new Map([
   ["Boreal", "Azure"],
   ["Nira", "Amber"],
   ["Amar", "Crimson"],
 ]);
+const SHARD_COLOR_KEYS: Record<string, MessageKey> = {
+  Azure: "archon.color.azure",
+  Amber: "archon.color.amber",
+  Crimson: "archon.color.crimson",
+};
 
 export function bird3ShardColor(nowMs: number): string {
   const offset = (((nowMs - BIRD3_ANCHOR_MS) % (3 * WEEK_MS)) + 3 * WEEK_MS) % (3 * WEEK_MS);
@@ -142,13 +141,12 @@ export function trackerLive(
       expiry: fourDayResetIso("coda", new Date(nowMs)),
     };
   }
-  // Shard color is a 3-week clock cycle; the shard names are item names, so
-  // they stay English like everything matched against the game.
   if (id === "bird3") {
     const color = bird3ShardColor(nowMs);
-    const plainKey = SHARD_PLAIN_KEYS[color];
     return {
-      detail: t("dailies.bird3Shard", { color, plain: plainKey ? t(plainKey) : color }),
+      detail: t("dailies.bird3Shard", {
+        color: t(SHARD_COLOR_KEYS[color]),
+      }),
     };
   }
 
@@ -172,7 +170,9 @@ export function trackerLive(
       if (!hunt) return {};
       const color = ARCHON_SHARDS.get(hunt.boss?.replace(/^Archon\s+/i, "").trim() ?? "");
       const shard = color
-        ? t("dailies.bird3Shard", { color, plain: t(SHARD_PLAIN_KEYS[color]) })
+        ? t("dailies.bird3Shard", {
+            color: t(SHARD_COLOR_KEYS[color]),
+          })
         : "";
       return {
         detail:

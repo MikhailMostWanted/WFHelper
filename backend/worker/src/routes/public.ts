@@ -12,6 +12,7 @@ import {
 	getOrHydratePrice,
 } from '../services/readThrough';
 import { readAdversaryVendorsDoc } from '../services/adversaryVendors';
+import { readNightwaveOfferingsDoc } from '../services/nightwaveOfferings';
 import { readBaroHistory } from '../services/baroHistory';
 import { isRelicSlug, normalizeOrderSubtype } from '../services/orderSubtype';
 import { readPublishedSupporters } from '../services/supporters';
@@ -43,6 +44,7 @@ const routeStats = {
 	supportersRequests: 0,
 	topTradedRequests: 0,
 	adversaryVendorsRequests: 0,
+	nightwaveOfferingsRequests: 0,
 	baroHistoryRequests: 0,
 };
 
@@ -57,6 +59,8 @@ const TOP_TRADED_CACHE_CONTROL = 'public, max-age=3600';
 const TOP_TRADED_CACHE_VERSION = 1;
 const ADVERSARY_VENDORS_CACHE_CONTROL = 'public, max-age=3600';
 const ADVERSARY_VENDORS_CACHE_VERSION = 1;
+const NIGHTWAVE_OFFERINGS_CACHE_CONTROL = 'public, max-age=3600';
+const NIGHTWAVE_OFFERINGS_CACHE_VERSION = 1;
 const RANKED_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let rankedCatalogCache: { expiresAt: number; bySlug: Map<string, number> } | null = null;
@@ -563,6 +567,45 @@ export async function handlePublicRoutes(req: Request, url: URL, env: Env, ctx?:
 			ctx.waitUntil(edgeCache.put(cacheKey, new Response(body, { status: 200, headers: responseHeaders })));
 		}
 
+		return annotateResponse(response, { cacheHit: false });
+	}
+
+	if (req.method === 'GET' && url.pathname === '/v1/nightwave-offerings') {
+		// Public and bootstrap-free like the vendor tables: one cron-owned wiki mirror.
+		const guardResponse = await guardPublicRequest(req, env, 'nightwave-offerings');
+		if (guardResponse) return guardResponse;
+
+		routeStats.nightwaveOfferingsRequests += 1;
+		const cacheKey = new Request(`${url.origin}/v1/nightwave-offerings?v=${NIGHTWAVE_OFFERINGS_CACHE_VERSION}`, { method: 'GET' });
+		const edgeCache = caches.default;
+		const cachedResponse = await edgeCache.match(cacheKey);
+		if (cachedResponse) {
+			const cachedEtag = cachedResponse.headers.get('etag');
+			if (requestHasMatchingEtag(req, cachedEtag)) {
+				return annotateResponse(notModifiedResponse(cachedEtag, NIGHTWAVE_OFFERINGS_CACHE_CONTROL, req, env), { cacheHit: true });
+			}
+			const cachedHeaders: Record<string, string> = { 'cache-control': NIGHTWAVE_OFFERINGS_CACHE_CONTROL };
+			if (cachedEtag) cachedHeaders.etag = cachedEtag;
+			return annotateResponse(streamJsonResponse(cachedResponse.body, req, env, 200, cachedHeaders), { cacheHit: true });
+		}
+
+		const doc = await readNightwaveOfferingsDoc(env);
+		if (!doc) {
+			// Nothing published yet; never cached, so the first refresh shows up at once.
+			return annotateResponse(jsonResponse({ ok: false, error: 'nightwave_offerings_not_ready' }, req, env, 404), { cacheHit: false });
+		}
+
+		const body = JSON.stringify({ ok: true, generatedAt: doc.generatedAt, source: doc.source, tabs: doc.tabs });
+		const etag = await clientBodyEtag(body, NIGHTWAVE_OFFERINGS_CACHE_VERSION);
+		if (requestHasMatchingEtag(req, etag)) {
+			return annotateResponse(notModifiedResponse(etag, NIGHTWAVE_OFFERINGS_CACHE_CONTROL, req, env), { cacheHit: true });
+		}
+
+		const responseHeaders: Record<string, string> = { 'cache-control': NIGHTWAVE_OFFERINGS_CACHE_CONTROL, etag };
+		const response = rawJsonResponse(body, req, env, 200, responseHeaders);
+		if (ctx) {
+			ctx.waitUntil(edgeCache.put(cacheKey, new Response(body, { status: 200, headers: responseHeaders })));
+		}
 		return annotateResponse(response, { cacheHit: false });
 	}
 

@@ -2,6 +2,7 @@
   import { registerSections } from "../lib/layout/registry.js";
 
   const WORLD_MAIN_SECTIONS = [
+    "world.weekOverview",
     "world.cycles",
     "world.timers",
     "world.resurgence",
@@ -12,6 +13,7 @@
     "world.invasions",
     "world.darvo",
     "world.vendors",
+    "world.nightwaveShop",
     "world.baro",
     "world.bounties",
   ];
@@ -21,6 +23,7 @@
   // Order is the default column split: the first half fills the wide left column,
   // which is why Darvo sits after Invasions rather than where its markup lives.
   registerSections("world", [
+    { id: "world.weekOverview", view: "world", labelKey: "world.thisWeek", defaultSpan: "full" },
     {
       id: "world.cycles",
       view: "world",
@@ -60,6 +63,7 @@
     },
     { id: "world.darvo", view: "world", labelKey: "world.darvosDeal", defaultSpan: 1 },
     { id: "world.vendors", view: "world", labelKey: "world.vendorRotations", defaultSpan: 1 },
+    { id: "world.nightwaveShop", view: "world", labelKey: "world.nightwaveShop", defaultSpan: 1 },
     {
       id: "world.baro",
       view: "world",
@@ -137,6 +141,8 @@
   import HeaderTabs from "../components/HeaderTabs.svelte";
   import ArbiSchedule from "../components/world/ArbiSchedule.svelte";
   import DailiesTracker from "../components/world/DailiesTracker.svelte";
+  import WorldWeekOverview from "../components/world/WorldWeekOverview.svelte";
+  import NightwaveShop from "../components/world/NightwaveShop.svelte";
   import VendorRotations from "../components/world/VendorRotations.svelte";
   import { tr, type Translator } from "../lib/i18n.js";
   import InvasionItem from "../components/world/InvasionItem.svelte";
@@ -366,6 +372,8 @@
         ? WORLD_DAILIES_SECTIONS
         : WORLD_MAIN_SECTIONS;
   $: availableWorldSections = [
+    "world.weekOverview",
+    "world.nightwaveShop",
     "world.cycles",
     "world.timers",
     "world.resurgence",
@@ -448,7 +456,21 @@
       className="world-layout"
       let:sectionId
     >
-      {#if sectionId === "world.cycles"}
+      {#if sectionId === "world.weekOverview"}
+        <div class="world-section">
+          <WorldWeekOverview {nowMs} onOpenDailies={() => setWorldTab("dailies")} />
+        </div>
+      {:else if sectionId === "world.nightwaveShop"}
+        <div class="world-section">
+          <CollapsibleSection
+            title={$tr("world.nightwaveShop")}
+            collapsed={collapsed.nightwaveShop}
+            onToggle={() => toggleSection("nightwaveShop")}
+          >
+            <NightwaveShop onOpenItem={openItemDetail} />
+          </CollapsibleSection>
+        </div>
+      {:else if sectionId === "world.cycles"}
         <div class="world-section">
           <CollapsibleSection
             title={$tr("world.planetCycles")}

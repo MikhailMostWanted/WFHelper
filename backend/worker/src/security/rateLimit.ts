@@ -15,7 +15,8 @@ type PublicRateLimitRoute =
 	| 'supporters'
 	| 'top-traded'
 	| 'baro-history'
-	| 'adversary-vendors';
+	| 'adversary-vendors'
+	| 'nightwave-offerings';
 
 function publicLimiter(env: Env, route: PublicRateLimitRoute): RateLimit {
 	if (route === 'healthz') return env.PUBLIC_HEALTH_RATE_LIMITER;

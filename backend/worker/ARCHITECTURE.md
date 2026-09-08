@@ -7,7 +7,7 @@ covers runtime ownership and invariants. See `README.md` for setup and operator 
 
 - `src/index.ts` handles CORS rejection, route dispatch, 404 responses, request logging, and cron.
 - `src/routes/public.ts` owns health, bootstrap, snapshot, item-catalog, top-traded,
-  adversary-vendor, price, meta, and order routes.
+  adversary-vendor, nightwave-offerings, price, meta, and order routes.
 - `src/routes/admin.ts` owns authenticated prewarm, catalog, hotset, and status routes.
 - `src/routes/feedback.ts` validates opt-in reports and forwards them to a private Discord webhook.
 - `src/services/readThrough.ts` owns cache-first reads, stale refresh, negative markers, and
@@ -44,7 +44,7 @@ Rate Limiting binding defaults in `wrangler.jsonc` are per IP:
 
 - health: 5 per minute
 - bootstrap and full orders: 60 per minute
-- prices, meta, order summaries, supporters, top traded, Baro history, and adversary vendors: 200 per minute
+- prices, meta, order summaries, supporters, top traded, Baro history, adversary vendors, and Nightwave offerings: 200 per minute
 - snapshot and item catalog: 2 per minute
 - admin: 60 per minute
 
@@ -432,6 +432,26 @@ A failed fetch or an unparsable page leaves the stored doc untouched with its ol
 logs status 204 with `wiki_unavailable` or `wiki_unparsed` on route `adversary-vendors:refresh`,
 and never writes a partial doc. The doc carries a 30-day TTL. The desktop app validates every row
 again on read and simply shows the weapons without bonuses when the route is absent or unreachable.
+
+## Nightwave offerings (wiki-sourced)
+
+`GET /v1/nightwave-offerings` serves KV key `nightwave-offerings:doc:v1` as
+`{ ok: true, generatedAt, source: "wiki", tabs }`, where a tab is `{ name, sections }`, a section is
+`{ name, creds, items }` and an item is `{ name, always, creds }`. The route is public, needs no
+bootstrap token, uses the price/meta rate-limit class, and is edge-cached for one hour with a body
+ETag; before the first refresh it answers `404 {"ok":false,"error":"nightwave_offerings_not_ready"}`
+and is never cached. Source: the raw wikitext of `Nightwave/Offerings`, fetched with the same
+`WFHelper-worker/1.0` user agent the vendor tables use. `services/nightwaveOfferings.ts` reads the
+`<tabber>` tabs, their `===` headings (a `({{Nc|N}} each)` parenthetical prices the whole section)
+and the `<gallery>` captions, unwrapping `{{M|X}}` and `[[Page|X]]` markup; `'''bold'''` marks an
+offer as always available, a caption's own `{{Nc|N}}` beats the section price, and a name repeated
+inside one tab is kept once. `refreshNightwaveOfferings()` runs on the 15-minute prewarm tick as
+cron stage `cron:nightwave-offerings`, rebuilds at most hourly, and treats a fetch failure or a
+parse under eight tabs or 150 items as failed: the stored doc keeps its old `generatedAt`, the run
+logs status 204 with `wiki_unavailable` or `wiki_unparsed` on route `nightwave-offerings:refresh`,
+and no partial doc is written. The doc carries a 30-day TTL, caps tabs at 12, sections at 40 per
+tab, items at 120 per section and creds at 1000, and the desktop app revalidates every row again on
+read, falling back to its built-in permanent list when the route is absent or unreachable.
 
 ## Daily budget
 

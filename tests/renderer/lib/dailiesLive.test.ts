@@ -104,9 +104,9 @@ describe("trackerExpiries", () => {
     expect(coda.lines).toBeUndefined();
   });
 
-  it("spells the shard color out beside its name", () => {
+  it("shows the translated shard name without a second color gloss", () => {
     const live = trackerLive("bird3", null, t, Date.parse("2026-08-24T12:00:00Z"));
-    expect(live.detail).toBe("dailies.bird3Shard(color=Crimson,plain=dailies.shardRed)");
+    expect(live.detail).toBe("dailies.bird3Shard(color=archon.color.crimson)");
   });
 
   const calendarWorld = (days: CalendarDay[]) =>
@@ -267,19 +267,19 @@ describe("trackerLive", () => {
     const live = trackerLive("archonHunt", wd, t, NOW);
 
     expect(live.detail).toBe(
-      "dailies.boss(name=Nira) - dailies.bird3Shard(color=Amber,plain=dailies.shardYellow)",
+      "dailies.boss(name=Nira) - dailies.bird3Shard(color=archon.color.amber)",
     );
     expect(live.lines).toEqual(["Extermination - Arval (Mars)", "Assassination - War (Mars)"]);
   });
 
   it.each([
-    ["Amar", "Crimson", "Red"],
-    ["Boreal", "Azure", "Blue"],
-    ["Archon Nira", "Amber", "Yellow"],
-  ])("shows the fixed shard reward for %s", (boss, color, plain) => {
+    ["Amar", "Crimson"],
+    ["Boreal", "Azure"],
+    ["Archon Nira", "Amber"],
+  ])("shows the fixed shard reward for %s", (boss, color) => {
     const wd = world({ archonHunt: { boss, missions: [], activation: "", expiry: "" } });
     expect(trackerLive("archonHunt", wd, t, NOW).detail).toBe(
-      `dailies.boss(name=${boss}) - dailies.bird3Shard(color=${color},plain=dailies.shard${plain})`,
+      `dailies.boss(name=${boss}) - dailies.bird3Shard(color=archon.color.${color.toLowerCase()})`,
     );
   });
 
