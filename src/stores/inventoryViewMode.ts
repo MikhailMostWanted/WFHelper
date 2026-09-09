@@ -1,6 +1,6 @@
 import { persistedString } from "../lib/persistence.js";
 
-type InventoryViewMode = "cards" | "list";
+export type InventoryViewMode = "cards" | "list";
 
 /** Order in the settings toggle; also the allow-list the persisted value degrades to. */
 export const INVENTORY_VIEW_MODES: readonly InventoryViewMode[] = ["cards", "list"];

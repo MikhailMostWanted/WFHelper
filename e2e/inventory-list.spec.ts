@@ -58,7 +58,7 @@ test.describe("Inventory list view", () => {
   });
 
   function modeButton(mode: "cards" | "list") {
-    return page.locator(`[data-inventory-view-mode-option="${mode}"]`);
+    return page.locator(`[data-inventory-view-mode] [data-segment-value="${mode}"]`);
   }
 
   // The Cards/Rows switch lives in Settings > Appearance, so every mode change is

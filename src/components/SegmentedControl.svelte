@@ -15,6 +15,8 @@
     <button
       type="button"
       {disabled}
+      data-segment-value={option.value}
+      aria-pressed={value === option.value}
       class="px-2 py-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50 {wrap
         ? 'grow'
         : index > 0

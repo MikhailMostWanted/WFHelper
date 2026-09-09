@@ -6,6 +6,8 @@
   import { marketDensity } from "../../stores/uiDensity.js";
   import type { UiDensity } from "../../stores/uiDensity.js";
   import { rivenCardSize } from "../../stores/rivenCardSize.js";
+  import { inventoryViewMode } from "../../stores/inventoryViewMode.js";
+  import type { InventoryViewMode } from "../../stores/inventoryViewMode.js";
   import type { RivenCardSize } from "../../stores/rivenCardSize.js";
   import ThemedControlCard from "../ThemedControlCard.svelte";
   import SegmentedControl from "../SegmentedControl.svelte";
@@ -38,12 +40,21 @@
     { value: "row", labelKey: "appearance.densityRows" },
   ];
 
+  const inventoryLayoutOptions: Array<{ value: InventoryViewMode; labelKey: MessageKey }> = [
+    { value: "cards", labelKey: "appearance.densityCards" },
+    { value: "list", labelKey: "appearance.densityRows" },
+  ];
+
   $: effects = $themeSettings.effects;
   $: cornerSegOptions = cornerOptions.map((o) => ({ value: o.value, label: $tr(o.labelKey) }));
   $: surfaceSegOptions = surfaceOptions.map((o) => ({ value: o.value, label: $tr(o.labelKey) }));
   $: relicSegOptions = relicCardOptions.map((o) => ({ value: o.value, label: $tr(o.labelKey) }));
   $: rivenSegOptions = rivenCardOptions.map((o) => ({ value: o.value, label: $tr(o.labelKey) }));
   $: densitySegOptions = densityOptions.map((o) => ({ value: o.value, label: $tr(o.labelKey) }));
+  $: inventoryLayoutSegOptions = inventoryLayoutOptions.map((o) => ({
+    value: o.value,
+    label: $tr(o.labelKey),
+  }));
 </script>
 
 <div class="appearance-section">
@@ -123,6 +134,24 @@
             value={$marketDensity}
             options={densitySegOptions}
             onChange={(v) => marketDensity.set(v)}
+          />
+        </span>
+      </div>
+    </ThemedControlCard>
+
+    <ThemedControlCard>
+      <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <span class="min-w-0 text-text-secondary text-xs font-medium">
+          {$tr("appearance.inventoryViewMode")}
+          <span class="block text-xs text-text-muted font-normal mt-0.5">
+            {$tr("appearance.inventoryViewModeHint")}
+          </span>
+        </span>
+        <span class="shrink-0" data-inventory-view-mode>
+          <SegmentedControl
+            value={$inventoryViewMode}
+            options={inventoryLayoutSegOptions}
+            onChange={(v) => inventoryViewMode.set(v)}
           />
         </span>
       </div>
