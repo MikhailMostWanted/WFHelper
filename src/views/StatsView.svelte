@@ -445,6 +445,7 @@
   function dotLabel(key: string, bar: ChartResult["bars"][number], absVal: number): string {
     const fmt = formatterFor(key);
     let text = shortDate(bar.date, $locale);
+    if (!RESOURCE_IDS.has(key)) return `${text} | ${fmt(bar.value, $locale)}`;
     if (!Number.isNaN(absVal)) text += ` | ${fmt(absVal, $locale)}`;
     if (bar.value !== 0) {
       const sign = bar.value >= 0 ? "+" : "−";
@@ -453,9 +454,12 @@
     return text;
   }
 
-  function onDotEnter(e: MouseEvent, key: string, barIdx: number, absVal: number): void {
-    const bar = chartDataMap[key]?.bars[barIdx];
-    if (!bar) return;
+  function onDotEnter(
+    e: MouseEvent,
+    key: string,
+    bar: ChartResult["bars"][number],
+    absVal = NaN,
+  ): void {
     tooltip = { text: dotLabel(key, bar, absVal), x: e.clientX, y: e.clientY };
   }
 
@@ -489,6 +493,7 @@
 <!-- Global tooltip (position: fixed, follows mouse) -->
 {#if tooltip}
   <div
+    data-stats-tooltip
     class="fixed pointer-events-none rounded-[var(--radius-sm)] border border-border-strong bg-bg-raised px-[10px] py-1 text-xs text-text-primary whitespace-nowrap z-[1100] shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
     style="left:{tooltip.x + 14}px; top:{tooltip.y - 38}px"
     aria-hidden="true"
@@ -581,6 +586,7 @@
           {/if}
           <div class="flex-1 min-w-0 relative">
             <svg
+              data-stats-chart-expanded={expandedKey}
               class="w-full h-full min-h-[40px] block"
               viewBox="0 0 {SVG_W} {BAR_H_EXPAND}"
               preserveAspectRatio="none"
@@ -619,13 +625,19 @@
               {#if showChange}
                 {#each exBars as bar}
                   <rect
+                    role="img"
+                    aria-label={dotLabel(expandedKey, bar, NaN)}
+                    data-stats-date={bar.date}
                     x={bar.x}
                     y={bar.y}
                     width={exBw}
                     height={bar.h}
                     class={bar.positive ? "fill-success opacity-75" : "fill-danger opacity-75"}
                     rx="1"
-                  />
+                    on:mouseenter={(e) => onDotEnter(e, expandedKey!, bar)}
+                    on:mouseleave={() => (tooltip = null)}
+                    ><title>{dotLabel(expandedKey, bar, NaN)}</title></rect
+                  >
                 {/each}
               {/if}
               {#if showValue && expandedChartData?.absLine}
@@ -640,27 +652,22 @@
                 />
               {/if}
             </svg>
-            <!-- Expanded dot overlay - tooltip only on dot hover, active days only -->
             {#if showValue && expandedChartData?.absLine}
+              {@const firstSample = expandedChartData.absLine.find((point) => point.recorded)?.idx}
               <div class="absolute inset-0 pointer-events-none">
                 {#each expandedChartData.absLine as pt}
                   {@const bar = exBars[pt.idx]}
                   {@const absVal = expandedChartData.absValues[pt.idx] ?? NaN}
-                  {#if bar && expandedChartData.realData[pt.idx] && bar.value !== 0}
+                  {#if bar && pt.recorded && (pt.idx === firstSample || bar.value !== 0)}
                     <button
+                      data-stats-point={expandedKey}
+                      data-stats-date={bar.date}
                       type="button"
                       class="absolute w-[15px] h-[15px] p-0 rounded-full bg-bg-surface border-[3px] border-text-primary/80 -translate-x-1/2 -translate-y-1/2 pointer-events-auto transition-[transform,box-shadow,border-color,background] duration-[0.12s] cursor-pointer hover:scale-[1.35] hover:border-text-heading hover:bg-surface-hover hover:shadow-[0_0_6px_rgba(255,255,255,0.35)]"
                       style="left:{(pt.x / SVG_W) * 100}%; top:{(pt.y / BAR_H_EXPAND) * 100}%"
                       aria-label={dotLabel(expandedKey, bar, absVal)}
                       title={dotLabel(expandedKey, bar, absVal)}
-                      on:mouseenter={(e) => {
-                        const fmt = formatterFor(expandedKey!);
-                        let text = shortDate(bar.date, $locale);
-                        if (!Number.isNaN(absVal)) text += `  ${fmt(absVal, $locale)}`;
-                        const sign = bar.value >= 0 ? "+" : "−";
-                        text += `  (${sign}${fmt(Math.abs(bar.value), $locale)})`;
-                        tooltip = { text, x: e.clientX, y: e.clientY };
-                      }}
+                      on:mouseenter={(e) => onDotEnter(e, expandedKey!, bar, absVal)}
                       on:mouseleave={() => {
                         tooltip = null;
                       }}
@@ -807,6 +814,7 @@
                           {$tr(labelKey)}
                         </span>
                         <button
+                          data-stats-expand={key}
                           class="bg-transparent border-0 text-text-muted cursor-pointer text-lg py-1 px-2 leading-none opacity-50 transition-[opacity,color] duration-150 rounded-[var(--radius-md)] hover:!opacity-100 hover:text-accent hover:bg-bg-raised group-hover/chart:opacity-70"
                           title={$tr("stats.expandChartTitle")}
                           on:click={() => {
@@ -876,6 +884,8 @@
                               {#if showChange}
                                 {#each cd.bars as bar}
                                   <rect
+                                    role="img"
+                                    aria-label={dotLabel(key, bar, NaN)}
                                     data-stats-date={bar.date}
                                     data-stats-value={bar.value}
                                     x={bar.x}
@@ -886,7 +896,10 @@
                                       ? "fill-success opacity-75"
                                       : "fill-danger opacity-75"}
                                     rx="1"
-                                  />
+                                    on:mouseenter={(e) => onDotEnter(e, key, bar)}
+                                    on:mouseleave={() => (tooltip = null)}
+                                    ><title>{dotLabel(key, bar, NaN)}</title></rect
+                                  >
                                 {/each}
                               {/if}
                               {#if showValue && cd.absLine}
@@ -902,19 +915,22 @@
                               {/if}
                             </svg>
                             {#if showValue && cd.absLine}
+                              {@const firstSample = cd.absLine.find((point) => point.recorded)?.idx}
                               <div class="absolute inset-0 pointer-events-none">
                                 {#each cd.absLine as pt}
                                   {@const bar = cd.bars[pt.idx]}
                                   {@const absVal = cd.absValues[pt.idx] ?? NaN}
-                                  {#if bar && cd.realData[pt.idx] && (bar.value !== 0 || cd.absLine.length === 1)}
+                                  {#if bar && pt.recorded && (pt.idx === firstSample || bar.value !== 0)}
                                     <button
+                                      data-stats-point={key}
+                                      data-stats-date={bar.date}
                                       type="button"
                                       class="absolute w-3 h-3 p-0 rounded-full bg-bg-surface border-2 border-text-primary/80 -translate-x-1/2 -translate-y-1/2 pointer-events-auto transition-[transform,box-shadow,border-color,background] duration-[0.12s] cursor-pointer hover:scale-[1.35] hover:border-text-heading hover:bg-surface-hover hover:shadow-[0_0_6px_rgba(255,255,255,0.35)]"
                                       style="left:{(pt.x / SVG_W) * 100}%; top:{(pt.y / BAR_H) *
                                         100}%"
                                       aria-label={dotLabel(key, bar, absVal)}
                                       title={dotLabel(key, bar, absVal)}
-                                      on:mouseenter={(e) => onDotEnter(e, key, pt.idx, absVal)}
+                                      on:mouseenter={(e) => onDotEnter(e, key, bar, absVal)}
                                       on:mouseleave={() => {
                                         tooltip = null;
                                       }}

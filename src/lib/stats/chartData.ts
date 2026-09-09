@@ -31,11 +31,9 @@ export interface ChartResult {
   bars: BarData[];
   zeroY: number;
   bw: number;
-  absLine: Array<{ x: number; y: number; idx: number }> | null;
+  absLine: Array<{ x: number; y: number; idx: number; recorded: boolean }> | null;
   absValues: number[];
   hasAbsData: boolean;
-  /** Per-bar flag: true if this day had a real history entry (not gap-filled). */
-  realData: boolean[];
   yTicks: YTick[];
   /** Upper bound of the shared balance/change axis. */
   niceMax: number;
@@ -209,7 +207,6 @@ export function barsForKey(
       absLine: null,
       absValues: [],
       hasAbsData: false,
-      realData: [],
       yTicks: [],
       niceMax: 0,
     };
@@ -222,14 +219,12 @@ export function barsForKey(
     else if (!carryIn || e.date > carryIn.date) carryIn = e;
   }
 
-  const realData: boolean[] = [];
   let values: number[] = [];
   const absField = ABS_FIELD_MAP[key];
   const rawAbs: (number | undefined)[] = [];
 
   for (const day of calendarDays) {
     const entry = entryMap.get(day);
-    realData.push(!!entry);
     values.push(entry ? (pickNumericField(entry, key) ?? 0) : 0);
     rawAbs.push(
       absField && entry ? ((entry[absField] as number | undefined) ?? undefined) : undefined,
@@ -251,6 +246,7 @@ export function barsForKey(
   const bw = Math.max(2, (SVG_W - gap * (n - 1)) / n);
   const xAt = (index: number): number => index * (bw + gap);
 
+  const absSamples = rawAbs.map((value) => value !== undefined);
   if (absField) {
     let lastKnown = carryIn ? (carryIn[absField] as number | undefined) : undefined;
     for (let i = 0; i < rawAbs.length; i++) {
@@ -294,7 +290,9 @@ export function barsForKey(
     validAbs.length === 0
       ? null
       : rawAbs.flatMap((value, idx) =>
-          value === undefined ? [] : [{ x: xAt(idx) + bw / 2, y: yAt(value), idx }],
+          value === undefined
+            ? []
+            : [{ x: xAt(idx) + bw / 2, y: yAt(value), idx, recorded: absSamples[idx] }],
         );
   return {
     bars,
@@ -303,7 +301,6 @@ export function barsForKey(
     absLine,
     absValues,
     hasAbsData: validAbs.length > 0,
-    realData,
     yTicks,
     niceMax,
   };

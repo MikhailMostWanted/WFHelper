@@ -22,7 +22,7 @@ function history() {
   return {
     schemaVersion: 2,
     entries: Array.from({ length: 200 }, (_, index) => {
-      const ducatsDelta = 15 * (1 + Math.floor(index / 40));
+      const ducatsDelta = index < 10 ? 0 : 15 * (1 + Math.floor(index / 40));
       ducats += ducatsDelta;
       return {
         date: dayKey(199 - index),
@@ -32,9 +32,9 @@ function history() {
         ducatsDelta,
         ayaDelta: 0,
         vitusDelta: 0,
-        relicsOpened: 1,
+        relicsOpened: index === 0 ? 1234 : 1,
         daysPlayed: 1,
-        dailyTrades: 0,
+        dailyTrades: index === 0 ? 47 : 0,
         absDucats: ducats,
       };
     }),
@@ -67,7 +67,7 @@ test.describe("Stats year timeframe", () => {
 
   test("charts a saved datum older than 90 days before and after reload", async () => {
     const page = harness!.page;
-    const oldest = seededHistory.entries[0]!;
+    const oldest = seededHistory.entries[10]!;
     const assertOldDatum = async () => {
       await page.locator('#sidebar [data-view="stats"]').click();
       const timeframe = page.locator("[data-stats-timeframe] select");
@@ -93,5 +93,35 @@ test.describe("Stats year timeframe", () => {
       .locator("xpath=ancestor::div[contains(@class, 'group/chart')]")
       .screenshot({ path: test.info().outputPath("stats-ducats-year.png") });
     await page.screenshot({ path: test.info().outputPath("stats-year.png"), fullPage: false });
+  });
+
+  test("shows the initial balance and exact daily counts on hover in both chart sizes", async () => {
+    const page = harness!.page;
+    const first = seededHistory.entries[0]!;
+    await page.locator('#sidebar [data-view="stats"]').click();
+    await page.locator("[data-stats-timeframe] select").selectOption("365");
+
+    for (const expanded of [false, true]) {
+      for (const [key, value] of [
+        ["ducats", "100"],
+        ["dailyTrades", "47"],
+        ["relicsOpened", "1,234"],
+      ]) {
+        if (expanded) await page.locator(`[data-stats-expand="${key}"]`).click();
+        const scope = expanded ? page.locator('[role="dialog"]') : page.locator("body");
+        const target =
+          key === "ducats"
+            ? scope.locator(`[data-stats-point="${key}"][data-stats-date="${first.date}"]`)
+            : scope.locator(
+                `[${expanded ? "data-stats-chart-expanded" : "data-stats-chart"}="${key}"] rect[data-stats-date="${first.date}"]`,
+              );
+        await target.hover();
+        await expect(page.locator("[data-stats-tooltip]")).toHaveText(new RegExp(`\\| ${value}$`));
+        if (expanded) {
+          await page.screenshot({ path: test.info().outputPath(`stats-${key}-hover.png`) });
+          await page.keyboard.press("Escape");
+        }
+      }
+    }
   });
 });

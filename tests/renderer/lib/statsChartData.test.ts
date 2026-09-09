@@ -55,6 +55,18 @@ describe("barsForKey abs line", () => {
     expect(Number.isNaN(res.absValues[0])).toBe(true);
   });
 
+  it("distinguishes unchanged balance samples from carried values", () => {
+    const res = barsForKey(
+      "ducatsDelta",
+      [entry(dayStr(-4), 100), entry(dayStr(-2)), entry(dayStr(-1), 100)],
+      7,
+    );
+
+    const samples = res.absLine!.filter((point) => point.recorded);
+    expect(samples.map((point) => res.bars[point.idx].date)).toEqual([dayStr(-4), dayStr(-1)]);
+    expect(samples.every((point) => res.bars[point.idx].value === 0)).toBe(true);
+  });
+
   it("renders axis and point when only today has a balance (newly tracked stat)", () => {
     const hist = [entry(dayStr(0), 10)];
     const res = barsForKey("ducatsDelta", hist, 7);
