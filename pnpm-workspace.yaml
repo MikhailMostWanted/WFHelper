@@ -9,6 +9,8 @@ nodeLinker: hoisted
 minimumReleaseAge: 2880
 
 overrides:
+  # electron-updater pins ^4.1.0; 4.3.2 closes the merge-key CPU advisory.
+  js-yaml: "^4.3.2"
   adm-zip: ^0.6.0
   esbuild: ^0.28.1
   postcss: ^8.5.23
