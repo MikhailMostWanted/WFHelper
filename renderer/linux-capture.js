@@ -8,10 +8,12 @@
   const canvas = document.createElement("canvas");
   let state = "idle";
   let stream = null;
+  let lastError = "";
 
-  function markDead() {
+  function markDead(reason) {
     state = "dead";
     stream = null;
+    lastError = reason || "";
   }
 
   async function start() {
@@ -24,17 +26,17 @@
       });
       const track = stream.getVideoTracks()[0];
       if (!track) {
-        markDead();
+        markDead("no video track");
         return;
       }
       // User ended the share (compositor indicator) or the source went away.
-      track.addEventListener("ended", markDead);
+      track.addEventListener("ended", () => markDead("track ended"));
       video.srcObject = stream;
       await video.play();
       state = "live";
-    } catch {
-      // Portal declined / cancelled / unsupported.
-      markDead();
+    } catch (err) {
+      // Portal declined / cancelled / unsupported; main logs the DOMException name.
+      markDead(err && err.name ? err.name + ": " + err.message : String(err));
     }
   }
 
@@ -46,6 +48,10 @@
 
   window.__captureState = function () {
     return state;
+  };
+
+  window.__captureError = function () {
+    return lastError;
   };
 
   // Raw pixels rather than a PNG data URL, and each step is timed: a slow grab

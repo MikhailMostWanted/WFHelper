@@ -13,6 +13,7 @@ import { resolveWarframeUiScale } from "../../services/eeLogPath";
 import * as itemDatabase from "../../services/itemDatabase";
 import { computeMasteryProgress } from "../../services/masteryHelper";
 import { getWindowsOcrHealth } from "../../services/ocrServer";
+import { getLinuxCaptureFailure } from "../../services/linuxStreamCapture";
 import { sleep } from "../../services/sleep";
 
 const SCAN_RETRY_WINDOW_MS = 5_000;
@@ -575,6 +576,21 @@ export function createOverlayScanController(options: OverlayScanControllerOption
           `[Trigger] reward scan resolved in ${result.elapsedMs}ms after ${result.attempts} attempt(s)` +
             `${sinceTrigger}; ${items.length} item(s)`,
         );
+      }
+
+      // Show the capture failure when the Linux stream could not supply a frame.
+      const captureFailure =
+        items.length === 0 && process.platform === "linux" ? getLinuxCaptureFailure() : null;
+      if (captureFailure) {
+        log.warn(
+          `[Trigger] no screen capture (${captureFailure}) - allow WFHelper in the share dialog`,
+        );
+        windows.sendOverlayEvent(RELIC_REWARD_ITEMS, {
+          items: [],
+          failureReason: "capture-unavailable",
+        });
+        windows.scheduleOverlayAutoHide(OVERLAY_AUTO_HIDE_OCR_UNAVAILABLE_MS);
+        return;
       }
 
       // A give-up read some cards, so OCR works; the language-pack hint would mislead.

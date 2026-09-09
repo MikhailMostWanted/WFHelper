@@ -56,6 +56,7 @@ const OVERLAY_MESSAGE_KEYS = [
   "overlay.planner.noRecommendations",
   "overlay.planner.scanning",
   "overlay.reward.bestLabel",
+  "overlay.reward.captureUnavailable",
   "overlay.reward.detecting",
   "overlay.reward.inFoundry",
   "overlay.reward.noPricedRewards",

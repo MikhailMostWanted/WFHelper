@@ -1374,6 +1374,7 @@
   "overlay.reward.ocrFailed": "OCR konnte auf dem aktuellen Bildschirm keine Belohnungen erkennen. Nutze den randlosen Fenstermodus und gleiche die Interface-Skalierung in den WFHelper-Einstellungen an.",
   "overlay.reward.ocrFailedShort": "OCR fehlgeschlagen",
   "overlay.reward.ocrUnavailable": "Windows-OCR ist auf diesem PC nicht installiert, daher kann der Bildschirm nicht gescannt werden. Installiere in den Windows-Einstellungen unter Zeit und Sprache > Sprache die Funktionen deiner Sprache (oder füge Englisch hinzu) und starte WFHelper neu.",
+  "overlay.reward.captureUnavailable": "WFHelper hat kein Bildschirmbild erhalten. Erlaube WFHelper im Bildschirmfreigabe-Dialog deines Desktops (er kann hinter dem Spiel liegen) und oeffne dann den naechsten Belohnungsbildschirm.",
   "overlay.reward.ownedParts": "Besitz {owned}/{required}",
   "overlay.reward.partFallback": "Teil",
   "overlay.reward.partInFoundry": "(in der Schmiede)",

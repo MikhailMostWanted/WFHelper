@@ -615,7 +615,11 @@ async function applyRewardItems(payload) {
 
   if (detectedItems.length === 0) {
     showDetectionError(
-      failureReason === "ocr-unavailable" ? "overlay.reward.ocrUnavailable" : undefined,
+      failureReason === "ocr-unavailable"
+        ? "overlay.reward.ocrUnavailable"
+        : failureReason === "capture-unavailable"
+          ? "overlay.reward.captureUnavailable"
+          : undefined,
     );
     return;
   }

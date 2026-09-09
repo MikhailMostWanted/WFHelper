@@ -28,6 +28,7 @@ let _starting: Promise<boolean> | null = null;
 let _handlerInstalled = false;
 let _cooldownUntil = 0;
 let _sourceLookupFailed = false;
+let _lastFailure: string | null = null;
 
 function _now(): number {
   return Date.now();
@@ -49,9 +50,15 @@ async function _installDisplayMediaHandler(win: BrowserWindowType): Promise<void
   // Routes the page's getDisplayMedia; getSources() opens the Wayland picker.
   win.webContents.session.setDisplayMediaRequestHandler(
     (_request, callback) => {
+      // A portal that never answers hangs here; the timing makes that visible in the log.
+      const askedAt = _now();
+      log.info("[LinuxCapture] display media requested, asking the compositor for sources");
       desktopCapturer
         .getSources({ types: ["window", "screen"], thumbnailSize: { width: 0, height: 0 } })
         .then((sources) => {
+          log.info(
+            `[LinuxCapture] compositor offered ${sources.length} source(s) after ${_now() - askedAt}ms`,
+          );
           const source = pickCaptureSource(sources);
           if (!source) {
             _sourceLookupFailed = true;
@@ -125,8 +132,15 @@ async function _waitForLiveStream(win: BrowserWindowType): Promise<boolean> {
   for (;;) {
     const state = await _exec<string>(win, "window.__captureState && window.__captureState()");
     if (state === "live") return true;
-    if (state === "dead" || state === null) return false;
-    if (_now() > deadline) return false;
+    if (state === "dead" || state === null) {
+      const error = await _exec<string>(win, "window.__captureError && window.__captureError()");
+      if (error) log.warn("[LinuxCapture] getDisplayMedia failed:", error);
+      return false;
+    }
+    if (_now() > deadline) {
+      log.warn("[LinuxCapture] no answer to the screen-share request within 120s");
+      return false;
+    }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 }
@@ -156,12 +170,14 @@ async function _ensureStream(): Promise<boolean> {
         const cooldownMs = _sourceLookupFailed ? SOURCE_ERROR_COOLDOWN_MS : DECLINE_COOLDOWN_MS;
         _cooldownUntil = _now() + cooldownMs;
         const reason = _sourceLookupFailed ? "no capture source" : "portal declined/failed";
+        _lastFailure = reason;
         log.warn(
           `[LinuxCapture] stream not acquired (${reason}) - cooling down ${Math.round(cooldownMs / 1000)}s`,
         );
         win.destroy();
         _win = null;
       } else {
+        _lastFailure = null;
         log.info("[LinuxCapture] persistent capture stream acquired");
       }
       return live;
@@ -283,6 +299,11 @@ export async function captureLinuxStreamFrame(): Promise<NativeImage | null> {
     log.warn("[LinuxCapture] frame decode failed:", normalizeErrorMessage(err));
     return null;
   }
+}
+
+/** Why the last stream attempt failed, or null while a stream is live. */
+export function getLinuxCaptureFailure(): string | null {
+  return _lastFailure;
 }
 
 /** Close the hidden capture window (app shutdown). */
