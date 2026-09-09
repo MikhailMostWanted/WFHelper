@@ -351,11 +351,19 @@
     daysArg: number,
     barH: number,
     localeCode: string,
+    visibility: { showValue: boolean; showChange: boolean },
   ): ChartResult {
     if (RESOURCE_IDS.has(key)) {
-      return barsForKey("platDelta", projectResource(hist, key), daysArg, barH, localeCode);
+      return barsForKey(
+        "platDelta",
+        projectResource(hist, key),
+        daysArg,
+        barH,
+        localeCode,
+        visibility,
+      );
     }
-    return barsForKey(key as ChartKey, hist, daysArg, barH, localeCode);
+    return barsForKey(key as ChartKey, hist, daysArg, barH, localeCode, visibility);
   }
 
   function computeChartDataMap(
@@ -363,10 +371,11 @@
     historyArg: typeof history,
     daysArg: number,
     localeCode: string,
+    visibility: { showValue: boolean; showChange: boolean },
   ): Record<string, ChartResult> {
     const m: Record<string, ChartResult> = {};
     for (const { key } of sections) {
-      m[key] = chartDataFor(key, historyArg, daysArg, BAR_H, localeCode);
+      m[key] = chartDataFor(key, historyArg, daysArg, BAR_H, localeCode, visibility);
     }
     return m;
   }
@@ -406,7 +415,10 @@
     (r): ChartSection => ({ key: r.id, labelKey: statResourceLabelKey(r.id) }),
   );
   $: chartSections = [...displayedResources, ...NON_RESOURCE_SECTIONS];
-  $: chartDataMap = computeChartDataMap(chartSections, history, chartDays, $locale);
+  $: chartDataMap = computeChartDataMap(chartSections, history, chartDays, $locale, {
+    showValue,
+    showChange,
+  });
 
   function chartIsEmpty(cd: ChartResult): boolean {
     return (
@@ -417,7 +429,10 @@
 
   // Expanded modal chart data - recomputes when expandedKey or chartDays changes
   $: expandedChartData = expandedKey
-    ? chartDataFor(expandedKey, history, chartDays, BAR_H_EXPAND, $locale)
+    ? chartDataFor(expandedKey, history, chartDays, BAR_H_EXPAND, $locale, {
+        showValue,
+        showChange,
+      })
     : null;
   $: sessionSummaryItems = buildSessionItems(session, displayedResources, $tr, $locale, iconMap);
   // Deselecting the expanded resource leaves the modal without a chart to page to.
@@ -493,7 +508,6 @@
 <!-- Expand modal -->
 {#if expandedKey !== null && expandedChartData}
   {@const exBars = expandedChartData.bars}
-  {@const exBaseline = expandedChartData.hasBaseline}
   {@const exBw = expandedChartData.bw}
   {@const step = labelStep(chartDays)}
   {@const exYTicks = expandedChartData.yTicks}
@@ -596,9 +610,9 @@
               {/each}
               <line
                 x1="0"
-                y1={exBaseline ? BAR_H_EXPAND / 2 : BAR_H_EXPAND}
+                y1={expandedChartData.zeroY}
                 x2={SVG_W}
-                y2={exBaseline ? BAR_H_EXPAND / 2 : BAR_H_EXPAND}
+                y2={expandedChartData.zeroY}
                 stroke="var(--border)"
                 stroke-width="0.5"
               />
@@ -853,9 +867,9 @@
                               {/each}
                               <line
                                 x1="0"
-                                y1={cd.hasBaseline ? BAR_H / 2 : BAR_H}
+                                y1={cd.zeroY}
                                 x2={SVG_W}
-                                y2={cd.hasBaseline ? BAR_H / 2 : BAR_H}
+                                y2={cd.zeroY}
                                 stroke="var(--border)"
                                 stroke-width="0.5"
                               />

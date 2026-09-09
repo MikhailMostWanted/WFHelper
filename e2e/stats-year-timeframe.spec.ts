@@ -18,21 +18,26 @@ function dayKey(offsetDays: number): string {
 
 // Two hundred days of ducat income, more than the old 90-day cap kept.
 function history() {
+  let ducats = 100;
   return {
     schemaVersion: 2,
-    entries: Array.from({ length: 200 }, (_, index) => ({
-      date: dayKey(199 - index),
-      platDelta: 0,
-      creditsDelta: 0,
-      endoDelta: 0,
-      ducatsDelta: 15 + (index % 7),
-      ayaDelta: 0,
-      vitusDelta: 0,
-      relicsOpened: 1,
-      daysPlayed: 1,
-      dailyTrades: 0,
-      absDucats: 100 + index * 15,
-    })),
+    entries: Array.from({ length: 200 }, (_, index) => {
+      const ducatsDelta = 15 * (1 + Math.floor(index / 40));
+      ducats += ducatsDelta;
+      return {
+        date: dayKey(199 - index),
+        platDelta: 0,
+        creditsDelta: 0,
+        endoDelta: 0,
+        ducatsDelta,
+        ayaDelta: 0,
+        vitusDelta: 0,
+        relicsOpened: 1,
+        daysPlayed: 1,
+        dailyTrades: 0,
+        absDucats: ducats,
+      };
+    }),
   };
 }
 
@@ -44,7 +49,14 @@ test.describe("Stats year timeframe", () => {
 
   test.beforeAll(async () => {
     harness = await launchElectronTestHarness("wfh-stats-year-", {
-      inventory: { MiscItems: [] },
+      inventory: {
+        MiscItems: [
+          {
+            ItemType: "/Lotus/Types/Items/MiscItems/PrimeBucks",
+            ItemCount: seededHistory.entries[199]!.absDucats,
+          },
+        ],
+      },
       userDataFiles: { "stats-history.json": seededHistory },
     });
   });
@@ -76,6 +88,10 @@ test.describe("Stats year timeframe", () => {
     expect(saved.entries.find((entry) => entry.date === oldest.date)?.ducatsDelta).toBe(
       oldest.ducatsDelta,
     );
+    await page
+      .locator('[data-stats-chart="ducats"]')
+      .locator("xpath=ancestor::div[contains(@class, 'group/chart')]")
+      .screenshot({ path: test.info().outputPath("stats-ducats-year.png") });
     await page.screenshot({ path: test.info().outputPath("stats-year.png"), fullPage: false });
   });
 });

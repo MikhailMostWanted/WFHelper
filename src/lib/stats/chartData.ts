@@ -29,7 +29,7 @@ interface YTick {
 
 export interface ChartResult {
   bars: BarData[];
-  hasBaseline: boolean;
+  zeroY: number;
   bw: number;
   absLine: Array<{ x: number; y: number; idx: number }> | null;
   absValues: number[];
@@ -37,7 +37,7 @@ export interface ChartResult {
   /** Per-bar flag: true if this day had a real history entry (not gap-filled). */
   realData: boolean[];
   yTicks: YTick[];
-  /** The nice ceiling used for scaling (0 -> niceMax). */
+  /** Upper bound of the shared balance/change axis. */
   niceMax: number;
 }
 
@@ -136,27 +136,22 @@ function niceRoundUp(val: number): number {
   return 10 * base;
 }
 
-/** Compute nice Y-axis ticks from 0 to a nice ceiling above maxVal. */
 function computeNiceTicks(
+  minVal: number,
   maxVal: number,
   locale: string,
-  targetCount: number = 5,
-): { ticks: YTick[]; niceMax: number } {
-  if (maxVal <= 0) {
-    return { ticks: [{ label: "0", value: 0, yFrac: 1 }], niceMax: 1 };
-  }
-  // For small integer values, use step=1 so we don't get 0.2, 0.4, etc.
-  let niceStep = niceRoundUp(maxVal / targetCount);
-  if (maxVal <= targetCount) niceStep = 1;
-  const niceMax = Math.ceil(maxVal / niceStep) * niceStep;
+  targetCount: number,
+): { ticks: YTick[]; niceMin: number; niceMax: number } {
+  const span = maxVal - minVal;
+  const step = span <= targetCount ? 1 : niceRoundUp(span / targetCount);
+  const niceMin = Math.floor(minVal / step) * step;
+  const niceMax = Math.max(niceMin + step, Math.ceil(maxVal / step) * step);
   const ticks: YTick[] = [];
-  const PAD = 0.02;
-  for (let v = 0; v <= niceMax; v += niceStep) {
-    // 0 at bottom (yFrac close to 1), niceMax at top (yFrac close to 0)
-    const yFrac = PAD + (1 - v / niceMax) * (1 - 2 * PAD);
-    ticks.push({ label: fmtTickSI(v, locale), value: v, yFrac });
+  for (let value = niceMin; value <= niceMax; value += step) {
+    const yFrac = 0.02 + ((niceMax - value) / (niceMax - niceMin)) * 0.96;
+    ticks.push({ label: fmtTickSI(value, locale), value, yFrac });
   }
-  return { ticks, niceMax };
+  return { ticks, niceMin, niceMax };
 }
 
 /** Typed accessor for chart-keyed numeric fields on DailyStatEntry. */
@@ -200,6 +195,7 @@ export function barsForKey(
   days: number,
   barH: number = BAR_H,
   locale: string = "en",
+  visibility: { showValue?: boolean; showChange?: boolean } = {},
 ): ChartResult {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
@@ -208,7 +204,7 @@ export function barsForKey(
   if (calendarDays.length === 0)
     return {
       bars: [],
-      hasBaseline: false,
+      zeroY: barH,
       bw: 4,
       absLine: null,
       absValues: [],
@@ -249,103 +245,68 @@ export function barsForKey(
       }
     }
   }
-  const maxAbs = Math.max(1, ...values.map(Math.abs));
   const n = calendarDays.length;
-  // Always fill the full SVG width so bars align with the date labels below
-  // Past 120 bars a 2px gap alone would overflow the 800px canvas.
+  // Dense timeframes must fit their bars and gaps inside the canvas.
   const gap = n > 120 ? 0 : BAR_GAP;
   const bw = Math.max(2, (SVG_W - gap * (n - 1)) / n);
-  const hasNeg = values.some((v) => v < 0);
-  const hasPos = values.some((v) => v > 0);
-  const hasBaseline = hasNeg && hasPos;
-
-  // For bar-only charts, pre-compute niceMax so bars scale to the Y-axis
-  let earlyNiceMax = 0;
-  if (!absField) {
-    const maxV = Math.max(...values);
-    if (maxV > 0) {
-      const targetTicks = barH >= BAR_H_EXPAND ? 8 : 5;
-      earlyNiceMax = computeNiceTicks(maxV, locale, targetTicks).niceMax;
-    }
-  }
-
-  // Scale bars: bar-only charts use niceMax for proper Y-axis alignment
-  const barScale = earlyNiceMax > 0 ? earlyNiceMax : maxAbs;
-  const PAD = 0.02;
-  const baseline = hasBaseline ? barH / 2 : hasNeg ? 0 : barH;
-  const availH = hasBaseline ? barH / 2 : barH;
-
-  const bars: BarData[] = calendarDays.map((day, i) => {
-    const val = values[i];
-    if (earlyNiceMax > 0 && !hasBaseline) {
-      // Bar-only: scale from 0 (bottom) to niceMax (top) with PAD
-      const ratio = Math.abs(val) / earlyNiceMax;
-      const drawH = val === 0 ? 0 : Math.max(1, ratio * barH * (1 - 2 * PAD));
-      const x = i * (bw + gap);
-      const bottomY = barH * (1 - PAD);
-      const y = val >= 0 ? bottomY - drawH : bottomY;
-      return { x, y, h: drawH, value: val, date: day, positive: val >= 0 };
-    }
-    // Delta charts: scale bars independently
-    const ratio = Math.abs(val) / barScale;
-    const h = val === 0 ? 0 : Math.max(1, ratio * availH);
-    const x = i * (bw + gap);
-    const y = val >= 0 ? baseline - h : baseline;
-    return { x, y, h, value: val, date: day, positive: val >= 0 };
-  });
-
-  let absLine: Array<{ x: number; y: number; idx: number }> | null = null;
-  let absValues: number[] = [];
-  let hasAbsData = false;
-
-  let yTicks: YTick[] = [];
-  let niceMax = 0;
+  const xAt = (index: number): number => index * (bw + gap);
 
   if (absField) {
-    // Carry forward the last known absolute value so the line extends across gaps
-    let lastKnown: number | undefined = carryIn
-      ? ((carryIn[absField] as number | undefined) ?? undefined)
-      : undefined;
+    let lastKnown = carryIn ? (carryIn[absField] as number | undefined) : undefined;
     for (let i = 0; i < rawAbs.length; i++) {
       if (rawAbs[i] !== undefined) lastKnown = rawAbs[i];
       else if (lastKnown !== undefined) rawAbs[i] = lastKnown;
     }
-    const validAbs = rawAbs.filter((v): v is number => v !== undefined);
-    hasAbsData = validAbs.length > 0;
-    absValues = rawAbs.map((v) => v ?? NaN);
-    // >= 1: a newly tracked stat has only today's balance - still show it
-    if (validAbs.length >= 1) {
-      const maxV = Math.max(...validAbs);
-      const targetTicks = barH >= BAR_H_EXPAND ? 8 : 5;
-      const nice = computeNiceTicks(maxV, locale, targetTicks);
-      yTicks = nice.ticks;
-      niceMax = nice.niceMax;
-
-      const PAD = 0.02;
-      absLine = [];
-      for (let i = 0; i < calendarDays.length; i++) {
-        const v = rawAbs[i];
-        if (v === undefined) continue;
-        // Scale: 0 -> bottom (1-PAD), niceMax -> top (PAD)
-        const yFrac = PAD + (1 - v / niceMax) * (1 - 2 * PAD);
-        absLine.push({
-          x: i * (bw + gap) + bw / 2,
-          y: yFrac * barH,
-          idx: i,
-        });
-      }
-    }
-  } else {
-    // Bar-only charts (relicsOpened, dailyTrades): Y-axis from bar values
-    if (earlyNiceMax > 0) {
-      const targetTicks = barH >= BAR_H_EXPAND ? 8 : 5;
-      const nice = computeNiceTicks(Math.max(...values), locale, targetTicks);
-      yTicks = nice.ticks;
-      niceMax = nice.niceMax;
-    }
   }
-
-  return { bars, hasBaseline, bw, absLine, absValues, hasAbsData, realData, yTicks, niceMax };
+  const validAbs = rawAbs.filter((value): value is number => value !== undefined);
+  const absValues = rawAbs.map((value) => value ?? NaN);
+  const shown = [
+    ...(visibility.showChange === false ? [] : values),
+    ...(visibility.showValue === false ? [] : validAbs),
+  ];
+  // Balances and changes use the same units, so both must match the labelled axis.
+  const {
+    ticks: yTicks,
+    niceMin,
+    niceMax,
+  } = computeNiceTicks(
+    Math.min(0, ...shown),
+    Math.max(0, ...shown),
+    locale,
+    barH >= BAR_H_EXPAND ? 8 : 5,
+  );
+  const yAt = (value: number): number =>
+    (0.02 + ((niceMax - value) / (niceMax - niceMin)) * 0.96) * barH;
+  const zeroY = yAt(0);
+  const bars: BarData[] = calendarDays.map((date, i) => {
+    const value = values[i];
+    const y = yAt(value);
+    return {
+      x: xAt(i),
+      y: Math.min(y, zeroY),
+      h: Math.abs(y - zeroY),
+      value,
+      date,
+      positive: value >= 0,
+    };
+  });
+  const absLine =
+    validAbs.length === 0
+      ? null
+      : rawAbs.flatMap((value, idx) =>
+          value === undefined ? [] : [{ x: xAt(idx) + bw / 2, y: yAt(value), idx }],
+        );
+  return {
+    bars,
+    zeroY,
+    bw,
+    absLine,
+    absValues,
+    hasAbsData: validAbs.length > 0,
+    realData,
+    yTicks,
+    niceMax,
+  };
 }
 
 export function labelStep(days: number): number {

@@ -67,6 +67,44 @@ describe("barsForKey abs line", () => {
   });
 });
 
+describe("shared balance and change axis", () => {
+  it("draws a 20-ducat change at one two-hundredth of a 4000-ducat balance", () => {
+    const hist = [{ ...entry(dayStr(0), 4000), ducatsDelta: 20 }];
+    const chart = barsForKey("ducatsDelta", hist, 7, 100);
+    const bar = chart.bars[chart.bars.length - 1];
+    const balance = chart.absLine![0];
+    expect(bar.value).toBe(20);
+    expect(bar.h / (chart.zeroY - balance.y)).toBeCloseTo(1 / 200);
+    expect(bar.y + bar.h).toBeCloseTo(chart.zeroY);
+    expect(bar.h).toBeLessThan(1);
+
+    const changeOnly = barsForKey("ducatsDelta", hist, 7, 100, "en", { showValue: false });
+    expect(changeOnly.niceMax).toBeLessThan(100);
+    expect(changeOnly.bars[changeOnly.bars.length - 1].h).toBeGreaterThan(80);
+  });
+
+  it("anchors opposite changes at the labelled zero and excludes hidden negative changes", () => {
+    const hist = [
+      { ...entry(dayStr(-1), 4000), ducatsDelta: -20 },
+      { ...entry(dayStr(0), 4020), ducatsDelta: 20 },
+    ];
+    const chart = barsForKey("ducatsDelta", hist, 7, 100);
+    const loss = chart.bars[chart.bars.length - 2];
+    const gain = chart.bars[chart.bars.length - 1];
+    const zero = chart.yTicks.find((tick) => tick.value === 0)!;
+    expect(loss.y).toBeCloseTo(chart.zeroY);
+    expect(gain.y + gain.h).toBeCloseTo(chart.zeroY);
+    expect(loss.h).toBeCloseTo(gain.h);
+    expect(zero.yFrac * 100).toBeCloseTo(chart.zeroY);
+    expect(chart.yTicks.some((tick) => tick.value < 0)).toBe(true);
+    expect(chart.absLine!.every((point) => point.y < gain.y)).toBe(true);
+
+    const balanceOnly = barsForKey("ducatsDelta", hist, 7, 100, "en", { showChange: false });
+    expect(balanceOnly.yTicks.every((tick) => tick.value >= 0)).toBe(true);
+    expect(balanceOnly.zeroY).toBeGreaterThan(chart.zeroY);
+  });
+});
+
 describe("stats formatting", () => {
   it("uses the selected locale for values, abbreviations and dates", () => {
     expect(formatAbsolute(1_250_000, "de")).toBe("1,25M");
