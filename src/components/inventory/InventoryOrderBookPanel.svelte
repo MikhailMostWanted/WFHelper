@@ -136,6 +136,8 @@
 
   $: filteredSellBase = filterStatus(orderBook?.sell ?? [], onlineIngameOnly);
   $: filteredBuyBase = filterStatus(orderBook?.buy ?? [], onlineIngameOnly);
+  $: hiddenSell = (orderBook?.sell.length ?? 0) - filteredSellBase.length;
+  $: hiddenBuy = (orderBook?.buy.length ?? 0) - filteredBuyBase.length;
   $: bestSell =
     filteredSellBase.length > 0
       ? Math.min(...filteredSellBase.map((entry) => entry.platinum))
@@ -626,6 +628,7 @@
         <InventoryOrderBookSide
           side="sell"
           rows={sellRows}
+          hidden={hiddenSell}
           {isRankedListingItem}
           {copyWhisper}
           {openSellerProfile}
@@ -633,6 +636,7 @@
         <InventoryOrderBookSide
           side="buy"
           rows={buyRows}
+          hidden={hiddenBuy}
           {isRankedListingItem}
           {copyWhisper}
           {openSellerProfile}

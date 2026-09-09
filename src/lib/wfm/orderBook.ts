@@ -10,6 +10,7 @@ import {
 } from "../../../config/shared/wfmOrders.js";
 import { fetchWithTimeout } from "../../../config/shared/fetchWithTimeout.js";
 import { createPriorityRequestQueue } from "./requestPolicy.js";
+import { log } from "../log.js";
 
 export type OrderBookEntry = WfmOrderBookEntry;
 
@@ -111,6 +112,8 @@ async function fetchDirectOrderBook(
   );
   if (v2Attempt.data) {
     bumpCounter("resultOk");
+    // A 200 with no orders is what an "empty listing" report looks like; keep the trace.
+    if (v2Attempt.data.length === 0) log.warn(`[OrderBook] v2 returned no orders for ${slug}`);
     return {
       status: "ok",
       data: {

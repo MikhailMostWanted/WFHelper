@@ -1056,6 +1056,7 @@
   "orderbook.noActiveListings": "No active listings found.",
   "orderbook.noBuyOrders": "No buy orders",
   "orderbook.noSellOrders": "No sell orders",
+  "orderbook.offlineHidden": "{count} offline, hidden by the filter",
   "orderbook.noSlug": "No market slug available for this item.",
   "orderbook.openWfm": "Open WFM",
   "orderbook.prepareOrderFailed": "Unable to prepare order for this item.",

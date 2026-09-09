@@ -1043,6 +1043,7 @@
   "orderbook.noActiveListings": "未找到有效的挂单。",
   "orderbook.noBuyOrders": "没有求购订单",
   "orderbook.noSellOrders": "没有出售订单",
+  "orderbook.offlineHidden": "筛选器已隐藏 {count} 个离线订单",
   "orderbook.noSlug": "该物品没有可用的市场标识符。",
   "orderbook.openWfm": "打开 WFM",
   "orderbook.prepareOrderFailed": "无法为该物品准备订单。",

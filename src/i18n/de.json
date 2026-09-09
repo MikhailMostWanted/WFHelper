@@ -1329,6 +1329,7 @@
   "orderbook.noActiveListings": "Keine aktiven Angebote gefunden.",
   "orderbook.noBuyOrders": "Keine Kauf-Orders",
   "orderbook.noSellOrders": "Keine Verkaufs-Orders",
+  "orderbook.offlineHidden": "{count} offline, vom Filter ausgeblendet",
   "orderbook.noSlug": "Kein Markt-Slug für dieses Item verfügbar.",
   "orderbook.openWfm": "WFM öffnen",
   "orderbook.prepareOrderFailed": "Für dieses Item konnte keine Order vorbereitet werden.",

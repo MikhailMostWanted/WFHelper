@@ -5,6 +5,8 @@
 
   export let side: OrderType;
   export let rows: OrderBookEntry[] = [];
+  /** Orders the online-only filter removed; an empty column must say so. */
+  export let hidden = 0;
   export let isRankedListingItem = false;
   export let copyWhisper: (entry: OrderBookEntry, side: OrderType) => void | Promise<void>;
   export let openSellerProfile: (entry: OrderBookEntry) => void;
@@ -40,6 +42,11 @@
       class="rounded-lg border border-dashed border-border bg-bg-soft px-2 py-2 text-xs text-text-secondary"
     >
       {emptyLabel}
+      {#if hidden > 0}
+        <span class="mt-1 block text-text-muted" data-orderbook-hidden={hidden}
+          >{$tr("orderbook.offlineHidden", { count: hidden })}</span
+        >
+      {/if}
     </div>
   {:else}
     <div class="grid">
