@@ -126,6 +126,19 @@ test("Warframe lifecycle stays opt-in and closes only after an observed game exi
     const toggle = page.locator('[data-setting="warframe-lifecycle"] input[type="checkbox"]');
     await expect(toggle).not.toBeChecked();
     expect(enabledOnDisk()).not.toBe(true);
+    const initialProcessState = await evaluateInMain(app, ({ app }) => {
+      const status = process.mainModule!.require(
+        `${app.getAppPath()}/.electron-build/services/warframeStatus`,
+      ) as typeof import("../services/warframeStatus");
+      const state = (globalThis as unknown as { lifecycleTest: LifecycleTestState }).lifecycleTest;
+      state.gameRunning = true;
+      status.getWarframeProcessState(true);
+      state.gameRunning = false;
+      // A startup sample from the real game can outlive the process mock.
+      const cached = status.getWarframeProcessState();
+      return { cached, fresh: status.getWarframeProcessState(true) };
+    });
+    expect(initialProcessState).toEqual({ cached: true, fresh: false });
     await toggle.check();
     await expect.poll(enabledOnDisk).toBe(true);
     await expect.poll(async () => (await state()).watcherSpawns).toBe(1);

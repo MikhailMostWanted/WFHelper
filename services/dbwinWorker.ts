@@ -99,7 +99,11 @@ function isWarframeRunning(): boolean {
   return enumProcessIds().some(isWarframePid);
 }
 
-const stopFlag = new Int32Array((workerData as { stopBuffer: SharedArrayBuffer }).stopBuffer);
+const { stopBuffer, dbwinPrefix = "DBWIN" } = workerData as {
+  stopBuffer: SharedArrayBuffer;
+  dbwinPrefix?: string;
+};
+const stopFlag = new Int32Array(stopBuffer);
 
 function runDbwinLoop(): void {
   // Create DBWIN_BUFFER (pagefile-backed, writable so the sender can use it)
@@ -109,7 +113,7 @@ function runDbwinLoop(): void {
     PAGE_READWRITE,
     0,
     DBWIN_BUFFER_SIZE,
-    "DBWIN_BUFFER",
+    `${dbwinPrefix}_BUFFER`,
   );
 
   if (!hMap) {
@@ -134,9 +138,9 @@ function runDbwinLoop(): void {
   }
 
   // DBWIN_BUFFER_READY: auto-reset (0), initially signaled (1) - "ready to receive"
-  const hReady = CreateEventW(null, 0, 1, "DBWIN_BUFFER_READY");
+  const hReady = CreateEventW(null, 0, 1, `${dbwinPrefix}_BUFFER_READY`);
   // DBWIN_DATA_READY:  auto-reset (0), initially unsignaled (0)
-  const hData = CreateEventW(null, 0, 0, "DBWIN_DATA_READY");
+  const hData = CreateEventW(null, 0, 0, `${dbwinPrefix}_DATA_READY`);
 
   if (!hReady || !hData) {
     parentPort?.postMessage({

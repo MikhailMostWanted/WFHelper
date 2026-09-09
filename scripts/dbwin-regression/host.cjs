@@ -1,5 +1,5 @@
 // Real Electron reproduces the koffi memory-cage failure that Node misses.
-// argv: [workerPath, stopFilePath]; Electron receives no piped stdin on Windows.
+// argv: [workerPath, stopFilePath, dbwinPrefix, userDataPath]
 
 const { app } = require("electron");
 const { Worker } = require("worker_threads");
@@ -7,6 +7,8 @@ const fs = require("fs");
 
 const workerPath = process.argv[2];
 const stopFilePath = process.argv[3];
+const dbwinPrefix = process.argv[4];
+app.setPath("userData", process.argv[5]);
 const HARD_TIMEOUT_MS = 120_000;
 const STOP_GRACE_MS = 10_000;
 const STOP_POLL_MS = 200;
@@ -22,7 +24,7 @@ app.whenReady().then(() => {
   const stopFlag = new Int32Array(stopBuffer);
 
   out({ event: "start", electron: process.versions.electron, workerPath });
-  const w = new Worker(workerPath, { workerData: { stopBuffer } });
+  const w = new Worker(workerPath, { workerData: { stopBuffer, dbwinPrefix } });
 
   let lines = 0;
   let matching = 0;

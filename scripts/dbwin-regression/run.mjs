@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Covers Electron's koffi memory cage and the BOOL event-flood regression.
-// Windows-only after build:main; close other DBWIN readers before running.
+// Windows-only after build:main; private objects keep the running app separate.
 
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
@@ -45,27 +45,30 @@ const hostPath = path.join(repoRoot, "scripts", "dbwin-regression", "host.cjs");
 const emitterPath = path.join(repoRoot, "scripts", "dbwin-regression", "emitter.cjs");
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wfhelper-dbwin-"));
+if (path.dirname(path.resolve(tmpDir)) !== path.resolve(os.tmpdir())) {
+  throw new Error("unexpected DBWIN test directory");
+}
 const decoyExe = path.join(tmpDir, "Warframe.x64.exe");
 const stopFile = path.join(tmpDir, "stop.flag");
+const dbwinPrefix = `WFHelper_Test_${path.basename(tmpDir)}`;
 fs.copyFileSync(process.execPath, decoyExe);
 log(`decoy: ${decoyExe}`);
 
 let host = null;
 let decoy = null;
 
-function cleanup() {
+async function cleanup() {
   try {
     if (decoy && decoy.exitCode === null) decoy.kill();
   } catch {}
   try {
     if (host && host.exitCode === null) host.kill();
   } catch {}
-  // The decoy exe can stay locked for a moment after kill - best effort.
-  setTimeout(() => {
-    try {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    } catch {}
-  }, 1000).unref();
+  // The decoy exe can stay locked briefly after kill; finish before process.exit.
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  try {
+    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  } catch {}
 }
 
 const hostEvents = [];
@@ -111,10 +114,14 @@ function attachLineReader(child, onLine, prefix) {
 }
 
 async function main() {
-  host = spawn(electronPath, [hostPath, workerPath, stopFile], {
-    cwd: repoRoot,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  host = spawn(
+    electronPath,
+    [hostPath, workerPath, stopFile, dbwinPrefix, path.join(tmpDir, "profile")],
+    {
+      cwd: repoRoot,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   attachLineReader(
     host,
     (line) => {
@@ -128,7 +135,7 @@ async function main() {
     "[host]",
   );
 
-  decoy = spawn(decoyExe, [emitterPath, koffiMain, String(MATCHING_SENDS)], {
+  decoy = spawn(decoyExe, [emitterPath, koffiMain, String(MATCHING_SENDS), dbwinPrefix], {
     cwd: tmpDir,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -154,9 +161,7 @@ async function main() {
   );
   log("worker ready");
   if (ready.alreadyExists) {
-    log(
-      "WARNING: DBWIN_BUFFER already existed - another debug listener is running; counts may be off",
-    );
+    fail("private DBWIN objects already existed");
   }
 
   await waitFor(() => decoyDone, EMITTER_TIMEOUT_MS, "emitter done");
@@ -196,7 +201,7 @@ async function main() {
     fail(problems.join(" | "));
   }
   log(`PASS: ${summary.lines} lines delivered for ${MATCHING_SENDS} sends, clean stop, no crash`);
-  cleanup();
+  await cleanup();
   process.exit(0);
 }
 

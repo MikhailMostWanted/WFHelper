@@ -1,15 +1,30 @@
-// Runs inside the decoy Warframe.x64.exe; emits OutputDebugStringW test lines,
-// then stays alive so the worker holds Phase 1. argv: [koffiMainPath, matchingSendCount]
+// Replays the DBWIN handshake on private objects so other readers cannot consume it.
+// argv: [koffiMainPath, matchingSendCount, dbwinPrefix]
 
 const koffi = require(process.argv[2]);
 
 const kernel32 = koffi.load("kernel32.dll");
-const OutputDebugStringW = kernel32.func("OutputDebugStringW", "void", ["str16"]);
 const OpenEventW = kernel32.func("OpenEventW", "void *", ["uint32", "int32", "str16"]);
+const OpenFileMappingW = kernel32.func("OpenFileMappingW", "void *", ["uint32", "int32", "str16"]);
+const MapViewOfFile = kernel32.func("MapViewOfFile", "void *", [
+  "void *",
+  "uint32",
+  "uint32",
+  "uint32",
+  "size_t",
+]);
+const WaitForSingleObject = kernel32.func("WaitForSingleObject", "uint32", ["void *", "uint32"]);
+const SetEvent = kernel32.func("SetEvent", "int32", ["void *"]);
+const UnmapViewOfFile = kernel32.func("UnmapViewOfFile", "int32", ["void *"]);
 const CloseHandle = kernel32.func("CloseHandle", "int32", ["void *"]);
 
 const SYNCHRONIZE = 0x00100000;
 const MATCHING_SENDS = Number(process.argv[3] || 8);
+const prefix = process.argv[4];
+if (!prefix?.startsWith("WFHelper_Test_")) throw new Error("missing private DBWIN prefix");
+const FILE_MAP_WRITE = 0x0002;
+const EVENT_MODIFY_STATE = 0x0002;
+const packetType = koffi.array("uint8", 4096);
 const READER_WAIT_MS = 60_000;
 const POLL_MS = 200;
 const SEND_INTERVAL_MS = 100;
@@ -17,11 +32,9 @@ const SEND_INTERVAL_MS = 100;
 const MATCH_LINE = "Script [Info]: TradingPost.lua: partner joined";
 const NOISE_LINE = "Sys [Info]: some unrelated engine chatter that must be filtered";
 
-// DBWIN_BUFFER_READY only exists once the reader created it (worker Phase 1).
-// Sends before that are silent no-ops, so wait for it to guarantee counting.
 const deadline = Date.now() + READER_WAIT_MS;
 const waitForReader = setInterval(() => {
-  const h = OpenEventW(SYNCHRONIZE, 0, "DBWIN_BUFFER_READY");
+  const h = OpenEventW(SYNCHRONIZE, 0, `${prefix}_BUFFER_READY`);
   if (h) {
     CloseHandle(h);
     clearInterval(waitForReader);
@@ -34,15 +47,33 @@ const waitForReader = setInterval(() => {
 }, POLL_MS);
 
 function sendAll() {
+  const mapping = OpenFileMappingW(FILE_MAP_WRITE, 0, `${prefix}_BUFFER`);
+  const ready = OpenEventW(SYNCHRONIZE, 0, `${prefix}_BUFFER_READY`);
+  const data = OpenEventW(EVENT_MODIFY_STATE, 0, `${prefix}_DATA_READY`);
+  const view = mapping && MapViewOfFile(mapping, FILE_MAP_WRITE, 0, 0, 4096);
+  if (!view || !ready || !data) throw new Error("cannot open private DBWIN objects");
+  function send(message) {
+    if (WaitForSingleObject(ready, 10_000) !== 0)
+      throw new Error("DBWIN reader did not acknowledge");
+    const packet = Buffer.alloc(4096);
+    packet.writeUInt32LE(process.pid, 0);
+    packet.write(message, 4, 4091, "utf8");
+    koffi.encode(view, packetType, packet);
+    if (!SetEvent(data)) throw new Error("cannot signal DBWIN data");
+  }
   let cycle = 0;
+  let phase = 0;
+  const messages = [MATCH_LINE, NOISE_LINE, ""];
   const t = setInterval(() => {
-    OutputDebugStringW(MATCH_LINE);
-    OutputDebugStringW(NOISE_LINE);
-    OutputDebugStringW("");
+    // Leave matching data in place long enough to expose a re-delivery flood.
+    send(messages[phase++ % messages.length]);
+    if (phase % messages.length !== 0) return;
     cycle++;
     console.log(`[emitter] cycle ${cycle}/${MATCHING_SENDS}`);
     if (cycle >= MATCHING_SENDS) {
       clearInterval(t);
+      UnmapViewOfFile(view);
+      for (const handle of [mapping, ready, data]) CloseHandle(handle);
       console.log("EMITTER_DONE");
       // Keep the decoy process alive so isWarframeRunning() stays true while
       // the host performs its clean-stop sequence. Runner kills us.
