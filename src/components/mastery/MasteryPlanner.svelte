@@ -310,7 +310,7 @@
               >
                 {materialsOpen
                   ? $tr("common.showFewer")
-                  : $tr("mastery.planner.moreMaterials", {
+                  : $tr("common.moreCount", {
                       count: missingMaterials.length - MATERIAL_CHIP_LIMIT,
                     })}
               </button>

@@ -202,10 +202,15 @@
   {:else}
     {@render children()}
     {#if overflow > 0}
-      <!-- "+N more" is generic; the key it lives under is the planner's only by history. -->
-      <p class="m-0 text-right text-[0.68rem] text-text-muted" data-widget-more>
-        {$tr("mastery.planner.moreMaterials", { count: String(overflow) })}
-      </p>
+      <button
+        type="button"
+        class="cursor-pointer self-end border-0 bg-transparent p-0 text-[0.68rem] text-text-muted underline-offset-2 hover:text-accent hover:underline"
+        data-widget-more
+        title={$tr("dashboard.openTab", { label: homeLabel })}
+        onclick={() => currentView.set(homeView)}
+      >
+        {$tr("common.moreCount", { count: String(overflow) })}
+      </button>
     {/if}
   {/if}
 </section>

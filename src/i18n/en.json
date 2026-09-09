@@ -708,6 +708,7 @@
   "common.mastered": "Mastered",
   "common.parentItemOwned": "Parent item owned",
   "common.mastery": "Mastery",
+  "common.moreCount": "+{count} more",
   "common.max": "Max",
   "common.median": "Median",
   "common.min": "Min",
@@ -2489,6 +2490,5 @@
   "market.priceAverage48h": "~{plat} platinum (48h average sale price)",
   "pt.recordedPlayer": "1 recorded player",
   "pt.recordedRosterHint": "Comparisons group runs by recorded players. Players loaded before capture may be missing.",
-  "market.averageSale48h": "48h average sale price",
-  "mastery.planner.moreMaterials": "+{count} more"
+  "market.averageSale48h": "48h average sale price"
 }

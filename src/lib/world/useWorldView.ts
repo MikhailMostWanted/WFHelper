@@ -247,7 +247,7 @@ export function buildWorldTimes({
     weekly: timeTo(nextWeeklyResetUtc(), nowMs),
     sortie: timeTo(parseIsoDate(sortie?.expiry) || nextDailyResetUtc(), nowMs),
     steelPath: timeTo(parseIsoDate(steelPath?.expiry ?? undefined) || nextWeeklyResetUtc(), nowMs),
-    duviri: timeTo(duviriExpiry, nowMs),
+    duviri: timeToStrict(duviriExpiry, nowMs),
     earth: cycleTimeDisplay(earth.timeLeft, earth.expiry, nowMs),
     cetus: cycleTimeDisplay(cetus.timeLeft, cetus.expiry, nowMs),
     vallis: cycleTimeDisplay(vallis.timeLeft, vallis.expiry, nowMs),

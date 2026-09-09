@@ -28,7 +28,7 @@ describe("widget frame overflow footer", () => {
 
   it("keeps the footer on the shared count key", () => {
     const frame = widgetSources().get("WidgetFrame.svelte") ?? "";
-    expect(frame).toContain('$tr("mastery.planner.moreMaterials", { count: String(overflow) })');
+    expect(frame).toContain('$tr("common.moreCount", { count: String(overflow) })');
   });
 
   it("passes an overflow count from every widget that limits its rows", () => {

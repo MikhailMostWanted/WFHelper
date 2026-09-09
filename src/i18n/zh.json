@@ -702,6 +702,7 @@
   "common.market": "市场",
   "common.mastered": "已精通",
   "common.mastery": "段位",
+  "common.moreCount": "+{count} 项",
   "common.max": "最大",
   "common.median": "中位数",
   "common.min": "最小",
@@ -2471,6 +2472,5 @@
   "market.priceAverage48h": "约 {plat} 白金（48 小时平均成交价）",
   "pt.recordedPlayer": "记录到 1 名玩家",
   "pt.recordedRosterHint": "按记录到的玩家人数分组比较。开始记录前已载入的玩家可能未被记录。",
-  "market.averageSale48h": "48 小时平均成交价",
-  "mastery.planner.moreMaterials": "+{count} 项"
+  "market.averageSale48h": "48 小时平均成交价"
 }

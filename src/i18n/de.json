@@ -996,6 +996,7 @@
   "settings.showMasteredBadges": "Gemeistert-Markierungen (M)",
   "settings.showOwnedParentBadges": "Besitz-Markierungen (C)",
   "common.mastery": "Meisterschaft",
+  "common.moreCount": "+{count} weitere",
   "common.max": "Max",
   "common.median": "Median",
   "common.min": "Min",
@@ -2472,6 +2473,5 @@
   "market.priceAverage48h": "~{plat} Platinum (48h-Durchschnittsverkaufspreis)",
   "pt.recordedPlayer": "1 erfasster Spieler",
   "pt.recordedRosterHint": "Vergleiche gruppieren Läufe nach erfassten Spielern. Vor der Aufzeichnung geladene Spieler können fehlen.",
-  "market.averageSale48h": "48h-Durchschnittsverkaufspreis",
-  "mastery.planner.moreMaterials": "+{count} weitere"
+  "market.averageSale48h": "48h-Durchschnittsverkaufspreis"
 }
