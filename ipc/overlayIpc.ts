@@ -17,6 +17,7 @@ import { writeFileAtomicSync } from "../services/atomicFile";
 import { userDataPath } from "../services/userDataPath";
 import { asRecord } from "../config/shared/objectValidation";
 import { withScope } from "../services/logger";
+import { matchesAcceleratorInput } from "../services/acceleratorVk";
 import { resolveWarframeUiScale } from "../services/eeLogPath";
 import * as warframeStatus from "../services/warframeStatus";
 import { configureWarframeLifecycle } from "../services/warframeLifecycle";
@@ -68,7 +69,7 @@ import {
 
 const log = withScope("overlayIpc");
 
-import { BrowserWindow, screen, type WebContents } from "electron";
+import { app, BrowserWindow, screen, type WebContents } from "electron";
 import fs from "node:fs";
 
 function pushOverlayInteractionMode(): void {
@@ -355,6 +356,28 @@ function moveInteractiveOverlayWindow(sender: WebContents, rawDelta: unknown): v
 }
 
 function register(): void {
+  if (process.platform === "win32") {
+    // The game-only keyboard hook stops matching once an overlay takes focus.
+    const attachInteractionShortcut = (win: BrowserWindow) => {
+      win.webContents.on("before-input-event", (event, input) => {
+        if (
+          !win.isFocused() ||
+          !ctx.overlaySettings.interactionHotkeyEnabled ||
+          input.type !== "keyDown" ||
+          input.isAutoRepeat ||
+          (win !== ctx.overlayWindow &&
+            win !== ctx.plannerOverlayWindow &&
+            !isRivenOverlayWindow(win))
+        )
+          return;
+        if (!matchesAcceleratorInput(ctx.overlaySettings.interactionHotkey, input)) return;
+        event.preventDefault();
+        toggleOverlayInteractionMode("overlay-keyboard");
+      });
+    };
+    app.on("browser-window-created", (_event, win) => attachInteractionShortcut(win));
+    BrowserWindow.getAllWindows().forEach(attachInteractionShortcut);
+  }
   const overlayEditor = registerOverlayEditor(settingsController.saveOverlaySettings, (kind) => {
     if (kind === "reward")
       rewardOverlayIpc.rewardWindowsController.positionOverlayWindow(

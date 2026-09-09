@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAccelerator } from "../../services/acceleratorVk";
+import { matchesAcceleratorInput, parseAccelerator } from "../../services/acceleratorVk";
 
 describe("parseAccelerator", () => {
   it("maps bare function keys", () => {
@@ -72,5 +72,19 @@ describe("parseAccelerator", () => {
     expect(parseAccelerator("")).toBeNull();
     expect(parseAccelerator("A+B")).toBeNull();
     expect(parseAccelerator("Control+PrintScreen")).toBeNull();
+  });
+});
+
+describe("matchesAcceleratorInput", () => {
+  it.each([
+    ["F7", "F7", false, false, false],
+    ["Control+Shift+R", "r", true, false, true],
+    ["Alt+Up", "ArrowUp", false, true, false],
+    ["Space", " ", false, false, false],
+  ])("matches %s against focused-window input", (accelerator, key, control, alt, shift) => {
+    const input = { key, control, alt, shift, meta: false };
+    expect(matchesAcceleratorInput(accelerator, input)).toBe(true);
+    expect(matchesAcceleratorInput(accelerator, { ...input, control: !control })).toBe(false);
+    expect(matchesAcceleratorInput(accelerator, { ...input, key: "F12" })).toBe(false);
   });
 });

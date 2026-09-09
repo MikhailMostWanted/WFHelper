@@ -84,3 +84,19 @@ export function parseAccelerator(accelerator: string): ParsedAccelerator | null 
   if (vk === null) return null; // key we can't map to a virtual-key code
   return { ctrl, alt, shift, win, vk };
 }
+
+export function matchesAcceleratorInput(
+  accelerator: string,
+  input: { key: string; control: boolean; alt: boolean; shift: boolean; meta: boolean },
+): boolean {
+  const binding = parseAccelerator(accelerator);
+  const key = input.key === " " ? "Space" : input.key.replace(/^Arrow/, "");
+  return !!(
+    binding &&
+    binding.vk === keyToVk(key.toUpperCase()) &&
+    binding.ctrl === input.control &&
+    binding.alt === input.alt &&
+    binding.shift === input.shift &&
+    binding.win === input.meta
+  );
+}
