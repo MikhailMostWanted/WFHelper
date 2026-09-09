@@ -13,6 +13,8 @@ export interface PepExportItem {
   productCategory?: string;
   era?: string;
   category?: string;
+  /** Sentinels only: the weapon the sentinel ships with. */
+  defaultWeapon?: string;
 }
 
 interface RecipeIngredient {

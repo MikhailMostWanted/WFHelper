@@ -259,3 +259,20 @@ describe("itemDatabase name and slug index", () => {
     expect(indexed?.item).toBe(itemDb.lookupItem(AKARIUS_BP));
   });
 });
+
+describe("itemDatabase sentinel weapon vaulting", () => {
+  beforeAll(() => {
+    itemDb.buildDatabase();
+  });
+
+  it("gives a bundled prime sentinel weapon its sentinel's vault status", () => {
+    const shade = itemDb.lookupItem(
+      "/Lotus/Types/Sentinels/SentinelPowersuits/PrimeShadePowerSuit",
+    );
+    const burstLaser = itemDb.lookupItem(
+      "/Lotus/Types/Sentinels/SentinelWeapons/PrimeBurstLaserPistol",
+    );
+    expect(shade?.vaulted).toBe(true);
+    expect(burstLaser?.vaulted).toBe(true);
+  });
+});

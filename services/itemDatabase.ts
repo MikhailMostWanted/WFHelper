@@ -196,6 +196,8 @@ interface ItemEntry {
 
 let itemsByUniqueName: Record<string, ItemEntry> = {};
 let wfcdItemsByUniqueName: Record<string, ItemEntry> = {};
+// Bundled sentinel weapon -> sentinel, from DE's export.
+let sentinelWeapons = new Map<string, string>();
 /** Maps resultType (the produced item's uniqueName) -> recipe data. */
 let recipesByResultType: Record<string, RecipeData> = {};
 /** Maps blueprint uniqueName -> resultType it builds. */
@@ -366,6 +368,9 @@ function loadPublicExportPlus(): number {
           _source: "pep",
         };
         pepCount++;
+        if (exportKey === "ExportSentinels" && typeof item.defaultWeapon === "string") {
+          sentinelWeapons.set(item.defaultWeapon, uniqueName);
+        }
       }
     }
 
@@ -793,6 +798,14 @@ function inheritBlueprintDisplayFromResults(): void {
   if (icons > 0) log.info(`[ItemDB] Inherited ${icons} blueprint icons from their crafted item`);
 }
 
+// Bundled sentinel weapons have no relic drops for WFCD to derive vaulting from.
+function inheritSentinelWeaponVaulting(): void {
+  for (const [weapon, sentinel] of sentinelWeapons) {
+    const entry = itemsByUniqueName[weapon];
+    if (entry && itemsByUniqueName[sentinel]?.vaulted) entry.vaulted = true;
+  }
+}
+
 // WFCD inherits false resource tradability for crafted mech parts.
 function applyMechPartTradability(): void {
   let fixed = 0;
@@ -812,6 +825,7 @@ export function buildDatabase(): void {
   itemsByUniqueName = {};
   nameSlugIndex = null;
   wfcdItemsByUniqueName = {};
+  sentinelWeapons = new Map();
   recipesByResultType = {};
   resultTypeByBlueprint = {};
   reusableBlueprints = new Set();
@@ -819,6 +833,7 @@ export function buildDatabase(): void {
   const pepCount = loadPublicExportPlus();
   buildRecipeIndex();
   const wfcdCount = loadWfcdItems();
+  inheritSentinelWeaponVaulting();
   applyMechPartTradability();
   linkBlueprintsToResults();
   inheritBlueprintDisplayFromResults();
