@@ -523,6 +523,7 @@ function register(): void {
       const display = screen.getPrimaryDisplay();
       const area = display.workArea;
       const bounds = {
+        ...ctx.overlaySettings.overlayWindowBounds?.[key],
         x: Math.round(area.x + xFrac * area.width),
         y: Math.round(area.y + yFrac * area.height),
         displayId: String(display.id),

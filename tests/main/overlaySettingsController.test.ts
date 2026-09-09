@@ -50,6 +50,15 @@ function buildController() {
 }
 
 describe("overlay settings controller", () => {
+  it("preserves native resize precision when settings are saved and reloaded", () => {
+    const { controller, deps } = buildController();
+    const saved = controller.setOverlaySettings({ overlayWindowScales: { planner: 1.237 } });
+    expect(saved.overlayWindowScales?.planner).toBe(1.237);
+    deps.fs.existsSync.mockReturnValue(true);
+    deps.fs.readFileSync.mockReturnValue(JSON.stringify(saved));
+    expect(controller.loadOverlaySettings().overlayWindowScales?.planner).toBe(1.237);
+  });
+
   it("loads a legacy reward layout and preserves it through unrelated settings saves", () => {
     const { controller, deps } = buildController();
     const rewardLayout = {
@@ -275,8 +284,8 @@ describe("overlay settings controller", () => {
     const normalized = controller.normalizeOverlaySettings({
       overlayScale: 2,
       overlayWindowBounds: {
-        reward: { x: 120, y: 240, displayId: "7" },
-        arbiSummary: { x: 15, y: 25 },
+        reward: { x: 120, y: 240, displayId: "7", width: 960.5, height: 200 },
+        arbiSummary: { x: 15, y: 25, width: "invalid", height: 200 },
         nope: { x: 1, y: 2 },
         planner: { x: "bad", y: 10 },
       },
@@ -284,7 +293,7 @@ describe("overlay settings controller", () => {
 
     expect(normalized.overlayScale).toBe(1.5);
     expect(normalized.overlayWindowBounds).toEqual({
-      reward: { x: 120, y: 240, displayId: "7" },
+      reward: { x: 120, y: 240, displayId: "7", width: 960.5, height: 200 },
       arbiSummary: { x: 15, y: 25 },
     });
   });

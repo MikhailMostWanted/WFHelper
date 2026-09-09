@@ -159,7 +159,7 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
     const out: Partial<Record<OverlayWindowKey, number>> = {};
     for (const key of OVERLAY_WINDOW_KEYS) {
       const scale = clampNumber(input[key], 0.75, 1.5, NaN);
-      if (Number.isFinite(scale)) out[key] = Number(scale.toFixed(2));
+      if (Number.isFinite(scale)) out[key] = Number(scale.toFixed(3));
     }
     return out;
   }
@@ -181,6 +181,12 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
           ? record.displayId.trim()
           : null;
       out[key] = displayId ? { x, y, displayId } : { x, y };
+      const width = clampNumber(record.width, 24, 20000, NaN);
+      const height = clampNumber(record.height, 24, 20000, NaN);
+      if (Number.isFinite(width) && Number.isFinite(height)) {
+        out[key].width = width;
+        out[key].height = height;
+      }
     }
     return out;
   }

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import type { Rectangle } from "electron";
 
 import { baseZoomForDisplay } from "../config/runtime/uiScale";
 import {
@@ -127,8 +128,7 @@ test("a resized riven overlay reopens at the size it was left at", async () => {
     const before = await leftRivenSize(harness);
     expect(before.w).toBeGreaterThan(0);
 
-    // What a drag on the window edge does, minus the mouse.
-    const target = { w: Math.round(before.w * 1.2), h: Math.round(before.h * 1.2) };
+    const target = { w: before.w + 60, h: before.h };
     await evaluateInMain(
       harness.app,
       ({ BrowserWindow }, size) => {
@@ -142,21 +142,26 @@ test("a resized riven overlay reopens at the size it was left at", async () => {
     );
     // The save is debounced and the main process is mid-resize, so poll for it
     // rather than reading once behind a fixed wait.
-    const scaleHarness = harness;
+    const resizeHarness = harness;
     await expect
       .poll(
         async () =>
-          evaluateInMain(scaleHarness.app, ({ app }) => {
+          evaluateInMain(resizeHarness.app, ({ app }) => {
             const main = process.mainModule as unknown as {
               require: (id: string) => { default: { overlaySettings: Record<string, unknown> } };
             };
             const settings = main.require(`${app.getAppPath()}/.electron-build/ipc/context`).default
               .overlaySettings;
-            return (settings.overlayWindowScales as Record<string, number>)?.rivenLeft ?? 0;
+            return (
+              settings.overlayWindowBounds as Record<string, { width?: number; height?: number }>
+            )?.rivenLeft;
           }),
         { timeout: 15_000 },
       )
-      .toBeGreaterThan(1);
+      .toMatchObject({
+        width: target.w / before.zoom,
+        height: target.h / before.zoom,
+      });
 
     // Reopening recomputes the bounds from the saved settings, which is the one
     // path that can throw the resized size away.
@@ -175,13 +180,194 @@ test("a resized riven overlay reopens at the size it was left at", async () => {
 
     const after = await leftRivenSize(harness);
     expect(Math.abs(after.w - target.w)).toBeLessThanOrEqual(3);
+    expect(Math.abs(after.h - target.h)).toBeLessThanOrEqual(3);
+    expect(after.zoom).toBe(before.zoom);
+  } finally {
+    await closeElectronTestHarness(harness);
+  }
+});
 
-    // The frame alone proves nothing: the content has to have grown with it.
-    // Zoom is the saved scale times a display-derived base, and a hosted runner
-    // steps that base between the two reads, so compare the scale, not the zoom.
-    expect(after.zoom / baseZoomForDisplay(after.workArea)).toBeGreaterThan(
-      before.zoom / baseZoomForDisplay(before.workArea),
-    );
+test("Windows edge resizing changes only the dragged dimension and preserves text size", async () => {
+  test.skip(process.platform !== "win32");
+  test.setTimeout(180_000);
+  let harness: ElectronTestHarness | undefined;
+  try {
+    harness = await launchElectronTestHarness("wfh-native-resize-");
+    await evaluateInMain(harness.app, ({ app }) => {
+      const main = process.mainModule as unknown as {
+        require: (id: string) => Record<string, (next?: boolean) => void>;
+      };
+      const riven = main.require(`${app.getAppPath()}/.electron-build/ipc/rivenOverlayIpc`);
+      riven.onRivenSessionOpen();
+      riven.setRivenInteractiveMode(true);
+    });
+    const overlay = await overlayWindow(harness, "side=left");
+    await overlay.waitForTimeout(1_000);
+
+    const result = await evaluateInMain(harness.app, async ({ app, BrowserWindow, screen }) => {
+      const main = process.mainModule as unknown as { require: (id: string) => unknown };
+      const koffi = main.require(
+        `${app.getAppPath()}/node_modules/koffi`,
+      ) as typeof import("koffi");
+      const user32 = koffi.load("user32.dll");
+      const send = user32.func(
+        "intptr __stdcall SendMessageW(void *hwnd, uint32 msg, uintptr wp, void *lp)",
+      );
+      const getRect = user32.func("int __stdcall GetWindowRect(void *hwnd, void *rect)");
+      const setPosition = user32.func(
+        "int __stdcall SetWindowPos(void *hwnd, void *after, int x, int y, int width, int height, uint32 flags)",
+      );
+      const Rect = koffi.struct({ left: "long", top: "long", right: "long", bottom: "long" });
+      const win = BrowserWindow.getAllWindows().find((candidate) =>
+        candidate.webContents.getURL().includes("side=left"),
+      )!;
+      const riven = main.require(`${app.getAppPath()}/.electron-build/ipc/rivenOverlayIpc`) as {
+        positionRivenOverlayWindows: () => void;
+        onRivenSessionClose: () => void;
+        onRivenSessionOpen: () => void;
+      };
+      const ctx = main.require(`${app.getAppPath()}/.electron-build/ipc/context`) as {
+        default: {
+          overlaySettings: {
+            overlayWindowBounds?: Record<string, { width?: number; height?: number }>;
+          };
+        };
+      };
+      win.setPosition(400, 200);
+      // Let the initial move settle before entering Windows' modal resize loop.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const before = win.getBounds();
+      const zoom = win.webContents.getZoomFactor();
+      const beforeImage = (await win.webContents.capturePage()).toPNG().toString("base64");
+      const handle = win.getNativeWindowHandle().readBigUInt64LE();
+      const memory = koffi.alloc(Rect, 1);
+      const message = (code: number, edge = 0, rect: unknown = null) =>
+        new Promise<void>((resolve, reject) => {
+          // Send from a worker so the window handler can make its own FFI calls.
+          send.async(handle, code, edge, rect, (error: Error | null) =>
+            error ? reject(error) : resolve(),
+          );
+        });
+      let resizingEvents = 0;
+      let releasedEvents = 0;
+      let preventedEvents = 0;
+      win.on("will-resize", (event) => {
+        resizingEvents++;
+        if (event.defaultPrevented) preventedEvents++;
+      });
+      win.on("resized", () => releasedEvents++);
+      const snapshots: Array<{
+        edge: "left" | "top";
+        before: Rectangle;
+        held: Rectangle;
+        refreshed: Rectangle;
+        zoom: number;
+      }> = [];
+      try {
+        for (const edge of ["left", "top"] as const) {
+          const start = win.getBounds();
+          const dpi = screen.getDisplayMatching(start).scaleFactor;
+          await message(0x231); // WM_ENTERSIZEMOVE
+          for (let tick = 0; tick < 3; tick++) {
+            getRect(handle, memory);
+            const rect = koffi.decode(memory, Rect) as {
+              left: number;
+              top: number;
+              right: number;
+              bottom: number;
+            };
+            rect[edge] -= Math.round(10 * dpi);
+            koffi.encode(memory, Rect, rect);
+            await message(0x214, edge === "left" ? 1 : 3, memory); // WM_SIZING
+            const applied = koffi.decode(memory, Rect) as typeof rect;
+            // Windows applies the returned outer RECT after WM_SIZING finishes.
+            await new Promise<void>((resolve, reject) => {
+              setPosition.async(
+                handle,
+                null,
+                applied.left,
+                applied.top,
+                applied.right - applied.left,
+                applied.bottom - applied.top,
+                0x14,
+                (error: Error | null) => (error ? reject(error) : resolve()),
+              );
+            });
+          }
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          const held = win.getBounds();
+          riven.positionRivenOverlayWindows();
+          snapshots.push({
+            edge,
+            before: start,
+            held,
+            refreshed: win.getBounds(),
+            zoom: win.webContents.getZoomFactor(),
+          });
+          await message(0x232); // WM_EXITSIZEMOVE
+        }
+      } finally {
+        koffi.free(memory);
+      }
+      const released = win.getBounds();
+      const saved = ctx.default.overlaySettings.overlayWindowBounds?.rivenLeft;
+      const afterImage = (await win.webContents.capturePage()).toPNG().toString("base64");
+      riven.onRivenSessionClose();
+      riven.onRivenSessionOpen();
+      return {
+        before,
+        beforeImage,
+        afterImage,
+        snapshots,
+        released,
+        saved,
+        zoom,
+        preventedEvents,
+        resizingEvents,
+        releasedEvents,
+      };
+    });
+    for (const [name, image] of [
+      ["before-resize", result.beforeImage],
+      ["after-resize", result.afterImage],
+    ]) {
+      await test
+        .info()
+        .attach(name, { body: Buffer.from(image, "base64"), contentType: "image/png" });
+    }
+    expect(result.resizingEvents).toBe(6);
+    expect(result.releasedEvents).toBe(2);
+    expect(result.preventedEvents).toBe(0);
+    for (const { edge, before, held, refreshed, zoom } of result.snapshots) {
+      expect(refreshed).toEqual(held);
+      expect(zoom).toBe(result.zoom);
+      if (edge === "left") {
+        expect(held.x + held.width).toBe(before.x + before.width);
+        expect(Math.abs(held.x - (before.x - 30))).toBeLessThanOrEqual(1);
+        expect(held.y).toBe(before.y);
+        expect(held.height).toBe(before.height);
+      } else {
+        expect(held.x).toBe(before.x);
+        expect(Math.abs(held.y - (before.y - 30))).toBeLessThanOrEqual(1);
+        expect(held.y + held.height).toBe(before.y + before.height);
+        expect(held.width).toBe(before.width);
+      }
+    }
+    expect(result.saved).toMatchObject({
+      width: result.released.width / result.zoom,
+      height: result.released.height / result.zoom,
+    });
+    expect(result.released.width).toBeGreaterThan(result.before.width);
+    const resizedApp = harness.app;
+    await expect
+      .poll(() =>
+        evaluateInMain(resizedApp, ({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()
+            .find((candidate) => candidate.webContents.getURL().includes("side=left"))
+            ?.getBounds(),
+        ),
+      )
+      .toEqual(result.released);
   } finally {
     await closeElectronTestHarness(harness);
   }

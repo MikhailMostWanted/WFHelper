@@ -294,11 +294,7 @@ function createPresentationProbe(options: {
   createPresentation?: (options: unknown) => unknown;
   windowStateKey?: OverlayWindowKey;
   persistBoundsWhenPassive?: boolean;
-  onWindowBoundsChanged?: (
-    key: OverlayWindowKey,
-    bounds: OverlaySavedWindowBounds,
-    scale?: number,
-  ) => void;
+  onWindowBoundsChanged?: (key: OverlayWindowKey, bounds: OverlaySavedWindowBounds) => void;
 }) {
   const display = {
     id: 1,
@@ -1203,28 +1199,35 @@ describe("createOverlayWindowBoundsChangeHandler", () => {
     expect(save).toHaveBeenCalledTimes(2);
   });
 
-  it("writes the per-window scale only when a resize supplies one", () => {
+  it("preserves custom dimensions and scale when only the position changes", () => {
     const ctx = {
       overlaySettings: {
-        overlayWindowBounds: {},
-        overlayWindowScales: {},
+        overlayWindowBounds: {
+          reward: { x: 10, y: 20, width: 1100, height: 200 },
+        },
+        overlayWindowScales: { reward: 1.25 },
       } as unknown as OverlaySettings,
     };
     const handler = createOverlayWindowBoundsChangeHandler({ ctx, save: vi.fn() });
 
-    handler("reward", { x: 10, y: 20 });
-    expect(ctx.overlaySettings.overlayWindowScales.reward).toBeUndefined();
+    handler("reward", { x: 30, y: 40 });
 
-    handler("reward", { x: 10, y: 20 }, 1.25);
+    expect(ctx.overlaySettings.overlayWindowBounds.reward).toEqual({
+      x: 30,
+      y: 40,
+      width: 1100,
+      height: 200,
+    });
     expect(ctx.overlaySettings.overlayWindowScales.reward).toBe(1.25);
   });
 });
 
 function createResizeProbe() {
   const display = { id: 1, workArea: { x: 0, y: 0, width: 1920, height: 1080 } };
-  const saves: Array<{ bounds: OverlaySavedWindowBounds; scale?: number }> = [];
+  const saves: OverlaySavedWindowBounds[] = [];
   let currentBounds = { x: 300, y: 400, width: 980, height: 140 };
   const windows: FakeResizableWindow[] = [];
+  let zoomFactor = 1;
 
   class FakeResizableWindow {
     webContents = {
@@ -1232,23 +1235,29 @@ function createResizeProbe() {
       on: vi.fn(),
       once: vi.fn(),
       send: vi.fn(),
-      setZoomFactor: vi.fn(),
+      setZoomFactor: vi.fn((zoom: number) => {
+        zoomFactor = zoom;
+      }),
+      getZoomFactor: () => zoomFactor,
       isLoadingMainFrame: () => false,
       isCrashed: () => false,
     };
 
-    listeners = new Map<string, () => void>();
+    listeners = new Map<string, (...args: unknown[]) => void>();
 
     constructor() {
       windows.push(this);
     }
 
-    on = vi.fn((event: string, listener: () => void) => {
+    on = vi.fn((event: string, listener: (...args: unknown[]) => void) => {
       this.listeners.set(event, listener);
     });
     loadFile = vi.fn(() => Promise.resolve());
     setAspectRatio = vi.fn();
-    setBounds = vi.fn();
+    setBounds = vi.fn((bounds: typeof currentBounds) => {
+      currentBounds = { ...bounds };
+      this.listeners.get("resize")?.();
+    });
     getBounds = vi.fn(() => currentBounds);
     isDestroyed = vi.fn(() => false);
     isVisible = vi.fn(() => false);
@@ -1265,11 +1274,11 @@ function createResizeProbe() {
 
   const ctx = {
     overlayWindow: null,
-    overlaySettings: {} as OverlaySettings,
+    overlaySettings: {
+      overlayWindowBounds: { reward: { x: 300, y: 400, displayId: "1" } },
+    } as OverlaySettings,
     overlayInteractiveMode: true,
   };
-  // The real persistence handler, so a saved scale is in place by the time the
-  // controller reads it back.
   const persist = createOverlayWindowBoundsChangeHandler({ ctx, save: () => {} });
 
   const controller = createOverlayWindowsController({
@@ -1287,9 +1296,9 @@ function createResizeProbe() {
     hardenBrowserWindowNavigation: () => {},
     overlayWindowFile: "D:\\app\\renderer\\overlay.html",
     windowStateKey: "reward",
-    onWindowBoundsChanged: (key, bounds, scale) => {
-      saves.push({ bounds, scale });
-      persist(key, bounds, scale);
+    onWindowBoundsChanged: (key, bounds) => {
+      saves.push(bounds);
+      persist(key, bounds);
     },
     platform: "win32",
   });
@@ -1302,11 +1311,22 @@ function createResizeProbe() {
   return {
     saves,
     ctx,
+    controller,
     window: () => windows[windows.length - 1],
-    dragEdgeTo: (width: number, height: number) => {
+    resizeEdge: (edge: string, bounds: typeof currentBounds) => {
+      const event = { preventDefault: vi.fn() };
+      windows[windows.length - 1].listeners.get("will-resize")?.(event, bounds, { edge });
+      if (!event.preventDefault.mock.calls.length) currentBounds = { ...bounds };
+      windows[windows.length - 1].listeners.get("resize")?.();
+      return event;
+    },
+    moveTo: (x: number, y: number) => {
+      currentBounds = { ...currentBounds, x, y };
+      windows[windows.length - 1].listeners.get("move")?.();
+    },
+    resizeTo: (width: number, height: number) => {
       currentBounds = { ...currentBounds, width, height };
       windows[windows.length - 1].listeners.get("resize")?.();
-      vi.advanceTimersByTime(250);
     },
   };
 }
@@ -1316,62 +1336,105 @@ describe("overlay resize", () => {
     vi.useRealTimers();
   });
 
-  it("saves the scale a dragged edge works out to", () => {
+  it.each(["left", "right", "top", "bottom", "bottom-right"])(
+    "lets a native %s drag change only the requested edges without zooming",
+    (edge) => {
+      const probe = createResizeProbe();
+      const bounds = {
+        x: edge.includes("left") ? 104 : 300,
+        y: edge.includes("top") ? 372 : 400,
+        width: edge.includes("left") || edge.includes("right") ? 1176 : 980,
+        height: edge.includes("top") || edge.includes("bottom") ? 168 : 140,
+      };
+      probe.window().setBounds.mockClear();
+      probe.window().webContents.setZoomFactor.mockClear();
+
+      const event = probe.resizeEdge(edge, bounds);
+      probe.window().listeners.get("resized")?.();
+
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(probe.window().setAspectRatio).not.toHaveBeenCalled();
+      expect(probe.window().setBounds).not.toHaveBeenCalled();
+      expect(probe.window().webContents.setZoomFactor).not.toHaveBeenCalled();
+      expect(probe.window().getBounds()).toEqual(bounds);
+      expect(probe.saves).toEqual([{ ...bounds, displayId: "1" }]);
+      expect(probe.ctx.overlaySettings.overlayWindowScales).toBeUndefined();
+    },
+  );
+
+  it("keeps an unfinished drag through a pause and content refresh", () => {
     const probe = createResizeProbe();
+    probe.resizeEdge("right", { x: 300, y: 400, width: 1176, height: 140 });
+    const bounds = probe.window().getBounds();
+    probe.window().setBounds.mockClear();
 
-    probe.dragEdgeTo(1225, 175);
-
-    expect(probe.saves).toHaveLength(1);
-    expect(probe.saves[0].scale).toBe(1.25);
-    expect(probe.saves[0].bounds).toMatchObject({ x: 300, y: 400, displayId: "1" });
-  });
-
-  it("zooms the content while the drag is still live", () => {
-    const probe = createResizeProbe();
-
-    probe.dragEdgeTo(1225, 175);
-
-    expect(probe.window().webContents.setZoomFactor).toHaveBeenLastCalledWith(1.25);
-  });
-
-  it("clamps a drag past the scale the settings slider allows", () => {
-    const probe = createResizeProbe();
-
-    probe.dragEdgeTo(1880, 268);
-
-    expect(probe.saves[0].scale).toBe(1.5);
-  });
-
-  it("scales from the edge that moved when only one of them did", () => {
-    const probe = createResizeProbe();
-
-    probe.dragEdgeTo(980, 175);
-
-    expect(probe.saves[0].scale).toBe(1.25);
-    expect(probe.window().setBounds).toHaveBeenLastCalledWith(
-      expect.objectContaining({ width: 1225, height: 175 }),
-      false,
-    );
-  });
-
-  it("springs a drag below the smallest scale back to that scale", () => {
-    const probe = createResizeProbe();
-
-    probe.dragEdgeTo(500, 71);
-
-    expect(probe.saves[0].scale).toBe(0.75);
-    expect(probe.window().setBounds).toHaveBeenLastCalledWith(
-      expect.objectContaining({ width: 735, height: 105 }),
-      false,
-    );
-  });
-
-  it("leaves the scale alone when the size is the one we asked for", () => {
-    const probe = createResizeProbe();
-
-    probe.dragEdgeTo(980, 140);
+    vi.advanceTimersByTime(500);
+    probe.controller.positionOverlayWindow();
 
     expect(probe.saves).toHaveLength(0);
+    expect(probe.window().setBounds).not.toHaveBeenCalled();
+    expect(probe.window().getBounds()).toEqual(bounds);
+
+    probe.window().listeners.get("resized")?.();
+    expect(probe.saves).toEqual([{ ...bounds, displayId: "1" }]);
+    expect(probe.window().setBounds).not.toHaveBeenCalled();
+  });
+
+  it("saves a debounced resize without changing its shape or text size", () => {
+    const probe = createResizeProbe();
+    probe.window().setBounds.mockClear();
+    probe.window().webContents.setZoomFactor.mockClear();
+
+    probe.resizeTo(1100, 200);
+    vi.advanceTimersByTime(250);
+
+    expect(probe.saves).toEqual([{ x: 300, y: 400, width: 1100, height: 200, displayId: "1" }]);
+    expect(probe.window().setBounds).not.toHaveBeenCalled();
+    expect(probe.window().webContents.setZoomFactor).not.toHaveBeenCalled();
+  });
+
+  it("flushes pending size and position before a content refresh", () => {
+    const probe = createResizeProbe();
+    probe.resizeTo(1100, 200);
+    probe.moveTo(350, 450);
+
+    probe.controller.positionOverlayWindow();
+    vi.advanceTimersByTime(500);
+
+    expect(probe.window().getBounds()).toEqual({ x: 350, y: 450, width: 1100, height: 200 });
+    expect(probe.ctx.overlaySettings.overlayWindowBounds.reward).toEqual({
+      x: 350,
+      y: 450,
+      width: 1100,
+      height: 200,
+      displayId: "1",
+    });
+  });
+
+  it("restores custom dimensions and applies explicit scale changes to them", () => {
+    const probe = createResizeProbe();
+    probe.ctx.overlaySettings.overlayWindowScales = { reward: 1.25 };
+    probe.controller.positionOverlayWindow();
+    vi.advanceTimersByTime(1);
+    probe.resizeTo(1375, 250);
+    vi.advanceTimersByTime(250);
+
+    expect(probe.ctx.overlaySettings.overlayWindowBounds.reward).toMatchObject({
+      width: 1100,
+      height: 200,
+    });
+    probe.window().listeners.get("closed")?.();
+    probe.controller.createOverlayWindow({ show: false });
+    probe.controller.markRendererReady(1);
+
+    expect(probe.window().getBounds()).toMatchObject({ width: 1375, height: 250 });
+    expect(probe.window().webContents.getZoomFactor()).toBe(1.25);
+
+    probe.ctx.overlaySettings.overlayWindowScales.reward = 1.5;
+    probe.controller.positionOverlayWindow();
+
+    expect(probe.window().getBounds()).toMatchObject({ width: 1650, height: 300 });
+    expect(probe.window().webContents.getZoomFactor()).toBe(1.5);
   });
 });
 

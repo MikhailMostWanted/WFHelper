@@ -32,6 +32,9 @@ export interface OverlaySavedWindowBounds {
   x: number;
   y: number;
   displayId?: string | null;
+  // Content pixels, before the display and user zoom are applied.
+  width?: number;
+  height?: number;
 }
 
 export interface OverlaySettings {

@@ -92,11 +92,7 @@ type OverlayWindowsControllerOptions = {
   transparent?: boolean;
   backgroundColor?: string;
   windowStateKey?: OverlayWindowKey;
-  onWindowBoundsChanged?: (
-    key: OverlayWindowKey,
-    bounds: OverlaySavedWindowBounds,
-    scale?: number,
-  ) => void;
+  onWindowBoundsChanged?: (key: OverlayWindowKey, bounds: OverlaySavedWindowBounds) => void;
   /** Persist moves even in passive mode (arbi summary drags without the unlock hotkey). */
   persistBoundsWhenPassive?: boolean;
   /** Skip click-through entirely for windows that are meant to stay clickable. */
@@ -155,26 +151,16 @@ export function moveOverlayWindowBy(
 
 export function createOverlayWindowBoundsChangeHandler(
   options: OverlaySettingsPersistenceOptions,
-): (key: OverlayWindowKey, bounds: OverlaySavedWindowBounds, scale?: number) => void {
-  return (key, bounds, scale) => {
+): (key: OverlayWindowKey, bounds: OverlaySavedWindowBounds) => void {
+  return (key, bounds) => {
     options.ctx.overlaySettings = {
       ...options.ctx.overlaySettings,
       // live drag = mechanic learned, retire the hint; arbi drags don't count (no hotkey needed there)
       ...(key === "arbiSummary" ? {} : { overlayDragHintDismissed: true }),
       overlayWindowBounds: {
         ...(options.ctx.overlaySettings.overlayWindowBounds || {}),
-        [key]: bounds,
+        [key]: { ...options.ctx.overlaySettings.overlayWindowBounds?.[key], ...bounds },
       },
-      // A resized window writes the scale slider it is now equivalent to, so the
-      // size survives the next open and Settings shows what the drag chose.
-      ...(scale != null
-        ? {
-            overlayWindowScales: {
-              ...(options.ctx.overlaySettings.overlayWindowScales || {}),
-              [key]: scale,
-            },
-          }
-        : {}),
     };
     options.save();
   };
@@ -223,6 +209,8 @@ export function createOverlayWindowsController(options: OverlayWindowsController
   // transparent window can be blanked instead of unmapped on native Wayland,
   // where each map steals game focus. The solid panel lives in the overlay CSS.
   const transparentWindow = transparent || platform === "linux";
+  const resizeMinWidth = Math.round(Math.min(windowWidth * 0.75, 240));
+  const resizeMinHeight = Math.round(Math.min(windowHeight * 0.75, 100));
 
   let lastOverlayAnchorMeta: OverlayAnchorMeta | null = null;
   let overlayAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -233,6 +221,7 @@ export function createOverlayWindowsController(options: OverlayWindowsController
   let selfRequestedSize: { width: number; height: number } | null = null;
   let moveSaveTimer: ReturnType<typeof setTimeout> | null = null;
   let resizeSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  let nativeResizeInProgress = false;
   let rendererReady = false;
   let logicalVisible = false;
   // Non-null only while this overlay is presented as a layer surface, which
@@ -361,22 +350,6 @@ export function createOverlayWindowsController(options: OverlayWindowsController
     return Number((baseZoomForDisplay(display.workArea) * readUserScale()).toFixed(3));
   }
 
-  // The layout is fixed and only the zoom factor makes it fill the frame, so a
-  // dragged edge is a scale change. The axis that moved furthest names it, which
-  // keeps a one-sided drag working where the aspect lock is only advisory.
-  function scaleFromWindowSize(
-    size: { width: number; height: number },
-    display: import("electron").Display,
-  ): number {
-    const base = baseZoomForDisplay(display.workArea);
-    const current = readUserScale();
-    const byWidth = size.width / Math.max(1, windowWidth * base);
-    const byHeight = size.height / Math.max(1, windowHeight * base);
-    const dragged =
-      Math.abs(byWidth - current) >= Math.abs(byHeight - current) ? byWidth : byHeight;
-    return Number(clampNumber(dragged, 0.75, 1.5, current).toFixed(2));
-  }
-
   function getOverlayBoundsForActiveDisplay(
     anchorMeta: OverlayAnchorMeta | null = lastOverlayAnchorMeta,
   ) {
@@ -385,8 +358,14 @@ export function createOverlayWindowsController(options: OverlayWindowsController
       (savedBounds ? findDisplayById(savedBounds.displayId) : null) ||
       getDisplayForOverlay(anchorMeta);
     const zoomFactor = computeOverlayZoomFactor(display);
-    const scaledWidth = Math.round(windowWidth * zoomFactor);
-    const scaledHeight = Math.round(windowHeight * zoomFactor);
+    const scaledWidth = Math.max(
+      resizeMinWidth,
+      Math.round((savedBounds?.width ?? windowWidth) * zoomFactor),
+    );
+    const scaledHeight = Math.max(
+      resizeMinHeight,
+      Math.round((savedBounds?.height ?? windowHeight) * zoomFactor),
+    );
     const area = display?.workArea || {
       x: 0,
       y: 0,
@@ -466,6 +445,14 @@ export function createOverlayWindowsController(options: OverlayWindowsController
   ): void {
     const overlayWindow = readOverlayWindow();
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
+    if (nativeResizeInProgress) return;
+    // A data refresh can arrive before the last drag position reaches disk.
+    if ((moveSaveTimer || resizeSaveTimer) && !suppressMoveSave) {
+      saveCurrentWindowBounds(overlayWindow, resizeSaveTimer !== null);
+      if (moveSaveTimer) clearTimeout(moveSaveTimer);
+      if (resizeSaveTimer) clearTimeout(resizeSaveTimer);
+      moveSaveTimer = resizeSaveTimer = null;
+    }
     // The compositor places and sizes a layer surface, so the geometry goes to
     // the surface and the offscreen window behind it follows its buffer.
     if (isLayerMode()) {
@@ -498,7 +485,7 @@ export function createOverlayWindowsController(options: OverlayWindowsController
 
   function saveCurrentWindowBounds(
     overlayWindow: import("electron").BrowserWindow,
-    scale?: number,
+    saveSize = false,
   ): void {
     if (!windowStateKey || !onWindowBoundsChanged) return;
     if (suppressMoveSave || overlayWindow.isDestroyed()) return;
@@ -506,15 +493,13 @@ export function createOverlayWindowsController(options: OverlayWindowsController
     const bounds = overlayWindow.getBounds();
     const display = displayMatchingBounds(bounds);
     const displayId = display ? String(display.id) : null;
-    onWindowBoundsChanged(
-      windowStateKey,
-      {
-        x: bounds.x,
-        y: bounds.y,
-        ...(displayId ? { displayId } : {}),
-      },
-      scale,
-    );
+    const zoom = saveSize ? overlayWindow.webContents.getZoomFactor() : 1;
+    onWindowBoundsChanged(windowStateKey, {
+      x: bounds.x,
+      y: bounds.y,
+      ...(displayId ? { displayId } : {}),
+      ...(saveSize ? { width: bounds.width / zoom, height: bounds.height / zoom } : {}),
+    });
   }
 
   /** Windows trims a pixel or two off a frame it grants, so never compare exactly. */
@@ -526,39 +511,24 @@ export function createOverlayWindowsController(options: OverlayWindowsController
     return Math.abs(a.width - b.width) <= 2 && Math.abs(a.height - b.height) <= 2;
   }
 
-  // Zoom follows the frame while the drag is live, so the content the user is
-  // sizing is the content they end up with.
-  function applyZoomForCurrentSize(overlayWindow: import("electron").BrowserWindow): void {
-    const bounds = overlayWindow.getBounds();
-    const display = displayMatchingBounds(bounds) || getDisplayForOverlay(lastOverlayAnchorMeta);
-    const zoomFactor = baseZoomForDisplay(display.workArea) * scaleFromWindowSize(bounds, display);
-    overlayWindow.webContents.setZoomFactor(Number(zoomFactor.toFixed(3)));
-  }
-
-  function saveResizedScale(overlayWindow: import("electron").BrowserWindow): void {
-    if (overlayWindow.isDestroyed()) return;
-    const bounds = overlayWindow.getBounds();
-    // Our own sizing lands here too. Only a size we never asked for came from the
-    // user, and a size clamped to the work area must not rewrite their scale.
-    if (sizeMatches(bounds, selfRequestedSize)) return;
-    if (sizeMatches(bounds, getOverlayBoundsForActiveDisplay())) return;
-    const display = displayMatchingBounds(bounds) || getDisplayForOverlay(lastOverlayAnchorMeta);
-    const scale = scaleFromWindowSize(bounds, display);
-    saveCurrentWindowBounds(overlayWindow, scale);
-    // Settle on the size the saved scale spells out, so a drag past either end
-    // of the slider springs back instead of clipping the content until restart.
-    positionOverlayWindow();
-    const settled = overlayWindow.getBounds();
-    log.info(
-      `[OverlayWindow] ${windowLabel} resized by the user to ${bounds.width}x${bounds.height}` +
-        ` -> scale ${scale}${readInteractiveMode() ? "" : " (passive, not saved)"}` +
-        `, settled at ${settled.width}x${settled.height}`,
-    );
-  }
-
   function attachBoundsPersistence(overlayWindow: import("electron").BrowserWindow): void {
     if (!windowStateKey || !onWindowBoundsChanged) return;
+    if (platform === "win32") {
+      overlayWindow.on("will-resize", () => {
+        if (!readInteractiveMode() && !persistBoundsWhenPassive) return;
+        nativeResizeInProgress = true;
+        if (moveSaveTimer) clearTimeout(moveSaveTimer);
+        if (resizeSaveTimer) clearTimeout(resizeSaveTimer);
+        moveSaveTimer = resizeSaveTimer = null;
+      });
+      overlayWindow.on("resized", () => {
+        if (!nativeResizeInProgress) return;
+        nativeResizeInProgress = false;
+        saveCurrentWindowBounds(overlayWindow, true);
+      });
+    }
     overlayWindow.on("move", () => {
+      if (suppressMoveSave || nativeResizeInProgress) return;
       if (moveSaveTimer) clearTimeout(moveSaveTimer);
       moveSaveTimer = setTimeout(() => {
         moveSaveTimer = null;
@@ -566,16 +536,14 @@ export function createOverlayWindowsController(options: OverlayWindowsController
       }, 250);
     });
     overlayWindow.on("resize", () => {
-      if (suppressMoveSave || overlayWindow.isDestroyed()) return;
+      if (nativeResizeInProgress || suppressMoveSave || overlayWindow.isDestroyed()) return;
       if (!readInteractiveMode() && !persistBoundsWhenPassive) return;
-      // The frame we just asked for is not a drag, whenever the event lands.
       if (sizeMatches(overlayWindow.getBounds(), selfRequestedSize)) return;
       selfRequestedSize = null;
-      applyZoomForCurrentSize(overlayWindow);
       if (resizeSaveTimer) clearTimeout(resizeSaveTimer);
       resizeSaveTimer = setTimeout(() => {
         resizeSaveTimer = null;
-        saveResizedScale(overlayWindow);
+        saveCurrentWindowBounds(overlayWindow, true);
       }, 250);
     });
   }
@@ -813,6 +781,8 @@ export function createOverlayWindowsController(options: OverlayWindowsController
         : {}),
       width: initialBounds.width,
       height: initialBounds.height,
+      minWidth: resizeMinWidth,
+      minHeight: resizeMinHeight,
       x: initialBounds.x,
       y: initialBounds.y,
       show: false,
@@ -821,9 +791,6 @@ export function createOverlayWindowsController(options: OverlayWindowsController
       frame: false,
       alwaysOnTop: true,
       skipTaskbar: true,
-      // resizable:false pins min size to the constructed size, and Windows then
-      // subtracts the frame insets on every setBounds, so each drag shrank the
-      // window by 16x8. Frameless windows have no resize grips to worry about.
       resizable: true,
       // Non-focusable so showing can never activate the overlay and unfocus
       // the game; interactive mode (F7) flips focusability on temporarily.
@@ -846,10 +813,6 @@ export function createOverlayWindowsController(options: OverlayWindowsController
       // apart; hold ours so each window stays individually addressable.
       createdWindow.on("page-title-updated", (event) => event.preventDefault());
     }
-
-    // Edge drags stay proportional, so any edge scales the overlay uniformly
-    // instead of stretching a layout that only the zoom factor can resize.
-    createdWindow.setAspectRatio(windowWidth / windowHeight);
 
     layer?.hide();
     layer = nextLayer;
@@ -923,6 +886,7 @@ export function createOverlayWindowsController(options: OverlayWindowsController
         clearTimeout(resizeSaveTimer);
         resizeSaveTimer = null;
       }
+      nativeResizeInProgress = false;
       writeOverlayWindow(null);
       rendererReady = false;
       logicalVisible = false;
@@ -1054,7 +1018,7 @@ export function createOverlayWindowsController(options: OverlayWindowsController
     // navigation commit, so the first load re-applies it here. Only displays
     // with a base zoom other than 1 ever see the difference.
     if (isLayerMode()) layer?.applyGeometry();
-    else applyZoomForCurrentSize(targetWindow);
+    else targetWindow.webContents.setZoomFactor(getOverlayBoundsForActiveDisplay().zoomFactor);
     const pending = pendingOverlayEvents.splice(0);
     for (const event of pending) {
       targetWindow.webContents.send(event.channel, event.payload);
