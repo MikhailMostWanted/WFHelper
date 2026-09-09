@@ -16,10 +16,9 @@ function event(id: string): TradeEvent {
   return { id, date: "2026-01-01T00:00:00.000Z", type: "sale", platChange: 1, items: [] };
 }
 
-/** Serves `total` rows LEDGER_QUERY_MAX_LIMIT at a time, like main does. */
 function servePages(total: number): void {
   invokeMock.mockImplementation((_channel: string, query: LedgerQuery): Promise<LedgerPage> => {
-    const offset = query.offset ?? 0;
+    const offset = query.before ? Number(query.before.id.slice(1)) + 1 : 0;
     const limit = query.limit ?? LEDGER_QUERY_MAX_LIMIT;
     const events: TradeEvent[] = [];
     for (let i = offset; i < Math.min(offset + limit, total); i++) events.push(event(`e${i}`));
@@ -48,7 +47,7 @@ describe("pageLedgerRange", () => {
   it("stops at the row ceiling and still reports what the query matched", async () => {
     servePages(1000);
     const result = await pageLedgerRange({}, 300);
-    expect(result?.events).toHaveLength(400);
+    expect(result?.events).toHaveLength(300);
     expect(result?.total).toBe(1000);
     expect(invokeMock).toHaveBeenCalledTimes(2);
   });

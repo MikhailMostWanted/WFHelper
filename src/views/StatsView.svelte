@@ -32,6 +32,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { invoke, on } from "../lib/ipc.js";
+  import { pageLedgerRange } from "../lib/stats/ledgerPaging.js";
   import EditLayoutBar from "../components/layout/EditLayoutBar.svelte";
   import LayoutGrid from "../components/layout/LayoutGrid.svelte";
   import LayoutSection from "../components/layout/LayoutSection.svelte";
@@ -108,29 +109,43 @@
     }
   }
 
+  // Older trades live in archives once the live log reaches 2000 rows.
+  const TRADE_LIST_MAX_ROWS = 50_000;
+  let tradeLoad = 0;
+  let tradesDuringLoad: TradeEvent[] | null = null;
+
   async function refreshTrades(): Promise<void> {
+    const load = ++tradeLoad;
+    const liveUpdates: TradeEvent[] = [];
+    tradesDuringLoad = liveUpdates;
     try {
-      const nextTrades = await invoke("getTradeLog");
-      if (destroyed) return;
-      trades = nextTrades;
+      const page = await pageLedgerRange(
+        {},
+        TRADE_LIST_MAX_ROWS,
+        () => !destroyed && load === tradeLoad,
+      );
+      if (!page) return;
+      const byId = new Map([...page.events, ...liveUpdates].map((trade) => [trade.id, trade]));
+      trades = [...byId.values()]
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+        .slice(0, TRADE_LIST_MAX_ROWS);
     } catch {
       // trade history is optional until the tracker has data
+    } finally {
+      if (load === tradeLoad) tradesDuringLoad = null;
     }
   }
 
   onMount(async () => {
-    // Refresh session card whenever new inventory data arrives
     unsubInventory = on("inventory-updated", () => {
       void refreshStats();
     });
 
-    // Live trade push - prepend new trades as they arrive
     unsubTrade = on("trade-recorded", (data) => {
       if (data?.trade) {
-        // Check if we already have this trade (from initial push before WFM match)
+        tradesDuringLoad?.push(data.trade);
         const idx = trades.findIndex((t) => t.id === data.trade.id);
         if (idx >= 0) {
-          // Replace in place (e.g. wfmClosed flag added later).
           trades = [...trades.slice(0, idx), data.trade, ...trades.slice(idx + 1)];
         } else {
           trades = [data.trade, ...trades];
@@ -206,7 +221,7 @@
               ? $tr("stats.importedTradeSingular", { count: tradeResult.count })
               : $tr("stats.importedTradePlural", { count: tradeResult.count })
           }`;
-          trades = await invoke("getTradeLog");
+          await refreshTrades();
         }
       }
 

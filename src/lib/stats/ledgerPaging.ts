@@ -5,26 +5,29 @@ import {
 import { invoke } from "../ipc.js";
 import type { TradeEvent } from "../../types/ipc.js";
 
-/**
- * Pages one ledger window newest-first up to `maxRows`. Null means `isCurrent`
- * went false, so the caller must leave its state alone.
- */
+/** Null means the caller's load is no longer current. */
 export async function pageLedgerRange(
   query: LedgerQuery,
   maxRows: number,
   isCurrent: () => boolean = () => true,
 ): Promise<{ events: TradeEvent[]; total: number } | null> {
   const collected: TradeEvent[] = [];
-  let offset = 0;
+  let before = query.before;
   let total = 0;
-  let more = true;
-  while (more) {
-    const page = await invoke("ledgerQuery", { ...query, offset, limit: LEDGER_QUERY_MAX_LIMIT });
+  while (collected.length < maxRows) {
+    const limit = Math.min(LEDGER_QUERY_MAX_LIMIT, maxRows - collected.length);
+    const page = await invoke("ledgerQuery", {
+      ...query,
+      offset: 0,
+      ...(before ? { before } : {}),
+      limit,
+    });
     if (!isCurrent()) return null;
     total = page.total;
     collected.push(...page.events);
-    offset += page.events.length;
-    more = page.events.length > 0 && offset < total && collected.length < maxRows;
+    if (page.events.length < limit) break;
+    const last = page.events[page.events.length - 1];
+    before = { date: last.date, id: last.id };
   }
   return { events: collected, total };
 }

@@ -235,7 +235,9 @@ function writeArchiveYear(year: number, events: TradeEvent[]): boolean {
 }
 
 function sortNewestFirst(events: TradeEvent[]): TradeEvent[] {
-  return [...events].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  return [...events].sort((a, b) =>
+    a.date === b.date ? (a.id < b.id ? 1 : a.id > b.id ? -1 : 0) : a.date < b.date ? 1 : -1,
+  );
 }
 
 /** Copy the live trade log aside once, before any rotation rewrites it. */
@@ -384,8 +386,14 @@ export function queryLedger(query: LedgerQuery, liveEvents: TradeEvent[]): Ledge
       : LEDGER_QUERY_MAX_LIMIT;
   const rawOffset = Number(query.offset);
   const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.trunc(rawOffset) : 0;
+  const before = query.before;
+  const remaining = before
+    ? selected.events.filter(
+        (event) => event.date < before.date || (event.date === before.date && event.id < before.id),
+      )
+    : selected.events;
   return {
-    events: selected.events.slice(offset, offset + limit),
+    events: remaining.slice(offset, offset + limit),
     total: selected.events.length,
     unreadableYears: selected.unreadableYears,
   };

@@ -9,6 +9,7 @@ export interface LedgerQuery {
   type?: TradeType;
   text?: string; // matches item names and partner, case-insensitive
   offset?: number;
+  before?: Pick<TradeEvent, "date" | "id">;
   limit?: number; // main clamps to LEDGER_QUERY_MAX_LIMIT
 }
 

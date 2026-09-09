@@ -56,6 +56,9 @@ test("Tracking retains its mounted trade history and search across sub-tabs", as
       contentType: "application/json",
     });
     expect(await original!.evaluate((node) => node.isConnected)).toBe(true);
+    // The list renders 300 rows at a time; the last trade needs every window expanded.
+    const more = panel.locator("[data-stats-trades-more]");
+    while ((await more.count()) > 0) await more.click();
     const lastTrade = panel.locator('[data-trade-row="tracking-1999"]');
     await lastTrade.scrollIntoViewIfNeeded();
     await expect(lastTrade).toBeInViewport();

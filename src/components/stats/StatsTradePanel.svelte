@@ -10,6 +10,9 @@
   type TradeFilter = "all" | "sale" | "purchase" | "trade";
   let tradeFilter: TradeFilter = "all";
   let tradeSearch = "";
+  // Rows rendered at once; a filter change starts over so search results show from the top.
+  const PAGE_ROWS = 300;
+  let visibleRows = PAGE_ROWS;
 
   $: filteredTrades = trades.filter((t) => {
     if (tradeFilter !== "all" && t.type !== tradeFilter) return false;
@@ -23,6 +26,8 @@
     }
     return true;
   });
+  $: visibleTrades = filteredTrades.slice(0, visibleRows);
+  $: hiddenTrades = filteredTrades.length - visibleTrades.length;
 
   $: tradeTimeFormat = new Intl.DateTimeFormat($locale, {
     hour: "2-digit",
@@ -58,7 +63,10 @@
             f
               ? 'bg-accent border-accent text-text-on-accent font-semibold'
               : 'border-border bg-transparent text-text-muted hover:text-text-primary'}"
-            on:click={() => (tradeFilter = f)}
+            on:click={() => {
+              tradeFilter = f;
+              visibleRows = PAGE_ROWS;
+            }}
           >
             {f === "all"
               ? $tr("common.all")
@@ -81,6 +89,7 @@
         type="text"
         placeholder={$tr("stats.tradeSearchPlaceholder")}
         bind:value={tradeSearch}
+        onInput={() => (visibleRows = PAGE_ROWS)}
         className="w-full py-1 px-2.5 text-xs"
         searchFocusTarget
       />
@@ -104,7 +113,7 @@
       </div>
     {:else}
       <div class="flex flex-col gap-2">
-        {#each filteredTrades as trade (trade.id)}
+        {#each visibleTrades as trade (trade.id)}
           <ThemedPanel
             className="py-3 px-4 [content-visibility:auto] [contain-intrinsic-size:auto_110px] transition-[border-color,background] duration-150 hover:border-border-strong hover:bg-bg-raised {trade.wfmClosed
               ? 'border-accent/20'
@@ -189,6 +198,16 @@
             {/if}
           </ThemedPanel>
         {/each}
+        {#if hiddenTrades > 0}
+          <button
+            type="button"
+            class="btn-secondary btn-sm mt-1 self-center"
+            data-stats-trades-more={hiddenTrades}
+            on:click={() => (visibleRows += PAGE_ROWS)}
+          >
+            {$tr("browse.showMore", { n: hiddenTrades })}
+          </button>
+        {/if}
       </div>
     {/if}
   </div>

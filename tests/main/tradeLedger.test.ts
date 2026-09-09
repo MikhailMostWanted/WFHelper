@@ -396,6 +396,19 @@ describe("queryLedger", () => {
     expect(page.unreadableYears).toEqual([]);
   });
 
+  it("keeps paging stable when new trades arrive or the cursor row is deleted", async () => {
+    const { store } = await modules();
+    const date = `${YEAR}-06-01T10:00:00.000Z`;
+    const original = [event("d", date), event("c", date), event("b", date), event("a", date)];
+    const first = store.queryLedger({ limit: 2 }, original);
+    expect(first.events.map((row) => row.id)).toEqual(["d", "c"]);
+    const cursor = first.events.at(-1)!;
+    const changed = [event("e", date), ...original.filter((row) => row.id !== cursor.id)];
+    const second = store.queryLedger({ limit: 2, before: cursor }, changed);
+    expect(second.events.map((row) => row.id)).toEqual(["b", "a"]);
+    expect(second.total).toBe(4);
+  });
+
   it("clamps offset and limit instead of trusting the caller", async () => {
     const { tracker, store } = await seeded();
     const live = tracker.getTradeLog();

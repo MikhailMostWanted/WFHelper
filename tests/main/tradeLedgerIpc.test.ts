@@ -149,6 +149,14 @@ describe("ledger IPC boundary", () => {
     const past = await page({ offset: 10 });
     expect(past.events).toEqual([]);
     expect(past.total).toBe(2);
+    const first = await page({ limit: 1 });
+    expect((await page({ before: first.events[0] })).events.map((event) => event.id)).toEqual([
+      "a",
+    ]);
+    expect((await page({ before: { date: "invalid", id: "b" } })).events).toHaveLength(2);
+    expect(
+      (await page({ before: { date: `${YEAR}-01-01T00:00:00.000000000000000Z`, id: "b" } })).events,
+    ).toHaveLength(0);
   });
 
   it("previews and applies an export whose item names are all unresolved", async () => {

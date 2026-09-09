@@ -70,10 +70,18 @@ function parseQuery(raw: unknown): LedgerQuery {
     typeof record.text === "string" && record.text.trim()
       ? record.text.trim().slice(0, MAX_TEXT_LENGTH)
       : null;
-  // Paging bounds and their fallbacks belong to queryLedger; this only keeps
-  // non-numbers out so the store never has to guess what a caller meant.
   const offset = asFiniteNumber(record.offset);
   const limit = asFiniteNumber(record.limit);
+  const cursor = asRecord(record.before);
+  const before =
+    typeof cursor?.date === "string" &&
+    cursor.date.length <= 64 &&
+    Number.isFinite(Date.parse(cursor.date)) &&
+    typeof cursor.id === "string" &&
+    cursor.id.length > 0 &&
+    cursor.id.length <= MAX_ID_LENGTH
+      ? { date: cursor.date, id: cursor.id }
+      : null;
   return {
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
@@ -81,6 +89,7 @@ function parseQuery(raw: unknown): LedgerQuery {
     ...(text ? { text } : {}),
     ...(offset != null ? { offset } : {}),
     ...(limit != null ? { limit } : {}),
+    ...(before ? { before } : {}),
   };
 }
 
