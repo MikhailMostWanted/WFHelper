@@ -2,10 +2,27 @@ import { app, type BrowserWindow } from "electron";
 import { withScope } from "../../services/logger";
 import * as warframeStatus from "../../services/warframeStatus";
 import { HIDE_IMMINENT_MS } from "./windows";
+import ctx from "../context";
 
 const log = withScope("overlayZOrder");
 
 type OverlayWindow = InstanceType<typeof BrowserWindow>;
+
+export function canRaiseOverlayWindows(platform: NodeJS.Platform = process.platform): boolean {
+  if (platform !== "win32") return true;
+  const handles = [
+    ctx.overlayWindow,
+    ctx.plannerOverlayWindow,
+    ctx.rivenOverlayLeftWindow,
+    ctx.rivenOverlayRightWindow,
+  ]
+    .filter(
+      (win): win is OverlayWindow =>
+        !!win && !win.isDestroyed() && win.isVisible() && win.isFocusable(),
+    )
+    .map((win) => win.getNativeWindowHandle());
+  return warframeStatus.isWarframeOrWindowForeground(handles) === true;
+}
 
 interface ZOrderSubscriber {
   isActive: () => boolean;

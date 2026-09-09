@@ -99,6 +99,7 @@ type OverlayWindowsControllerOptions = {
   neverClickThrough?: boolean;
   /** Restore content the controller does not send itself after a rebuild. */
   onWindowCreated?: (window: import("electron").BrowserWindow) => void;
+  canRaise?: () => boolean;
   platform?: NodeJS.Platform;
   isNativeWayland?: () => boolean;
   isTilingCompositor?: () => boolean;
@@ -198,6 +199,7 @@ export function createOverlayWindowsController(options: OverlayWindowsController
     persistBoundsWhenPassive = false,
     neverClickThrough = false,
     onWindowCreated,
+    canRaise = () => true,
     platform = process.platform,
     isNativeWayland = linuxIsNativeWayland,
     isTilingCompositor = linuxIsTilingCompositor,
@@ -662,6 +664,11 @@ export function createOverlayWindowsController(options: OverlayWindowsController
         // Same imminent-hide guard as the z-order poll.
         const hideDueIn = overlayHideDueIn();
         if (hideDueIn !== null && hideDueIn <= HIDE_IMMINENT_MS) return;
+        if (!canRaise()) {
+          overlayWindow.setAlwaysOnTop(false);
+          overlayWindow.setVisibleOnAllWorkspaces(false);
+          return;
+        }
         keepOverlayAboveGame(overlayWindow);
         overlayWindow.moveTop();
       }, delay),
@@ -1068,7 +1075,7 @@ export function createOverlayWindowsController(options: OverlayWindowsController
       overlayWindow.setFocusable(true);
     } else {
       applyClickThrough(overlayWindow);
-      if (visible) overlayWindow.blur();
+      if (visible && overlayWindow.isFocused()) overlayWindow.blur();
       overlayWindow.setFocusable(false);
     }
 
@@ -1081,6 +1088,12 @@ export function createOverlayWindowsController(options: OverlayWindowsController
 
     // Stacking and focus only mean something for a window that is on screen.
     if (!visible) return;
+
+    if (!interactive && !canRaise()) {
+      overlayWindow.setAlwaysOnTop(false);
+      overlayWindow.setVisibleOnAllWorkspaces(false);
+      return;
+    }
 
     keepOverlayAboveGame(overlayWindow);
     overlayWindow.moveTop();

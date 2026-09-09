@@ -295,6 +295,7 @@ function createPresentationProbe(options: {
   windowStateKey?: OverlayWindowKey;
   persistBoundsWhenPassive?: boolean;
   onWindowBoundsChanged?: (key: OverlayWindowKey, bounds: OverlaySavedWindowBounds) => void;
+  canRaise?: () => boolean;
 }) {
   const display = {
     id: 1,
@@ -315,6 +316,7 @@ function createPresentationProbe(options: {
     };
 
     visible = false;
+    focused = false;
     destroyed = false;
     options: { webPreferences: { offscreen?: boolean } };
 
@@ -340,8 +342,13 @@ function createPresentationProbe(options: {
     isVisible = vi.fn(() => this.visible);
     isDestroyed = vi.fn(() => this.destroyed);
     moveTop = vi.fn();
-    focus = vi.fn();
-    blur = vi.fn();
+    focus = vi.fn(() => {
+      this.focused = true;
+    });
+    blur = vi.fn(() => {
+      this.focused = false;
+    });
+    isFocused = vi.fn(() => this.focused);
     setFocusable = vi.fn();
     setIgnoreMouseEvents = vi.fn();
     setSkipTaskbar = vi.fn();
@@ -388,6 +395,7 @@ function createPresentationProbe(options: {
     windowStateKey: options.windowStateKey,
     persistBoundsWhenPassive: options.persistBoundsWhenPassive === true,
     onWindowBoundsChanged: options.onWindowBoundsChanged,
+    canRaise: options.canRaise,
   });
 
   const contentEvents = (win: FakePresentationWindow) =>
@@ -661,6 +669,56 @@ describe("keep-mapped presentation mode (Windows and native Wayland)", () => {
 
     expect(win.setAlwaysOnTop).toHaveBeenCalledWith(true, "screen-saver");
     expect(win.moveTop).toHaveBeenCalled();
+  });
+
+  it("does not raise over an unrelated foreground window after interaction ends", () => {
+    vi.useFakeTimers();
+    const canRaise = vi.fn(() => true);
+    const { controller, windows } = createPresentationProbe({
+      platform: "win32",
+      nativeWayland: false,
+      transparent: false,
+      canRaise,
+    });
+    controller.createOverlayWindow();
+    const win = windows[0];
+    controller.setOverlayInteractiveMode(true);
+    vi.advanceTimersByTime(2_000);
+    win.focused = false;
+    canRaise.mockReturnValue(false);
+    win.blur.mockClear();
+    win.moveTop.mockClear();
+    win.showInactive.mockClear();
+    win.setAlwaysOnTop.mockClear();
+
+    fireWindowEvent(win, "blur");
+    controller.setOverlayInteractiveMode(false);
+    vi.advanceTimersByTime(2_000);
+
+    expect(win.blur).not.toHaveBeenCalled();
+    expect(win.moveTop).not.toHaveBeenCalled();
+    expect(win.showInactive).not.toHaveBeenCalled();
+    expect(win.setAlwaysOnTop).not.toHaveBeenCalledWith(true, "screen-saver");
+    expect(win.setAlwaysOnTop).toHaveBeenCalledWith(false);
+  });
+
+  it("rechecks foreground when a delayed raise runs", () => {
+    vi.useFakeTimers();
+    const canRaise = vi.fn(() => true);
+    const { controller, windows } = createPresentationProbe({
+      platform: "win32",
+      nativeWayland: false,
+      canRaise,
+    });
+    controller.createOverlayWindow();
+    const win = windows[0];
+    win.moveTop.mockClear();
+    canRaise.mockReturnValue(false);
+
+    vi.advanceTimersByTime(1_600);
+
+    expect(win.moveTop).not.toHaveBeenCalled();
+    expect(win.setAlwaysOnTop).toHaveBeenLastCalledWith(false);
   });
 
   it("stacked reassert triggers collapse into one pending raise pair", () => {

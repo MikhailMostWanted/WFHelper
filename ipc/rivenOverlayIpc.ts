@@ -9,6 +9,7 @@ import {
 } from "./overlay/windows";
 import {
   applyOverlayZOrder,
+  canRaiseOverlayWindows,
   registerZOrderSubscriber,
   syncOverlayWindowZOrder,
 } from "./overlay/zOrder";
@@ -100,6 +101,7 @@ const rivenWindowBaseOptions = {
   preloadFileName: "preload-riven.js",
   hasShadow: false,
   onWindowCreated: onRivenWindowCreated,
+  canRaise: canRaiseOverlayWindows,
 };
 
 const rivenLeftWindowsController = createOverlayWindowsController({
@@ -259,7 +261,8 @@ function syncRivenWindowZOrder(warframeFocused: boolean): void {
   }
   // Interactive clicks unfocus the game, so keep the panels raised through it.
   // Own-process focus must not count: panels would cover the main window.
-  const keepRaised = warframeFocused || _rivenInteractive;
+  const keepRaised =
+    process.platform === "win32" ? canRaiseOverlayWindows() : warframeFocused || _rivenInteractive;
   probeRivenZOrder(keepRaised);
   for (const { win, controller } of rivenWindowEntries()) {
     syncOverlayWindowZOrder(controller, win, keepRaised);

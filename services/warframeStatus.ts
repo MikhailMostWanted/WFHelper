@@ -2,7 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { withScope } from "./logger";
-import { enumProcessNames, getProcessSessionId, queryExePath } from "./win32Process";
+import {
+  enumProcessNames,
+  getProcessSessionId,
+  isWarframeExePath,
+  queryExePath,
+} from "./win32Process";
 import { findWindowBoundsByTitle, isWindowFocusedByTitle } from "./x11WindowQuery";
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { WARFRAME_STATUS_CACHE_TTL_MS } from "../config/runtime/cacheConfig";
@@ -46,7 +51,8 @@ let inFlightWithoutBounds: Promise<WarframeStatus> | null = null;
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- native FFI bindings are untyped at compile time */
 let _win32: {
-  GetForegroundWindow: (...args: any[]) => any;
+  GetForegroundWindow: () => number | bigint;
+  SetForegroundWindow: (handle: bigint) => number;
   GetWindowThreadProcessId: (...args: any[]) => any;
   GetWindowLongW: (...args: any[]) => any;
   GetWindowRect: (...args: any[]) => any;
@@ -62,7 +68,8 @@ function ensureWin32(): boolean {
     const k = koffi();
     const user32 = k.load("user32.dll");
     _win32 = {
-      GetForegroundWindow: user32.func("__stdcall", "GetForegroundWindow", "void *", []),
+      GetForegroundWindow: user32.func("__stdcall", "GetForegroundWindow", "uintptr_t", []),
+      SetForegroundWindow: user32.func("__stdcall", "SetForegroundWindow", "int32", ["uintptr_t"]),
       GetWindowThreadProcessId: user32.func("__stdcall", "GetWindowThreadProcessId", "uint32", [
         "void *",
         "void *",
@@ -83,6 +90,69 @@ function ensureWin32(): boolean {
 const foregroundPidBuffer = Buffer.alloc(4);
 const foregroundRectBuffer = Buffer.alloc(16);
 const processNameCache = new Map<number, { name: string | null; checkedAt: number }>();
+let interactionGameWindow: { handle: bigint; pid: number } | null = null;
+
+function windowPid(handle: bigint): number {
+  foregroundPidBuffer.fill(0);
+  _win32!.GetWindowThreadProcessId(handle, foregroundPidBuffer);
+  return foregroundPidBuffer.readUInt32LE(0);
+}
+
+function handleMatches(handle: bigint, candidates: Buffer[]): boolean {
+  return candidates.some((candidate) => {
+    if (candidate.length < 4) return false;
+    const value =
+      candidate.length >= 8 ? candidate.readBigUInt64LE() : BigInt(candidate.readUInt32LE());
+    return value !== 0n && value === handle;
+  });
+}
+
+export function captureWarframeFocus(): void {
+  interactionGameWindow = null;
+  try {
+    if (!ensureWin32()) return;
+    const handle = BigInt(_win32!.GetForegroundWindow());
+    if (!handle) return;
+    const pid = windowPid(handle);
+    const query = queryExePath(pid);
+    if (query.status === "ok" && isWarframeExePath(query.path)) {
+      interactionGameWindow = { handle, pid };
+    }
+  } catch {
+    // Missing foreground information must not choose a different return target.
+  }
+}
+
+export function restoreWarframeFocus(overlayHandles: Buffer[]): boolean {
+  const target = interactionGameWindow;
+  interactionGameWindow = null;
+  try {
+    if (!target || !ensureWin32()) return false;
+    const foreground = BigInt(_win32!.GetForegroundWindow());
+    if (!handleMatches(foreground, overlayHandles)) return false;
+    if (windowPid(target.handle) !== target.pid) return false;
+    const query = queryExePath(target.pid);
+    if (query.status !== "ok" || !isWarframeExePath(query.path)) return false;
+    const restored = !!_win32!.SetForegroundWindow(target.handle);
+    log.info(`[OverlayFocus] returned to Warframe=${restored}`);
+    return restored;
+  } catch (error) {
+    log.warn("[OverlayFocus] return failed:", normalizeErrorMessage(error));
+    return false;
+  }
+}
+
+export function isWarframeOrWindowForeground(handles: Buffer[]): boolean | null {
+  try {
+    if (!ensureWin32()) return null;
+    const foreground = BigInt(_win32!.GetForegroundWindow());
+    if (!foreground) return false;
+    if (handleMatches(foreground, handles)) return true;
+    return getProcessName(windowPid(foreground))?.toLowerCase() === "warframe.x64";
+  } catch {
+    return null;
+  }
+}
 
 function getProcessName(pid: number): string | null {
   if (pid <= 0) return null;

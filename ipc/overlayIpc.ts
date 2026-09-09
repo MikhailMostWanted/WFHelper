@@ -139,6 +139,17 @@ function toggleOverlayInteractionMode(source = "unknown"): void {
   const next = anyRivenVisible
     ? !rivenOverlayIpc.isRivenInteractiveMode()
     : !ctx.overlayInteractiveMode;
+  if (next) {
+    warframeStatus.captureWarframeFocus();
+  } else {
+    const handles = [
+      ctx.overlayWindow,
+      ctx.plannerOverlayWindow,
+      ctx.rivenOverlayLeftWindow,
+      ctx.rivenOverlayRightWindow,
+    ].flatMap((win) => (win && !win.isDestroyed() ? [win.getNativeWindowHandle()] : []));
+    warframeStatus.restoreWarframeFocus(handles);
+  }
   if (anyRivenVisible) {
     rivenOverlayIpc.setRivenInteractiveMode(next);
   }

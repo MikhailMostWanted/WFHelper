@@ -11,7 +11,11 @@ import {
 } from "./ipcSecurity";
 import { createOverlayScanController } from "./overlay/scan";
 import { createRelicSelectionController } from "./overlay/relicSelection";
-import { registerZOrderSubscriber, syncOverlayWindowZOrder } from "./overlay/zOrder";
+import {
+  canRaiseOverlayWindows,
+  registerZOrderSubscriber,
+  syncOverlayWindowZOrder,
+} from "./overlay/zOrder";
 import {
   createOverlayWindowBoundsChangeHandler,
   createOverlayWindowsController,
@@ -81,6 +85,7 @@ export const rewardWindowsController = createOverlayWindowsController({
   windowTitle: "WFHelper Relic Rewards",
   windowStateKey: "reward",
   onWindowBoundsChanged: rememberOverlayWindowBounds,
+  canRaise: canRaiseOverlayWindows,
 });
 
 export const plannerWindowsController = createOverlayWindowsController({
@@ -108,6 +113,7 @@ export const plannerWindowsController = createOverlayWindowsController({
   windowTitle: "WFHelper Relic Planner",
   windowStateKey: "planner",
   onWindowBoundsChanged: rememberOverlayWindowBounds,
+  canRaise: canRaiseOverlayWindows,
 });
 
 registerZOrderSubscriber({
@@ -115,8 +121,9 @@ registerZOrderSubscriber({
     rewardWindowsController.isOverlayWindowVisible() ||
     plannerWindowsController.isOverlayWindowVisible(),
   sync: (warframeFocused) => {
-    syncOverlayWindowZOrder(rewardWindowsController, ctx.overlayWindow, warframeFocused);
-    syncOverlayWindowZOrder(plannerWindowsController, ctx.plannerOverlayWindow, warframeFocused);
+    const keepRaised = process.platform === "win32" ? canRaiseOverlayWindows() : warframeFocused;
+    syncOverlayWindowZOrder(rewardWindowsController, ctx.overlayWindow, keepRaised);
+    syncOverlayWindowZOrder(plannerWindowsController, ctx.plannerOverlayWindow, keepRaised);
   },
 });
 

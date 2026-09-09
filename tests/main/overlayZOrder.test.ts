@@ -7,6 +7,7 @@ vi.mock("electron", () => ({
 vi.mock("../../services/warframeStatus", () => ({
   getStatus: vi.fn(),
   isWindowTopmost: vi.fn(() => null),
+  isWarframeOrWindowForeground: vi.fn(() => false),
 }));
 // hoisted: vi.mock factories run before top-level consts are initialised.
 const { logInfo } = vi.hoisted(() => ({ logInfo: vi.fn() }));
@@ -21,12 +22,23 @@ vi.mock("../../services/logger", () => ({
   }),
 }));
 
-import { applyOverlayZOrder, syncOverlayWindowZOrder } from "../../ipc/overlay/zOrder";
+import {
+  applyOverlayZOrder,
+  canRaiseOverlayWindows,
+  syncOverlayWindowZOrder,
+} from "../../ipc/overlay/zOrder";
 import * as warframeStatus from "../../services/warframeStatus";
+import ctx from "../../ipc/context";
 
 beforeEach(() => {
   vi.mocked(warframeStatus.isWindowTopmost).mockReset().mockReturnValue(null);
   logInfo.mockClear();
+  ctx.overlayWindow =
+    ctx.plannerOverlayWindow =
+    ctx.rivenOverlayLeftWindow =
+    ctx.rivenOverlayRightWindow =
+      null;
+  vi.mocked(warframeStatus.isWarframeOrWindowForeground).mockReset().mockReturnValue(false);
 });
 
 function fakeWindow(alwaysOnTop = false) {
@@ -40,6 +52,8 @@ function fakeWindow(alwaysOnTop = false) {
     moveTop: vi.fn(),
     isAlwaysOnTop: vi.fn(() => win.alwaysOnTop),
     isDestroyed: vi.fn(() => false),
+    isVisible: vi.fn(() => true),
+    isFocusable: vi.fn(() => true),
     getNativeWindowHandle: vi.fn(() => Buffer.alloc(8)),
   };
   return win;
@@ -88,6 +102,33 @@ const sync = (
   focused: boolean,
   platform: typeof process.platform,
 ) => syncOverlayWindowZOrder(controller, asWindow(win), focused, platform);
+
+describe("overlay foreground guard", () => {
+  it("checks only visible, focusable overlay handles", () => {
+    const planner = fakeWindow();
+    const passiveReward = fakeWindow();
+    passiveReward.isFocusable.mockReturnValue(false);
+    const hiddenRiven = fakeWindow();
+    hiddenRiven.isVisible.mockReturnValue(false);
+    ctx.plannerOverlayWindow = asWindow(planner);
+    ctx.overlayWindow = asWindow(passiveReward);
+    ctx.rivenOverlayLeftWindow = asWindow(hiddenRiven);
+    vi.mocked(warframeStatus.isWarframeOrWindowForeground).mockReturnValue(true);
+
+    expect(canRaiseOverlayWindows("win32")).toBe(true);
+    expect(warframeStatus.isWarframeOrWindowForeground).toHaveBeenCalledWith([
+      planner.getNativeWindowHandle(),
+    ]);
+  });
+
+  it("does not raise when another app has focus or foreground is unknown", () => {
+    for (const foreground of [false, null]) {
+      vi.mocked(warframeStatus.isWarframeOrWindowForeground).mockReturnValue(foreground);
+      expect(canRaiseOverlayWindows("win32")).toBe(false);
+    }
+    expect(canRaiseOverlayWindows("linux")).toBe(true);
+  });
+});
 
 // Pinned to win32: the suite runs on ubuntu in CI, where an unpinned call would
 // silently take the linux branch and stop testing the WS_EX_TOPMOST gate.
