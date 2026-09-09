@@ -324,6 +324,35 @@ describe("world state desktop notifications", () => {
       { fissures: [] },
     ]);
   });
+
+  it("notifies both routes about cycles without a main window or renderer polling", async () => {
+    ctx.mainWindow = null;
+    ctx.overlaySettings = {
+      ...ctx.overlaySettings,
+      cycleAlerts: { earth: false, cetus: false, vallis: true, cambion: false, duviri: false },
+      cycleAlertMinutesBefore: 3,
+    };
+    channels.routes = { native: true, webhook: true };
+    const sent: Array<{ title: string; body: string }> = [];
+    worldStateIpc.__test__.setDesktopNotificationSender((title, body) =>
+      sent.push({ title, body }),
+    );
+    const expiry = Date.now() + 4 * 60_000;
+    vi.spyOn(worldStateParser, "fetchAndParse").mockImplementation(async () => ({
+      vallisCycle: {
+        isWarm: Date.now() >= expiry,
+        expiry: new Date(Date.now() >= expiry ? expiry + 30 * 60_000 : expiry).toISOString(),
+      },
+    }));
+
+    registerWorldStateHandler();
+    await vi.advanceTimersByTimeAsync(75_000);
+    expect(sent).toEqual([{ title: "Vallis Cycle", body: "Warm in ~3 mins." }]);
+    await vi.advanceTimersByTimeAsync(165_000);
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual({ title: "Orb Vallis Cycle", body: "Warm cycle has begun." });
+    expect(channels.webhookSends.map(({ title, body }) => ({ title, body }))).toEqual(sent);
+  });
 });
 
 describe("windows toast audio and lifetime", () => {
