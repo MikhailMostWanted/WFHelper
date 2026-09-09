@@ -952,6 +952,7 @@
   "mastery.rankLine": "等级 {rank}/{maxRank} · {pct}%",
   "mastery.roadmap.accessClaimable": "可领取",
   "mastery.roadmap.accessOwned": "已拥有：练级",
+  "mastery.roadmap.accessGild": "已拥有：先镀金，再升级",
   "mastery.roadmap.accessPlatinum": "在市场购买",
   "mastery.roadmap.accessRelics": "来自已有遗物",
   "mastery.roadmap.bestValue": "最超值",

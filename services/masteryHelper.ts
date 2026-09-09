@@ -736,6 +736,8 @@ interface OwnedMasteryRecord {
   mastered: boolean;
   masteryPerRank: number;
   fromXPInfo?: boolean;
+  /** Modular build still ungilded: the game grants no mastery until it is. */
+  needsGilding?: boolean;
 }
 
 function readOwnedMasteryRecord(
@@ -809,6 +811,8 @@ interface MasteryProgressItem extends MasterableItem {
   rank: number;
   maxRank: number;
   currentlyOwned: boolean;
+  /** Owned modular build that grants no mastery until it is gilded. */
+  needsGilding?: boolean;
   masteryXp: number;
   /** Mastery still on the table: what maxing this item would add. */
   masteryXpRemaining: number;
@@ -980,6 +984,7 @@ export function computeMasteryProgress(inventoryData: Record<string, unknown>): 
         record.rank = 0;
         record.masteryRank = 0;
         record.mastered = false;
+        record.needsGilding = true;
       }
       const keys = [part ?? entry.ItemType];
       for (const key of keys) {
@@ -1085,6 +1090,7 @@ export function computeMasteryProgress(inventoryData: Record<string, unknown>): 
       rank,
       maxRank,
       currentlyOwned,
+      ...(owned?.needsGilding ? { needsGilding: true } : {}),
       masteryXp,
       masteryXpRemaining,
       components,

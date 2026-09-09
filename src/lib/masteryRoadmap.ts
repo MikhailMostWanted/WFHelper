@@ -3,7 +3,7 @@ import type { ComponentInfo, ParsedItem } from "../types/inventory.js";
 import type { FoundryState } from "../types/filters.js";
 import type { OwnedCounts, RelicDatabase, RelicQuality, RelicReward } from "../types/relics.js";
 
-type MasteryRoadmapAccess = "owned" | "claimable" | "building" | "buildable";
+type MasteryRoadmapAccess = "owned" | "gild" | "claimable" | "building" | "buildable";
 
 interface MissingMasteryComponent {
   component: ComponentInfo;
@@ -75,12 +75,15 @@ export interface MasteryRoadmap {
 
 const ACCESS_PRIORITY: Record<MasteryRoadmapAccess, number> = {
   owned: 0,
-  claimable: 1,
-  building: 2,
-  buildable: 3,
+  gild: 1,
+  claimable: 2,
+  building: 3,
+  buildable: 4,
 };
 
 function easyAccess(item: MasteryRoadmapSourceItem): MasteryRoadmapAccess | null {
+  // A max-rank ungilded amp reads "level it" otherwise, which is what the player just did.
+  if (item.needsGilding) return "gild";
   if (item.owned || item.currentlyOwned) return "owned";
   if (item.foundryState === "claimable") return "claimable";
   if (item.foundryState === "building") return "building";

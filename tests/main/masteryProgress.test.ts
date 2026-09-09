@@ -289,6 +289,7 @@ describe("mastery progress", () => {
     expect(progress.items.some((entry) => entry.name === "Mote Amp")).toBe(false);
     expect(prism?.rank).toBe(0);
     expect(prism?.masteryXp).toBe(0);
+    expect(prism?.needsGilding).toBe(true);
   });
 
   it("credits a gilded Mote Amp once through Mote Prism", () => {

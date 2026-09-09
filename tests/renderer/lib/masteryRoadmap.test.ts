@@ -73,6 +73,20 @@ describe("buildMasteryRoadmap", () => {
     expect(roadmap.easy.map((entry) => entry.name)).toEqual(["Owned", "Claimable", "Buildable"]);
   });
 
+  it("tells an ungilded modular build to gild before levelling", () => {
+    const roadmap = buildMasteryRoadmap([
+      item({ name: "Claimable", foundryState: "claimable" }),
+      item({ name: "Mote Prism", status: "progress", owned: true, needsGilding: true }),
+      item({ name: "Owned", status: "progress", owned: true }),
+    ]);
+
+    expect(roadmap.easy.map((entry) => [entry.name, entry.access])).toEqual([
+      ["Owned", "owned"],
+      ["Mote Prism", "gild"],
+      ["Claimable", "claimable"],
+    ]);
+  });
+
   it("ranks purchases by remaining XP per platinum", () => {
     const roadmap = buildMasteryRoadmap([
       item({ name: "Efficient", platinum: 10, estimatedCost: 10, masteryXpRemaining: 3_000 }),

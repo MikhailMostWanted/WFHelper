@@ -27,6 +27,7 @@
 
   $: ACCESS_LABELS = {
     owned: $tr("mastery.roadmap.accessOwned"),
+    gild: $tr("mastery.roadmap.accessGild"),
     claimable: $tr("mastery.roadmap.accessClaimable"),
     building: $tr("mastery.roadmap.accessBuilding"),
     buildable: $tr("common.canBuild"),

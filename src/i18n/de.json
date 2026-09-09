@@ -1247,6 +1247,7 @@
   "mastery.rankLine": "Lv {rank}/{maxRank} · {pct}%",
   "mastery.roadmap.accessClaimable": "Abholbereit",
   "mastery.roadmap.accessOwned": "Im Besitz: leveln",
+  "mastery.roadmap.accessGild": "Im Besitz: vergolden, dann leveln",
   "mastery.roadmap.accessPlatinum": "Am Markt kaufen",
   "mastery.roadmap.accessRelics": "Aus eigenen Relikten",
   "mastery.roadmap.bestValue": "Bestes Preis-Leistungs-Verhältnis",

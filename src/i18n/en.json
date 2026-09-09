@@ -963,6 +963,7 @@
   "mastery.rankLine": "Lv {rank}/{maxRank} · {pct}%",
   "mastery.roadmap.accessClaimable": "Ready to claim",
   "mastery.roadmap.accessOwned": "Owned: level it",
+  "mastery.roadmap.accessGild": "Owned: gild it, then level it",
   "mastery.roadmap.accessPlatinum": "Buy on Market",
   "mastery.roadmap.accessRelics": "From owned relics",
   "mastery.roadmap.bestValue": "Best value",
