@@ -62,5 +62,5 @@ with `--no-verify`.
 
 ## Scope notes
 
-- The app is Windows-primary: reward OCR and screen capture are Windows-only.
+- The app supports Windows and Linux. Windows-native OCR and capture are platform-specific; Linux uses ONNX OCR and screen sharing.
 - No telemetry or crash reporting is bundled. Please don't add any.

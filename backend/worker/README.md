@@ -11,6 +11,7 @@ Public:
 - `GET /v1/bootstrap`
 - `GET /v1/snapshot`
 - `GET /v1/prices/:slug`
+- `GET /v1/price-history/:slug`, archived daily prices and nullable sales volume
 - `GET /v1/meta/:slug`
 - `GET /v1/order-summary/:slug`, with `?subtype=` for relic refinements
 - `GET /v1/supporters`
@@ -28,8 +29,8 @@ Admin routes require `Authorization: Bearer <ADMIN_API_KEY>`:
 - `POST /admin/prewarm/order-summaries`
 - `GET /admin/prewarm/order-summaries/status`
 - `GET /admin/snapshot/status`
-- `POST /admin/patreon/exclusions`
-- `POST /admin/patreon/sync`
+- `POST /admin/supporters/exclusions`
+- `POST /admin/supporters/sync`
 
 ## Automatic flow
 
@@ -53,21 +54,13 @@ Baro history can recover only visit archives this Worker still retains. See
 
 ### Baro history
 
-The daily archive stage maintains `ITEM_META` key `baro:history:v1` without a TTL. Its migration
-runs even when Baro is inactive and reads up to 128 retained visit archives. Visit details follow
-`HISTORY_RETENTION_DAYS` and a 128-visit bound, while up to 5,000 item last-seen records survive
-visit removal. Raw manifests are stored before durable reconciliation; unknown missing or failed archive reads are retried daily and block index pruning. A bounded acknowledgement ledger lets already-materialized archives expire without blocking later cron runs. Corrupt durable data is backed up to `baro:history:recovery:v1` before recoverable dates are salvaged. Persistent migration errors need operator investigation. Coverage is partial; an absent item or visit is unknown, not proof it never appeared.
-
-`GET /v1/baro-history` is public without bootstrap and uses the existing snapshot rate limiter (2/minute per IP). Valid
-history is edge-cached for one hour; an empty history for five minutes. Invalid durable data returns 503. The endpoint reads only the materialized key and supports ETag/304; it never reconstructs archives, fetches upstream history or writes KV. Missing history also returns 503 until the daily stage materializes it. No new binding or secret is needed.
-
-New version 2 archives use inventory item paths and keep missing ducat/credit costs as `null`.
-Migration reads version 1 too, treating legacy zeros as unknown because they may represent missing
-prices. Explicit zeros in version 2 stay zero. Dates reflect recorded visits, not predictions.
-
-Keep the existing daily cron as the only history writer. Its local queue does not provide atomic
-updates across Worker isolates; adding another writer requires coordination. Do not delete the
-durable key as routine cache cleanup because its last-seen records can outlive the source archives.
+The daily archive stage keeps `ITEM_META` key `baro:history:v1` (no TTL): up to 128 visits with
+their manifests, trimmed by `HISTORY_RETENTION_DAYS`, plus up to 5,000 per-item last-seen records
+that outlive their visits. `GET /v1/baro-history` serves only that materialized key: public, the
+API rate limiter, a one-hour edge cache (five minutes while empty), 503 while the key is missing or
+invalid. Coverage is partial, so an absent item or visit is unknown rather than proof it never
+appeared. Reconciliation, the recovery keys and the single-writer rule are described in
+`ARCHITECTURE.md` under "Baro visit history".
 
 ## Configuration
 
@@ -147,17 +140,14 @@ Important variables:
 - `RIVEN_ARCHIVE_BATCH_SIZE`
 - `PUBLIC_BOOTSTRAP_REQUIRED`
 - `BOOTSTRAP_TOKEN_TTL_SEC`
-- `PATREON_CAMPAIGN_ID`
-- `PATREON_CLIENT_ID`
-- `PATREON_TIER_MAP`
+- `DISCORD_GUILD_ID`
+- `DISCORD_ROLE_TIER_MAP`
 
 Secrets:
 
 - `ADMIN_API_KEY`
 - `BOOTSTRAP_TOKEN_SECRET`
-- `PATREON_CLIENT_SECRET`
-- `PATREON_ACCESS_TOKEN`
-- `PATREON_REFRESH_TOKEN`
+- `DISCORD_BOT_TOKEN`
 
 Production values and binding identifiers live in `wrangler.jsonc`.
 

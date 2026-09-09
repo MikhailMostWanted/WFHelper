@@ -298,83 +298,83 @@ three families. Every write logs its byte size on route `archive:prices`, `archi
 
 ### Per-item price series
 
-The day archives are keyed by date, so reading one item's year would mean downloading every day.
-`services/priceHistory.ts` folds them the other way into 64 bucket documents
-`history:prices:v1:{bucket}`, each `{ v: 1, updatedAt, lastDate, series }` where `series` maps an
-archive row key (a bare slug or `{slug}:rank-v3:r{n}`) to `[date, median, volume|null]` entries,
-ascending by date, one entry per date and at most 400 per key. The bucket is the fnv1a-32 hash of
-the bare slug modulo 64, so every rank of an item lands in the same document. Medians that are not
-finite or not positive are skipped.
+`services/priceHistory.ts` folds the day archives into 64 documents at
+`history:prices:v2:{bucket}`. Each holds `{ v: 2, updatedAt, revisions, afterDate, series }`;
+`series` maps a bare slug or `{slug}:rank-v3:r{n}` to `[date, median, volume|null]` entries,
+sorted by date and capped at 400 per key. The bucket is the fnv1a-32 hash of the bare slug modulo
+64, so every rank of an item shares a document. Version 2 rebuilds from the retained day archives
+instead of trusting the old date-only cursor.
 
-`foldPriceHistory()` advances one bucket per 15-minute tick. `history:prices:state:v1` holds
-`{ bucket, updatedAt }`; the stage reads that bucket's document, takes the oldest
-`daysPerTick` (30) dated entries of `archive:index:prices:v1` newer than the document's `lastDate`,
-reads those day archives one at a time so only one is ever in memory, folds the rows whose bare
-slug hashes to the bucket, writes the document with `lastDate` set to the newest folded date, and
-then moves the state to the next bucket. A tick that finds no new date writes no document and only
-advances the bucket. A document past 4MB is refused with `history_too_large` on route
-`history:prices`, and the bucket still advances so one oversized shard cannot stall the rotation.
-The stage reads the shared archive index, so it runs in the same deferred branch as the price seed
-and the top-traded sweep and never on the tick that collides with the daily cron.
-`HISTORY_ARCHIVE_ENABLED=0` stops it.
+Each price-archive write assigns a revision and records it in `archive:index:prices:v1`.
+The daily writer, volume merger and seed reannounce an existing revision on unchanged retries,
+so a failed index write can recover after the day value was saved. Older archives without a
+revision use the `legacy` marker.
 
-`GET /v1/price-history/{slug}` serves that item's series as
+`foldPriceHistory()` advances one bucket per 15-minute tick;
+`history:prices:state:v2` holds `{ bucket, updatedAt }`. It selects up to 30 dates whose indexed
+revision differs from the bucket's acknowledged revision and reads their archives one at a time.
+A successful fold replaces that date's entries. Missing or unreadable days remain pending, as do
+values whose revision has not caught up with the index under KV propagation. The per-bucket
+`afterDate` cursor rotates pending dates so repeated failures cannot block newer days.
+
+Rows tagged `closed-daily-median-v1` use their stored price. Other tagged prices, including
+snapshot 48-hour averages, require a separately recorded `dailyMedians` value and are skipped
+until it arrives. Legacy untagged rows retain their stored value. Non-positive or non-finite
+prices are skipped; absent volume stays `null`.
+
+An idle tick advances the bucket without rewriting its document. A document over 4MB is refused
+with `history_too_large` on route `history:prices`, and the bucket still advances. The stage
+runs alongside the deferred price-seed and top-traded stages, outside the tick that collides with
+the daily cron. `HISTORY_ARCHIVE_ENABLED=0` stops it.
+
+`GET /v1/price-history/{slug}` returns
 `{ ok: true, slug, generatedAt, rows: [[date, rank|null, median, volume|null]] }`, sorted by date
-then rank. The archive's bare row of a ranked mod holds its rank 0 price, so it is reported as rank
-0 whenever the slug also has ranked keys, and as `null` when it has none. The route is public,
-needs no bootstrap token, uses the price/meta rate-limit class, and is edge-cached for one hour with
-a body ETag. A slug on the non-tradable exclusion list answers the shared 404. A bucket the cron has
-not folded yet answers `404 {"ok":false,"error":"price_history_not_ready"}` and a folded bucket
-holding no series for the slug answers `404 {"ok":false,"error":"not_found"}`; neither is cached, so
-the first fold shows up immediately. The desktop app fills the gaps of its own rolling year from
-this route, which is why entries stay whole days and never carry a partial current day.
+then rank. The ranked catalog identifies bare mod rows as rank 0 even when no explicit ranked
+siblings exist; unranked items use `null`. When a bare row needs classification and the catalog
+is unavailable, the route returns uncached `503 {"ok":false,"error":"catalog_unavailable"}`.
+
+The route needs no bootstrap token, uses the price/meta rate-limit class, and caches successful
+responses for one hour with a body ETag. Excluded slugs return the shared 404. Unbuilt buckets
+return `404 {"ok":false,"error":"price_history_not_ready"}`; a built bucket with no matching
+series returns `404 {"ok":false,"error":"not_found"}`. These failures are not cached. The
+desktop can refresh previously archived rows from this route while preserving its direct WFM
+statistics. Archive rows supply no OHLC, average-price or Donchian values.
 
 ## Baro visit history
 
 `GET /v1/baro-history` returns `{ ok: true, data: { version, updatedAt, coverageStart, visits,
-lastSeen } }`. It uses the public API rate limiter (200 requests per minute per IP), shared CORS and daily-budget guards,
-and does not require bootstrap. The edge cache lasts one hour for recorded history and five
-minutes for an empty history. Body ETags support 304 on cold and cached requests. Missing, invalid or unreadable durable data returns 503 without caching a false empty result. A cold request reads one KV key and never reconstructs archives. Cache API failures fall back to that read.
+lastSeen } }`: public, no bootstrap, the API rate limiter, a one-hour edge cache (five minutes
+while the history is empty) and body ETags. Missing, invalid or unreadable durable data answers 503
+and is never cached. The route reads one KV key; it never reconstructs archives, fetches upstream
+or writes.
 
-`services/baroHistory.ts` owns `ITEM_META` key `baro:history:v1`, which has no TTL. It stores at
-most 128 visit manifests and 5,000 per-item last-seen records. Visit details also obey
-`HISTORY_RETENTION_DAYS`; removing an old visit never removes its last-seen item records.
-`coverageStart` is the earliest visit actually recorded or recovered, not evidence that every
-visit since then is present. Missing items mean unknown history, not that Baro never sold them.
-History carries the observed ducat and credit prices, each nullable, and makes no next-visit
-predictions.
+`services/baroHistory.ts` owns `ITEM_META` key `baro:history:v1` (no TTL): at most 128 visit
+manifests, trimmed by `HISTORY_RETENTION_DAYS`, and 5,000 per-item last-seen records that survive
+their visit's removal. `coverageStart` is the earliest visit recorded or recovered, not a promise
+that every later visit is present; a missing item means unknown, not never sold. Prices are the
+observed ducat and credit costs, each nullable, and nothing is predicted.
 
-The daily Baro stage reconciles retained archives on every tick, including while Baro is inactive
-or world state is unavailable. One prefix listing discovers manifests omitted from the index by
-a failed earlier durable write. A listing or index union exceeding 128 ids stops reconciliation with
-`baro_archive_scan_limit`; accepted archives are read in batches of eight. Unknown missing and failed archive reads retain recoverable data
-but keep reconciliation incomplete and prevent index pruning; the next daily tick retries them.
-The durable envelope also keeps up to 128 acknowledged archive ids in `archivedVisits`, omitted
-from public responses. An id is acknowledged after its complete parsed manifest was materialized
-or its malformed source was durably quarantined; valid pre-ledger durable visits also provide that proof. Missing or failed reads
-for acknowledged ids do not block after archive TTL expiry. The ledger survives visit-detail
-retention and is trimmed only when ids leave both the index and prefix listing. It is written
-atomically with the history document before index pruning.
-Readable malformed archives are copied into `baro:history:recovery:archives:v1` without a TTL before
-acknowledgement. That recovery document keeps at most 128 sources and 4MB; overflow or a failed
-quarantine write prevents acknowledgement and pruning. Future visits remain pending for retry.
-The operator must investigate persistent `baro_history_migration_incomplete`, `baro_archive_recovery_limit`
-or `baro_archive_scan_limit` errors rather than discard unknown archive entries automatically.
+The daily Baro stage reconciles the retained archives on every tick, Baro active or not. One prefix
+listing finds manifests a failed index write left out; more than 128 ids stops the pass with
+`baro_archive_scan_limit`, and archives are read eight at a time. A missing or failed read keeps
+the pass incomplete and blocks index pruning until a later tick succeeds. The envelope keeps up to
+128 acknowledged archive ids in `archivedVisits` (never served): an id is acknowledged once its
+parsed manifest is materialized or its malformed source is quarantined, after which its archive may
+expire without blocking anything. The ledger is trimmed only when an id has left both the index and
+the listing, and it is written together with the history document before pruning.
 
-The current raw manifest is written before reconciliation, so migration failure cannot lose the
-only live copy DE publishes. Index updates and pruning happen only after the durable write. Each
-tick writes the durable key once. Item last-seen dates never move backward. The stable visit id
-allows corrected expiry times; replaying an older archive cannot revert a corrected schedule.
-Treasure boxes are excluded consistently with the desktop.
+Malformed archives are copied to `baro:history:recovery:archives:v1` (no TTL, 128 sources, 4MB)
+before acknowledgement; overflow or a failed copy blocks acknowledgement and pruning. A corrupt
+durable document is saved to `baro:history:recovery:v1` before its valid visits and dates are
+salvaged, and a later valid tick leaves that key alone. Persistent
+`baro_history_migration_incomplete`, `baro_archive_recovery_limit` or `baro_archive_scan_limit`
+errors need a look rather than an automatic discard.
 
-Before repairing a corrupt durable document, the stage saves its raw value in
-`baro:history:recovery:v1` without TTL and salvages individually valid per-item dates and visits.
-The recovery key retains the latest corrupt source for operator inspection. Surviving archives
-are merged with those records; a later valid tick does not touch the recovery key. Invalid index
-data, an incomplete listing, item-limit overflow and documents over 4MB stop pruning. The public
-route serves only validated materialized data. KV is eventually consistent and has no
-cross-isolate atomic merge, so keep this daily stage as the sole writer. Same-isolate writes are
-serialized; additional writers require a coordinator.
+The current raw manifest is written before reconciliation, so a migration failure cannot lose the
+only live copy DE publishes; the index is updated and pruned only after that write, once per tick.
+Last-seen dates never move backward, a stable visit id lets a corrected expiry replace an older one,
+and treasure boxes are excluded as on the desktop. KV has no cross-isolate atomic merge, so this
+daily stage stays the sole writer.
 
 ## Top traded (rolling volume sweep)
 
@@ -481,20 +481,24 @@ again on read and simply shows the weapons without bonuses when the route is abs
 `GET /v1/nightwave-offerings` serves KV key `nightwave-offerings:doc:v1` as
 `{ ok: true, generatedAt, source: "wiki", tabs }`, where a tab is `{ name, sections }`, a section is
 `{ name, creds, items }` and an item is `{ name, always, creds }`. The route is public, needs no
-bootstrap token, uses the price/meta rate-limit class, and is edge-cached for one hour with a body
+bootstrap token, uses the price/meta rate-limit class and is edge-cached for one hour with a body
 ETag; before the first refresh it answers `404 {"ok":false,"error":"nightwave_offerings_not_ready"}`
-and is never cached. Source: the raw wikitext of `Nightwave/Offerings`, fetched with the same
-`WFHelper-worker/1.0` user agent the vendor tables use. `services/nightwaveOfferings.ts` reads the
-`<tabber>` tabs, their `===` headings (a `({{Nc|N}} each)` parenthetical prices the whole section)
-and the `<gallery>` captions, unwrapping `{{M|X}}` and `[[Page|X]]` markup; `'''bold'''` marks an
-offer as always available, a caption's own `{{Nc|N}}` beats the section price, and a name repeated
-inside one tab is kept once. `refreshNightwaveOfferings()` runs on the 15-minute prewarm tick as
-cron stage `cron:nightwave-offerings`, rebuilds at most hourly, and treats a fetch failure or a
-parse under eight tabs or 150 items as failed: the stored doc keeps its old `generatedAt`, the run
-logs status 204 with `wiki_unavailable` or `wiki_unparsed` on route `nightwave-offerings:refresh`,
-and no partial doc is written. The doc carries a 30-day TTL, caps tabs at 12, sections at 40 per
-tab, items at 120 per section and creds at 1000, and the desktop app revalidates every row again on
-read, falling back to its built-in permanent list when the route is absent or unreachable.
+and is never cached.
+
+The source is the raw wikitext of `Nightwave/Offerings`, fetched with the same
+`WFHelper-worker/1.0` user agent the vendor tables use. `services/nightwaveOfferings.ts` reads
+the `<tabber>` tabs, their `===` headings (a `({{Nc|N}} each)` parenthetical prices the whole
+section) and the `<gallery>` captions, unwrapping `{{M|X}}` and `[[Page|X]]` markup. Bold marks
+an offer as always available, a caption's own `{{Nc|N}}` beats the section price, and a name
+repeated inside one tab is kept once.
+
+`refreshNightwaveOfferings()` runs on the 15-minute prewarm tick as cron stage
+`cron:nightwave-offerings` and rebuilds at most hourly. A fetch failure or a parse under eight tabs
+or 150 items counts as failed: the stored doc keeps its old `generatedAt`, the run logs status 204
+with `wiki_unavailable` or `wiki_unparsed` on route `nightwave-offerings:refresh`, and no partial
+doc is written. The doc carries a 30-day TTL and caps tabs at 12, sections at 40 per tab, items at
+120 per section and creds at 1000. The desktop app revalidates every row again on read and falls
+back to its built-in permanent list when the route is absent or unreachable.
 
 ## Daily budget
 
@@ -550,5 +554,6 @@ pnpm run backend:test
 pnpm run lint:worker
 ```
 
-Unit and integration behavior belongs in `test/index.spec.ts`. The scheduled GitHub workflow runs
+Unit and integration tests belong in `test/`, with top-level Worker cases in `index.spec.ts`.
+The scheduled GitHub workflow runs
 `test/smoke.spec.ts` against the deployed custom domain every six hours.
