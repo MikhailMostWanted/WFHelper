@@ -50,6 +50,8 @@
     autoFocusSearch,
     hideFoundryClaims,
     hideFounderMasteryItems,
+    showMasteredBadges,
+    showOwnedParentBadges,
   } from "../stores/preferences.js";
   import { startTour } from "../stores/tour.js";
   import { currentView } from "../stores/app.js";
@@ -838,6 +840,18 @@
             <div class="mt-2.5 grid gap-1">
               <SettingsRow label={$tr("settings.hideFounderItems")}>
                 <input type="checkbox" bind:checked={$hideFounderMasteryItems} />
+              </SettingsRow>
+              <SettingsRow
+                label={$tr("settings.showMasteredBadges")}
+                dataSetting="show-mastered-badges"
+              >
+                <input type="checkbox" bind:checked={$showMasteredBadges} />
+              </SettingsRow>
+              <SettingsRow
+                label={$tr("settings.showOwnedParentBadges")}
+                dataSetting="show-owned-parent-badges"
+              >
+                <input type="checkbox" bind:checked={$showOwnedParentBadges} />
               </SettingsRow>
             </div>
           </SettingsSection>

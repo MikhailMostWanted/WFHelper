@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { showMasteredBadges, showOwnedParentBadges } from "../../stores/preferences.js";
   import { itemLabel } from "../../lib/itemLabel.js";
   import { createEventDispatcher, onDestroy, onMount } from "svelte";
 
@@ -12,6 +13,7 @@
     showsSafetyBadge,
     verdictFor,
   } from "../../stores/inventorySafety.js";
+  import { itemMarksFor } from "../../lib/parentMastery.js";
   import { tr } from "../../lib/i18n.js";
   import type { InventoryViewItem } from "../../lib/inventoryMarket.js";
   import { isRankedGroup } from "../../../config/shared/numeric.js";
@@ -45,6 +47,8 @@
         ...reservedVerdict.reservations.map((entry) => $tr(entry.reasonKey, entry.params)),
       ].join("\n")
     : "";
+
+  $: marks = itemMarksFor(item);
 
   $: mastered = item.rank >= item.maxRank && item.maxRank > 1;
   $: canShowRank = item.maxRank > 1 && isRankedGroup(item.inventoryGroup);
@@ -155,7 +159,21 @@
       alt={itemLabel(item)}
       auditKey={item.name}
     />
-    {#if item.vaulted}<span class="vault-badge">V</span>{/if}
+    {#if item.vaulted || ($showMasteredBadges && marks.mastered) || ($showOwnedParentBadges && marks.crafted)}
+      <span class="item-mark-row">
+        {#if item.vaulted}<span class="vault-badge">V</span>{/if}
+        {#if $showMasteredBadges && marks.mastered}<span
+            class="item-mark item-mark--mastered"
+            data-item-mark="mastered"
+            title={$tr("common.mastered")}>M</span
+          >{/if}
+        {#if $showOwnedParentBadges && marks.crafted}<span
+            class="item-mark item-mark--crafted"
+            data-item-mark="crafted"
+            title={$tr("common.parentItemOwned")}>C</span
+          >{/if}
+      </span>
+    {/if}
     {#if shardCopies.length > 0}
       <!-- Absolute so a shardless card keeps exactly the same height. -->
       <span class="absolute bottom-1.5 left-1.5 flex flex-col items-start gap-0.5">

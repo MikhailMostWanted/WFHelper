@@ -1,5 +1,8 @@
 <script lang="ts">
   import { itemLabel } from "../lib/itemLabel.js";
+  import { itemMarksFor, sharedPartMasteryResolver } from "../lib/parentMastery.js";
+  import { masteryData } from "../stores/mastery.js";
+  import { showMasteredBadges, showOwnedParentBadges } from "../stores/preferences.js";
   import { activeItem } from "../stores/modals.js";
   import { itemDb, wfmItems, componentOwnership, inventoryData } from "../stores/data.js";
   import { createPriceLoader } from "../lib/priceState.js";
@@ -55,6 +58,8 @@
   let navigationStack: Array<{ item: ParsedItem; showCraftingTree: boolean }> = [];
 
   $: item = $activeItem;
+  $: partMastery = sharedPartMasteryResolver($itemDb, $masteryData);
+  $: marks = itemMarksFor(item ? { ...item, ...partMastery(item) } : {});
 
   $: itemKey = item?.uniqueName || item?.internalName || "";
   $: if (itemKey) void loadBaroHistory();
@@ -256,9 +261,20 @@
           <div class="detail-tags">
             {#if item.isPrime}<span class="detail-tag prime">{$tr("common.prime")}</span>{/if}
             {#if item.vaulted}<span class="detail-tag vaulted">{$tr("common.vaulted")}</span>{/if}
-            {#if item.status === "mastered"}<span class="detail-tag mastered"
-                >{$tr("common.mastered")}</span
-              >{/if}
+            {#if $showMasteredBadges && (marks.mastered || item.status === "mastered")}
+              <span
+                class="item-mark item-mark--mastered item-mark--inline"
+                data-item-mark="mastered"
+                title={$tr("common.mastered")}>M</span
+              >
+            {/if}
+            {#if $showOwnedParentBadges && marks.crafted}
+              <span
+                class="item-mark item-mark--crafted item-mark--inline"
+                data-item-mark="crafted"
+                title={$tr("common.parentItemOwned")}>C</span
+              >
+            {/if}
             {#if item.status === "progress"}<span class="detail-tag progress"
                 >{$tr("common.inProgress")}</span
               >{/if}

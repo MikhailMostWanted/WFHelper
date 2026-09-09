@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { showMasteredBadges, showOwnedParentBadges } from "../stores/preferences.js";
   import { itemLabel } from "../lib/itemLabel.js";
   import { itemDb, wfmItems } from "../stores/data.js";
   import { createPriceLoader } from "../lib/priceState.js";
@@ -7,6 +8,8 @@
     resolveComponentPriceLookup,
     resolveComponentWikiFallback,
   } from "../lib/componentResolution.js";
+  import { itemMarksFor, sharedPartMasteryResolver } from "../lib/parentMastery.js";
+  import { masteryData } from "../stores/mastery.js";
   import { resolveDrops } from "../lib/resolveDrops.js";
   import DropsList from "./DropsList.svelte";
   import MarketPrice from "./MarketPrice.svelte";
@@ -40,11 +43,17 @@
   $: compLocation = resolveComponentLocation(compDbEntry);
   $: compWikiUrl = comp?.uniqueName ? $itemDb[comp.uniqueName]?.wikiaUrl || null : null;
 
-  // `parentName` stays the English lookup key for prices and the wiki, so only
-  // the meta row swaps in the parent's translated label, and only for the very
-  // entry that name belongs to.
+  // Keep the English lookup key for prices and the wiki; translate only its matching label.
   $: parentEntry = compDbEntry?.componentOf ? $itemDb[compDbEntry.componentOf] || null : null;
   $: parentLabel = parentEntry?.name === parentName ? itemLabel(parentEntry) : parentName;
+
+  $: partMastery = sharedPartMasteryResolver($itemDb, $masteryData);
+  $: parentMarks = itemMarksFor(
+    partMastery({
+      name: comp?.name ?? "",
+      ...(comp?.uniqueName ? { internalName: comp.uniqueName } : {}),
+    }),
+  );
 
   // Reload price whenever the component (identity) changes.
   $: if (comp) {
@@ -89,7 +98,17 @@
     <div class="detail-title-area">
       <h2>{itemLabel(comp) || $tr("detail.unknownComponent")}</h2>
       <div class="comp-meta-stack">
-        {#if parentName}<div class="detail-meta">{parentLabel}</div>{/if}
+        {#if parentName}<div class="detail-meta">
+            {parentLabel}{#if $showMasteredBadges && parentMarks.mastered}<span
+                class="item-mark item-mark--mastered item-mark--inline ml-1.5"
+                data-item-mark="mastered"
+                title={$tr("common.mastered")}>M</span
+              >{/if}{#if $showOwnedParentBadges && parentMarks.crafted}<span
+                class="item-mark item-mark--crafted item-mark--inline ml-1.5"
+                data-item-mark="crafted"
+                title={$tr("common.parentItemOwned")}>C</span
+              >{/if}
+          </div>{/if}
         {#if comp.tradable}<div class="detail-meta">{$tr("detail.tradable")}</div>{/if}
         <div class="detail-meta">
           {$tr("detail.owned", { owned: comp.ownedCount ?? 0, needed: comp.itemCount || 1 })}

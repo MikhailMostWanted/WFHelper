@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { showMasteredBadges, showOwnedParentBadges } from "../stores/preferences.js";
   import { itemLabel } from "../lib/itemLabel.js";
   import { activeRelic } from "../stores/modals.js";
   import { itemDb, componentOwnership } from "../stores/data.js";
+  import { masteryData } from "../stores/mastery.js";
   import { relicOwnedCounts } from "../stores/relics.js";
+  import { itemMarksFor, sharedPartMasteryResolver } from "../lib/parentMastery.js";
   import { fetchPriceBySlug } from "../lib/wfm/wfmPrice.js";
   import { fetchWfmItemMetaBySlug } from "../lib/wfm/wfmItemMeta.js";
   import { buildItemNameIndex, resolveComponentByName } from "../lib/componentResolution.js";
@@ -183,6 +186,7 @@
   $: iconSrc = group ? group.imageUrl || RELIC_ICON_PATHS[tierCls] || RELIC_ICON_PATHS.default : "";
 
   $: itemNameIndex = buildItemNameIndex($itemDb);
+  $: partMastery = sharedPartMasteryResolver($itemDb, $masteryData);
 
   function selectReward(reward: RelicReward): void {
     if (selectedReward === reward) {
@@ -322,6 +326,7 @@
           {@const platEv = price != null ? (reward.chance / 100) * price : null}
           {@const ducatEv = ducatValue != null ? (reward.chance / 100) * ducatValue : null}
           {@const canClick = itemNameIndex.has(reward.name)}
+          {@const marks = itemMarksFor(partMastery({ name: reward.name }))}
           <button
             class="grid grid-cols-[30px_minmax(0,1fr)_72px_78px_78px_120px] max-[800px]:grid-cols-[24px_minmax(0,1fr)_56px_60px_60px_94px] max-[800px]:gap-1.5 gap-1.5 items-center px-1.5 py-1.5 border-0 border-b border-border-subtle rounded bg-transparent text-inherit text-left w-full last:border-b-0 {canClick
               ? 'cursor-pointer hover:enabled:bg-surface-hover'
@@ -335,10 +340,22 @@
               )}"
               title={reward.rarity}>{reward.rarity?.charAt(0) || "?"}</span
             >
-            <span
-              class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-text-primary text-sm"
-              title={itemLabel(reward)}>{itemLabel(reward)}</span
-            >
+            <span class="flex min-w-0 items-center gap-1.5">
+              <span
+                class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-text-primary text-sm"
+                title={itemLabel(reward)}>{itemLabel(reward)}</span
+              >
+              {#if $showMasteredBadges && marks.mastered}<span
+                  class="item-mark item-mark--mastered item-mark--inline shrink-0"
+                  data-item-mark="mastered"
+                  title={$tr("common.mastered")}>M</span
+                >{/if}
+              {#if $showOwnedParentBadges && marks.crafted}<span
+                  class="item-mark item-mark--crafted item-mark--inline shrink-0"
+                  data-item-mark="crafted"
+                  title={$tr("common.parentItemOwned")}>C</span
+                >{/if}
+            </span>
             <span class="text-right text-xs text-text-secondary">{reward.chance}%</span>
             <span class="text-right text-xs text-text-secondary">
               {#if price != null}

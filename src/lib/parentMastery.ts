@@ -1,23 +1,41 @@
 import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
 import { componentParentOf } from "./inventory/partConsumers.js";
 import type { SafetyVerdictLookup } from "./inventory/safetyRules.js";
-import { buildMasteryLookup, inheritedMasteryStatus, normalizeLookupKey } from "./masteryLookup.js";
-import type { ItemDbEntry, MasteryData, MasteryStatus } from "../types/inventory.js";
+import { buildMasteryLookup, inheritedMasteryFacts, normalizeLookupKey } from "./masteryLookup.js";
+import type { MasteryFacts } from "./masteryLookup.js";
+import type { ItemDbEntry, MasteryData } from "../types/inventory.js";
 
 interface RowLike {
   name: string;
   internalName?: string;
   parentMastered?: boolean;
+  parentOwned?: boolean;
   spare?: boolean;
 }
 
 interface PartMasteryFlags {
   parentMastered?: boolean;
+  /** The build this row feeds is in the inventory now. Left unset on a built
+   *  row: there the owned count is the answer. */
+  parentOwned?: boolean;
   /** The row is a build component, the only kind the Spares filter is about. */
   component?: true;
 }
 
 type PartMasteryResolver = (row: RowLike) => PartMasteryFlags;
+
+/** What the M and C badges show for a row. */
+interface ItemMarks {
+  mastered: boolean;
+  crafted: boolean;
+}
+
+export function itemMarksFor(flags: {
+  parentMastered?: unknown;
+  parentOwned?: unknown;
+}): ItemMarks {
+  return { mastered: flags.parentMastered === true, crafted: flags.parentOwned === true };
+}
 
 function dbEntryFor(
   itemDb: Record<string, ItemDbEntry>,
@@ -47,12 +65,14 @@ export function buildPartMasteryResolver(
     if (key && !nameIndex.has(key)) nameIndex.set(key, uniqueName);
   }
 
-  const masteredFlag = (status: MasteryStatus | undefined): PartMasteryFlags =>
-    status ? { parentMastered: status === "mastered" } : {};
+  // A part and a set row both answer for the build they belong to, so both
+  // flags describe that build and never the row itself.
+  const partFlags = (facts: MasteryFacts | undefined): PartMasteryFlags =>
+    facts ? { parentMastered: facts.status === "mastered", parentOwned: facts.owned } : {};
 
   return (row) => {
     const setBase = /\sSet$/i.test(row.name) ? row.name.replace(/\s+Set$/i, "") : null;
-    if (setBase) return masteredFlag(lookup.byName.get(normalizeLookupKey(setBase)));
+    if (setBase) return partFlags(inheritedMasteryFacts(lookup, itemDb, null, setBase));
 
     const resolved =
       dbEntryFor(itemDb, row.internalName) ??
@@ -60,14 +80,36 @@ export function buildPartMasteryResolver(
     const parent = resolved ? componentParentOf(resolved.uniqueName, itemDb) : null;
     if (parent) {
       return {
-        ...masteredFlag(inheritedMasteryStatus(lookup, itemDb, parent, itemDb[parent]?.name)),
+        ...partFlags(inheritedMasteryFacts(lookup, itemDb, parent, itemDb[parent]?.name)),
         component: true,
       };
     }
-    return masteredFlag(
-      inheritedMasteryStatus(lookup, itemDb, resolved?.uniqueName ?? row.internalName, row.name),
+    const facts = inheritedMasteryFacts(
+      lookup,
+      itemDb,
+      resolved?.uniqueName ?? row.internalName,
+      row.name,
     );
+    return facts ? { parentMastered: facts.status === "mastered" } : {};
   };
+}
+
+const RESOLVER_CACHE = new WeakMap<
+  Record<string, ItemDbEntry>,
+  { mastery: MasteryData | null; resolve: PartMasteryResolver }
+>();
+
+/** For per-row callers: building the resolver indexes the whole item database,
+ *  which a card list must not repeat per card. */
+export function sharedPartMasteryResolver(
+  itemDb: Record<string, ItemDbEntry>,
+  mastery: MasteryData | null,
+): PartMasteryResolver {
+  const cached = RESOLVER_CACHE.get(itemDb);
+  if (cached && cached.mastery === mastery) return cached.resolve;
+  const resolve = buildPartMasteryResolver(itemDb, mastery);
+  RESOLVER_CACHE.set(itemDb, { mastery, resolve });
+  return resolve;
 }
 
 /** Takes a prebuilt resolver: it indexes the whole item database, so keep one

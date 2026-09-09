@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { showMasteredBadges, showOwnedParentBadges } from "../../stores/preferences.js";
   import { onDestroy } from "svelte";
 
   import ArchonShardPips from "../archon/ArchonShardPips.svelte";
@@ -13,6 +14,7 @@
     nextInventorySort,
     ownedSortKeyFor,
   } from "./inventoryListColumns.js";
+  import { itemMarksFor } from "../../lib/parentMastery.js";
   import { wfmItems } from "../../stores/data.js";
   import {
     inventorySafetyVerdicts,
@@ -267,6 +269,7 @@
           {@const shardCopies =
             $archonShardsBySuit.get(item.uniqueName || item.internalName || "") ?? []}
           {@const selected = selectedKeys?.has(item.internalName) ?? false}
+          {@const marks = itemMarksFor(item)}
           {@const verdict = verdictFor(item, $inventorySafetyVerdicts)}
           {@const reserved = showsSafetyBadge(item, verdict) ? verdict : null}
           {@const safeTitle = reserved
@@ -333,6 +336,16 @@
                 {#if item.vaulted}<span
                     class="vault-badge vault-badge--inline"
                     title={$t("common.vaulted")}>V</span
+                  >{/if}
+                {#if $showMasteredBadges && marks.mastered}<span
+                    class="item-mark item-mark--mastered item-mark--inline"
+                    data-item-mark="mastered"
+                    title={$t("common.mastered")}>M</span
+                  >{/if}
+                {#if $showOwnedParentBadges && marks.crafted}<span
+                    class="item-mark item-mark--crafted item-mark--inline"
+                    data-item-mark="crafted"
+                    title={$t("common.parentItemOwned")}>C</span
                   >{/if}
                 {#each shardCopies as copy, copyIndex (copy.instanceId ?? copyIndex)}
                   <ArchonShardPips

@@ -1,8 +1,12 @@
 <script lang="ts">
+  import { showMasteredBadges, showOwnedParentBadges } from "../../stores/preferences.js";
   import { itemLabel } from "../../lib/itemLabel.js";
   import ItemImage from "../ItemImage.svelte";
   import MarketMetricStrip from "../MarketMetricStrip.svelte";
   import { fissureTierClass, QUALITY_MODES, RELIC_ICON_PATHS } from "../../lib/relic.js";
+  import { itemMarksFor, sharedPartMasteryResolver } from "../../lib/parentMastery.js";
+  import { itemDb } from "../../stores/data.js";
+  import { masteryData } from "../../stores/mastery.js";
   import { tr, type MessageKey } from "../../lib/i18n.js";
   import type { RelicGroup, RelicQuality, RelicReward } from "../../types/relics.js";
   import type { RelicQualityMode } from "../../stores/relics.js";
@@ -53,11 +57,20 @@
     radiant: $tr(RELIC_QUALITY_SHORT_KEY.radiant),
   };
 
+  $: partMastery = sharedPartMasteryResolver($itemDb, $masteryData);
+  // Keep $tr in this reactive statement so tooltip marks follow language changes.
+  $: rewardTitles = rewardIcons.map((reward) => {
+    const marks = itemMarksFor(partMastery({ name: reward.name }));
+    return [
+      rewardTooltip(reward),
+      ...($showMasteredBadges && marks.mastered ? [$tr("common.mastered")] : []),
+      ...($showOwnedParentBadges && marks.crafted ? [$tr("common.parentItemOwned")] : []),
+    ].join(" · ");
+  });
+
   $: tierClass = fissureTierClass(group.tier);
   $: iconSrc = group.imageUrl || RELIC_ICON_PATHS[tierClass] || RELIC_ICON_PATHS.default;
 
-  // Reactive statement, not a function call: the template must re-render when
-  // qualityMode/selectedOwned change (a bare {fn()} never updates).
   $: qualityHeader =
     qualityMode === "owned"
       ? selectedOwned
@@ -137,11 +150,11 @@
   </button>
 
   <span class="relic-reward-preview-row grid grid-cols-6 gap-1">
-    {#each rewardIcons as reward}
+    {#each rewardIcons as reward, rewardIndex}
       <span
         class="relic-reward-preview-icon inline-flex min-h-8 items-center justify-center rounded-[var(--radius-md)] border border-[var(--ui-control-border)] bg-[color-mix(in_oklab,var(--bg-raised)_86%,var(--bg-base))] p-1"
         class:owned={isOwnedReward(reward)}
-        title={rewardTooltip(reward)}
+        title={rewardTitles[rewardIndex]}
       >
         <ItemImage
           src={rewardIconSrc(reward)}

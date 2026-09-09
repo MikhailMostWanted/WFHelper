@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { attachPartMasteryFlags, buildPartMasteryResolver } from "../../../src/lib/parentMastery";
+import {
+  attachPartMasteryFlags,
+  buildPartMasteryResolver,
+  itemMarksFor,
+} from "../../../src/lib/parentMastery";
 import type { SafetyVerdict } from "../../../src/lib/inventory/safetyRules";
 import type { ItemDbEntry, MasteryData } from "../../../src/types/inventory";
 
@@ -32,13 +36,29 @@ const itemDb = {
     isBuildComponent: true,
     componentOf: "/W/AnkyrosPrime",
   },
+  "/W/LexPrime": {
+    name: "Lex Prime",
+    components: [{ name: "Barrel", uniqueName: "/W/LexPrimeBarrel", itemCount: 1 }],
+  },
+  "/W/LexPrimeBarrel": {
+    name: "Lex Prime Barrel",
+    isBuildComponent: true,
+    componentOf: "/W/LexPrime",
+  },
 } as unknown as Record<string, ItemDbEntry>;
 
 const mastery = {
   items: [
-    { name: "Braton Prime", uniqueName: "/W/BratonPrime", status: "mastered" },
-    { name: "Soma Prime", uniqueName: "/W/SomaPrime", status: "progress" },
+    {
+      name: "Braton Prime",
+      uniqueName: "/W/BratonPrime",
+      status: "mastered",
+      currentlyOwned: true,
+    },
+    { name: "Soma Prime", uniqueName: "/W/SomaPrime", status: "progress", currentlyOwned: true },
     { name: "Ankyros Prime", uniqueName: "/W/AnkyrosPrime", status: "missing" },
+    // Mastered and then sold: the mastery is banked, the weapon is gone.
+    { name: "Lex Prime", uniqueName: "/W/LexPrime", status: "mastered", currentlyOwned: false },
   ],
 } as unknown as MasteryData;
 
@@ -85,6 +105,58 @@ describe("buildPartMasteryResolver", () => {
   it("returns nothing without mastery data", () => {
     const cold = buildPartMasteryResolver(itemDb, null);
     expect(cold({ name: "Braton Prime Barrel", internalName: "/W/BratonPrimeBarrel" })).toEqual({});
+  });
+
+  it("reports the build a part feeds as owned only while it is in the inventory", () => {
+    expect(resolve({ name: "Braton Prime Barrel", internalName: "/W/BratonPrimeBarrel" })).toEqual({
+      parentMastered: true,
+      parentOwned: true,
+      component: true,
+    });
+    expect(resolve({ name: "Lex Prime Barrel", internalName: "/W/LexPrimeBarrel" })).toEqual({
+      parentMastered: true,
+      parentOwned: false,
+      component: true,
+    });
+    expect(resolve({ name: "Soma Prime Stock", internalName: "/W/SomaPrimeStock" })).toEqual({
+      parentMastered: false,
+      parentOwned: true,
+      component: true,
+    });
+  });
+
+  it("reads ownership on a set row too, since the set is not the built item", () => {
+    expect(resolve({ name: "Lex Prime Set" })).toEqual({
+      parentMastered: true,
+      parentOwned: false,
+    });
+  });
+
+  it("leaves the built row itself without an owned flag", () => {
+    expect(resolve({ name: "Soma Prime", internalName: "/W/SomaPrime" })).toEqual({
+      parentMastered: false,
+    });
+  });
+});
+
+describe("itemMarksFor", () => {
+  it("shows M for a mastered parent and C only while it is owned", () => {
+    expect(itemMarksFor({ parentMastered: true, parentOwned: true })).toEqual({
+      mastered: true,
+      crafted: true,
+    });
+    expect(itemMarksFor({ parentMastered: true, parentOwned: false })).toEqual({
+      mastered: true,
+      crafted: false,
+    });
+    expect(itemMarksFor({ parentMastered: false, parentOwned: true })).toEqual({
+      mastered: false,
+      crafted: true,
+    });
+  });
+
+  it("shows nothing for a row no mastery pass stamped", () => {
+    expect(itemMarksFor({})).toEqual({ mastered: false, crafted: false });
   });
 });
 

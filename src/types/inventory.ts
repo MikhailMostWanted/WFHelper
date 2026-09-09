@@ -158,6 +158,10 @@ export interface ParsedItem {
   /** Mastery still on the table: what ranking this item to max would add. */
   masteryXpRemaining?: number;
   currentlyOwned?: boolean;
+  /** Stamped by attachPartMasteryFlags: the build this row belongs to is mastered. */
+  parentMastered?: boolean;
+  /** That build is in the inventory now. Only set on parts and set rows. */
+  parentOwned?: boolean;
   uniqueName?: string;
   inventoryKey?: string;
   keywords?: string[];

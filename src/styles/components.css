@@ -666,7 +666,8 @@
   }
 
   /* cross-component badges */
-  .vault-badge {
+  .vault-badge,
+  .item-mark {
     position: absolute;
     border-radius: 999px;
     padding: 0.12rem 0.42rem;
@@ -683,12 +684,35 @@
     border: 1px solid var(--danger-dim);
   }
   /* Same badge at row scale: a list row has no positioned art to pin it to. */
-  .vault-badge--inline {
+  .vault-badge--inline,
+  .item-mark--inline {
     position: static;
     display: inline-block;
     padding: 0 0.3rem;
     font-size: 0.6rem;
     line-height: 1.35;
+  }
+  /* Align badges at the artwork's top-left corner. */
+  .item-mark-row {
+    position: absolute;
+    top: 0.4rem;
+    left: 0.4rem;
+    display: flex;
+    gap: 0.2rem;
+  }
+  .item-mark-row .vault-badge,
+  .item-mark-row .item-mark {
+    position: static;
+  }
+  .item-mark--mastered {
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success-dim);
+  }
+  .item-mark--crafted {
+    background: var(--info-bg);
+    color: var(--info);
+    border: 1px solid var(--info-dim);
   }
 
   .listing-warning {
