@@ -44,7 +44,8 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatRunDate(epochMs: number): string {
-  if (!Number.isFinite(epochMs)) return "\u2014";
+  // A run captured with no wall-clock time carries 0, which would print as 1970.
+  if (!Number.isFinite(epochMs) || epochMs <= 0) return "\u2014";
   const d = new Date(epochMs);
   if (!Number.isFinite(d.getTime())) return "\u2014";
   const p = (n: number) => String(n).padStart(2, "0");

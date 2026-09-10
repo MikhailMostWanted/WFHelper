@@ -20,7 +20,7 @@ import {
 } from "../../../../src/lib/arbi/arbiChartData.js";
 import type { ArbiRunStats } from "../../../../src/types/ipc.js";
 
-it.each([null, undefined, "2026-09-08", NaN, Infinity, 1e30])(
+it.each([null, undefined, "2026-09-08", NaN, Infinity, 1e30, 0, -1])(
   "does not turn an invalid run timestamp into a date: %s",
   (value) => {
     expect(formatRunDate(value as number)).toBe("\u2014");
