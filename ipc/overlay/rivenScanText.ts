@@ -577,3 +577,9 @@ export function looksLikeStaleCardRead(scanned: RivenStat[], knownCards: RivenSt
   if (scanned.length < 2) return false;
   return knownCards.some((card) => card.length > 0 && countExactValueMatches(scanned, card) >= 2);
 }
+
+export function rollRescanReason(scanned: RivenStat[], knownCards: RivenStat[][]): string | null {
+  if (scanned.length === 0) return "read nothing";
+  if (looksLikeStaleCardRead(scanned, knownCards)) return "matches a pre-roll card";
+  return null;
+}

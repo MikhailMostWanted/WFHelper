@@ -116,6 +116,15 @@ describe("isIncompleteRivenRead", () => {
     expect(isIncompleteRivenRead([stat("Damage", true)])).toBe(true);
   });
 
+  it("rejects the field repro: one buff plus a faction curse", () => {
+    expect(
+      isIncompleteRivenRead([
+        { name: "Reload Speed", positive: true, value: 72.5 },
+        { name: "Damage to Corpus", positive: false, value: 0.75, multiplier: true },
+      ]),
+    ).toBe(true);
+  });
+
   it("leaves an empty read to the empty-scan path", () => {
     expect(isIncompleteRivenRead([])).toBe(false);
   });

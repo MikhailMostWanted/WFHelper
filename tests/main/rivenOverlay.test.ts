@@ -12,6 +12,7 @@ import {
 import {
   looksLikeStaleCardRead,
   parseRivenStats,
+  rollRescanReason,
   type RivenStat,
 } from "../../ipc/overlay/rivenScanText";
 import { findWeaponInText, getWeaponNameByUniqueName } from "../../services/rivenData";
@@ -1519,5 +1520,28 @@ describe("looksLikeStaleCardRead", () => {
       { name: "Impact", positive: true, value: 116.5 },
     ];
     expect(looksLikeStaleCardRead(scanned, [currentCard])).toBe(false);
+  });
+});
+
+describe("rollRescanReason", () => {
+  const currentCard: RivenStat[] = [
+    { name: "Multishot", positive: true, value: 155.2 },
+    { name: "Critical Chance", positive: true, value: 121.8 },
+  ];
+
+  it("rescans an empty read: the OCR rejects a card the reveal effect covers", () => {
+    expect(rollRescanReason([], [currentCard])).toBe("read nothing");
+  });
+
+  it("rescans a read of a pre-roll card", () => {
+    expect(rollRescanReason(currentCard, [currentCard])).toBe("matches a pre-roll card");
+  });
+
+  it("keeps a settled read", () => {
+    const rolled: RivenStat[] = [
+      { name: "Heat", positive: true, value: 138 },
+      { name: "Toxin", positive: true, value: 151.5 },
+    ];
+    expect(rollRescanReason(rolled, [currentCard])).toBeNull();
   });
 });

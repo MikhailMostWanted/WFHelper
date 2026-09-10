@@ -21,7 +21,7 @@ import {
   shouldApplyLabelWeapon,
   type RivenWeaponSource,
 } from "./overlay/rivenWeaponLabel";
-import { looksLikeStaleCardRead } from "./overlay/rivenScanText";
+import { looksLikeStaleCardRead, rollRescanReason } from "./overlay/rivenScanText";
 import { captureScreenFast, type CaptureResult } from "../services/screenCapture";
 import type { WeaponLabelMatch } from "../services/rivenData";
 import { sleep } from "../services/sleep";
@@ -658,13 +658,11 @@ function triggerRollScan(delayMs = ROLL_SCAN_DELAY_MS): void {
     try {
       let panels = await rivenScan.scanNewRoll();
       if (!rollScanGeneration.isCurrent(mySerial)) return;
-      for (
-        let rescan = 0;
-        rescan < MAX_ROLL_STALE_RESCANS && looksLikeStaleCardRead(panels.right, knownCards);
-        rescan++
-      ) {
+      for (let rescan = 0; rescan < MAX_ROLL_STALE_RESCANS; rescan++) {
+        const reason = rollRescanReason(panels.right, knownCards);
+        if (!reason) break;
         log.warn(
-          `[RivenScan] roll result matches a pre-roll card (rescan ${rescan + 1}/${MAX_ROLL_STALE_RESCANS}) - waiting ${ROLL_STALE_RESCAN_DELAY_MS}ms`,
+          `[RivenScan] roll result ${reason} (rescan ${rescan + 1}/${MAX_ROLL_STALE_RESCANS}) - waiting ${ROLL_STALE_RESCAN_DELAY_MS}ms`,
         );
         await sleep(ROLL_STALE_RESCAN_DELAY_MS);
         if (!rollScanGeneration.isCurrent(mySerial)) return;
