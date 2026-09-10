@@ -710,6 +710,7 @@
   "common.market": "Market",
   "common.mastered": "Mastered",
   "common.parentItemOwned": "Parent item owned",
+  "common.parentOwned": "Parent owned",
   "common.mastery": "Mastery",
   "common.moreCount": "+{count} more",
   "common.max": "Max",

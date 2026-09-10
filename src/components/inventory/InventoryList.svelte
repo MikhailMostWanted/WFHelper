@@ -338,14 +338,14 @@
                     title={$t("common.vaulted")}>V</span
                   >{/if}
                 {#if $showMasteredBadges && marks.mastered}<span
-                    class="item-mark item-mark--mastered item-mark--inline"
+                    class="detail-tag mastered"
                     data-item-mark="mastered"
-                    title={$t("common.mastered")}>M</span
+                    title={$t("common.mastered")}>{$t("common.mastered")}</span
                   >{/if}
                 {#if $showOwnedParentBadges && marks.crafted}<span
-                    class="item-mark item-mark--crafted item-mark--inline"
+                    class="detail-tag crafted"
                     data-item-mark="crafted"
-                    title={$t("common.parentItemOwned")}>C</span
+                    title={$t("common.parentItemOwned")}>{$t("common.parentOwned")}</span
                   >{/if}
                 {#each shardCopies as copy, copyIndex (copy.instanceId ?? copyIndex)}
                   <ArchonShardPips

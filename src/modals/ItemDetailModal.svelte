@@ -263,16 +263,16 @@
             {#if item.vaulted}<span class="detail-tag vaulted">{$tr("common.vaulted")}</span>{/if}
             {#if $showMasteredBadges && (marks.mastered || item.status === "mastered")}
               <span
-                class="item-mark item-mark--mastered item-mark--inline"
+                class="detail-tag mastered"
                 data-item-mark="mastered"
-                title={$tr("common.mastered")}>M</span
+                title={$tr("common.mastered")}>{$tr("common.mastered")}</span
               >
             {/if}
             {#if $showOwnedParentBadges && marks.crafted}
               <span
-                class="item-mark item-mark--crafted item-mark--inline"
+                class="detail-tag crafted"
                 data-item-mark="crafted"
-                title={$tr("common.parentItemOwned")}>C</span
+                title={$tr("common.parentItemOwned")}>{$tr("common.parentOwned")}</span
               >
             {/if}
             {#if item.status === "progress"}<span class="detail-tag progress"

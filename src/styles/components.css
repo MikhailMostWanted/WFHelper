@@ -684,8 +684,7 @@
     border: 1px solid var(--danger-dim);
   }
   /* Same badge at row scale: a list row has no positioned art to pin it to. */
-  .vault-badge--inline,
-  .item-mark--inline {
+  .vault-badge--inline {
     position: static;
     display: inline-block;
     padding: 0 0.3rem;
@@ -994,6 +993,10 @@
   .detail-tag.mastered {
     background: var(--success-bg);
     color: var(--success);
+  }
+  .detail-tag.crafted {
+    background: var(--info-bg);
+    color: var(--info);
   }
   .detail-tag.progress {
     background: var(--warning-bg);

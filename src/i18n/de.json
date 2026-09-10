@@ -996,6 +996,7 @@
   "common.market": "Markt",
   "common.mastered": "Gemeistert",
   "common.parentItemOwned": "Übergeordneter Gegenstand im Besitz",
+  "common.parentOwned": "Basis im Besitz",
   "settings.showMasteredBadges": "Gemeistert-Markierungen (M)",
   "settings.showOwnedParentBadges": "Besitz-Markierungen (C)",
   "common.mastery": "Meisterschaft",

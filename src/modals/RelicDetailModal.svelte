@@ -346,14 +346,14 @@
                 title={itemLabel(reward)}>{itemLabel(reward)}</span
               >
               {#if $showMasteredBadges && marks.mastered}<span
-                  class="item-mark item-mark--mastered item-mark--inline shrink-0"
+                  class="detail-tag mastered shrink-0"
                   data-item-mark="mastered"
-                  title={$tr("common.mastered")}>M</span
+                  title={$tr("common.mastered")}>{$tr("common.mastered")}</span
                 >{/if}
               {#if $showOwnedParentBadges && marks.crafted}<span
-                  class="item-mark item-mark--crafted item-mark--inline shrink-0"
+                  class="detail-tag crafted shrink-0"
                   data-item-mark="crafted"
-                  title={$tr("common.parentItemOwned")}>C</span
+                  title={$tr("common.parentItemOwned")}>{$tr("common.parentOwned")}</span
                 >{/if}
             </span>
             <span class="text-right text-xs text-text-secondary">{reward.chance}%</span>

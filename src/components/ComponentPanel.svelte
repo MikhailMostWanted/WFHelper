@@ -100,13 +100,13 @@
       <div class="comp-meta-stack">
         {#if parentName}<div class="detail-meta">
             {parentLabel}{#if $showMasteredBadges && parentMarks.mastered}<span
-                class="item-mark item-mark--mastered item-mark--inline ml-1.5"
+                class="detail-tag mastered ml-1.5 inline-block"
                 data-item-mark="mastered"
-                title={$tr("common.mastered")}>M</span
+                title={$tr("common.mastered")}>{$tr("common.mastered")}</span
               >{/if}{#if $showOwnedParentBadges && parentMarks.crafted}<span
-                class="item-mark item-mark--crafted item-mark--inline ml-1.5"
+                class="detail-tag crafted ml-1.5 inline-block"
                 data-item-mark="crafted"
-                title={$tr("common.parentItemOwned")}>C</span
+                title={$tr("common.parentItemOwned")}>{$tr("common.parentOwned")}</span
               >{/if}
           </div>{/if}
         {#if comp.tradable}<div class="detail-meta">{$tr("detail.tradable")}</div>{/if}
