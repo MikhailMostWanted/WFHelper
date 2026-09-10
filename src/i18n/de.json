@@ -1947,6 +1947,7 @@
   "marketAlerts.editRule": "Regel bearbeiten",
   "marketAlerts.ruleName": "Regelname",
   "marketAlerts.cooldownMinutes": "Abklingzeit (Minuten)",
+  "marketAlerts.cooldownHint": "{min} bis {max} Minuten Ruhe nach einem Treffer. Sonst prüft eine Regel alle paar Minuten.",
   "marketAlerts.enabled": "Aktiv",
   "marketAlerts.desktopNotification": "Desktop-Benachrichtigung",
   "marketAlerts.kindBaro": "Baro",

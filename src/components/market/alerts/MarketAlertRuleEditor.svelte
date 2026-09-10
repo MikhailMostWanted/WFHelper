@@ -766,6 +766,12 @@
           max={MARKET_ALERT_MAX_COOLDOWN_MINUTES}
           bind:value={cooldownMinutes}
         />
+        <span class="text-xs text-text-muted" data-alert-cooldown-hint>
+          {$tr("marketAlerts.cooldownHint", {
+            min: MARKET_ALERT_MIN_COOLDOWN_MINUTES,
+            max: MARKET_ALERT_MAX_COOLDOWN_MINUTES,
+          })}
+        </span>
       </label>
       <div class="flex items-end gap-4 text-sm">
         <label class="flex items-center gap-1.5">

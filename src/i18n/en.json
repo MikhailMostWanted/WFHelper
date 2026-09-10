@@ -1964,6 +1964,7 @@
   "marketAlerts.editRule": "Edit rule",
   "marketAlerts.ruleName": "Rule name",
   "marketAlerts.cooldownMinutes": "Cooldown (minutes)",
+  "marketAlerts.cooldownHint": "{min} to {max} minutes of quiet after a hit. Otherwise a rule checks every few minutes.",
   "marketAlerts.enabled": "Enabled",
   "marketAlerts.desktopNotification": "Desktop notification",
   "marketAlerts.kindBaro": "Baro",

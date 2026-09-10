@@ -1946,6 +1946,7 @@
   "marketAlerts.editRule": "编辑规则",
   "marketAlerts.ruleName": "规则名称",
   "marketAlerts.cooldownMinutes": "冷却时间（分钟）",
+  "marketAlerts.cooldownHint": "命中后静默 {min} 至 {max} 分钟。其余时间规则每隔几分钟检查一次。",
   "marketAlerts.enabled": "已启用",
   "marketAlerts.desktopNotification": "桌面通知",
   "marketAlerts.kindBaro": "Baro",
