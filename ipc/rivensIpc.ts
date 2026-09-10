@@ -4,9 +4,11 @@ import * as rivenFingerprint from "../services/rivenFingerprint";
 import * as wfmRivenSearch from "../services/wfmRivenSearch";
 import * as rivenData from "../services/rivenData";
 import * as rivenBestAttributes from "../services/rivenBestAttributes";
+import { getRivenWeaponSlugs } from "../services/wfmRivenItems";
 import { boundedInt, isObject, stringArray } from "./ipcValidators";
 import { toFiniteNumber } from "../config/shared/numeric";
 import { toNonEmptyString } from "../config/shared/stringValidation";
+import { VARIANT_PREFIXES, VARIANT_SUFFIXES } from "../config/shared/weaponVariants";
 import { polarityToWfm, tagToWfmUrlName } from "../config/shared/wfmRivenVocabulary";
 import {
   RIVENS_GET,
@@ -62,6 +64,31 @@ function weaponNameForFamilySlug(slug: string): string | null {
   return null;
 }
 
+function hasVariantAffix(name: string): boolean {
+  const lc = name.toLowerCase();
+  return (
+    VARIANT_SUFFIXES.some((suffix) => lc.endsWith(suffix.toLowerCase())) ||
+    VARIANT_PREFIXES.some((prefix) => lc.startsWith(prefix.toLowerCase()))
+  );
+}
+
+// One entry per WFM riven family, named locally so the disposition lookup still resolves it.
+async function rivenMarketWeaponNames(): Promise<string[]> {
+  const names = rivenData.getAllRivenWeaponNames();
+  const families = await getRivenWeaponSlugs();
+  if (!families) return names;
+  const byFamily = new Map<string, string>();
+  for (const name of names) {
+    const slug = rivenData.getRivenFamilySlug(name);
+    if (!slug || !families.has(slug)) continue;
+    const chosen = byFamily.get(slug);
+    // Prefer the affix-free base form; a family without one keeps its first member.
+    if (chosen && (!hasVariantAffix(chosen) || hasVariantAffix(name))) continue;
+    byFamily.set(slug, name);
+  }
+  return [...byFamily.values()].sort((a, b) => a.localeCompare(b));
+}
+
 function register(): void {
   handleAuthorized(RIVENS_GET, assertMainRendererSender, async () => {
     if (!ctx.currentInventoryData) {
@@ -72,8 +99,11 @@ function register(): void {
     return rivenFingerprint.decodeAllRivens(ctx.currentInventoryData);
   });
 
-  handleAuthorized(RIVENS_GET_WEAPON_NAMES, assertMainRendererSender, () =>
-    rivenData.getAllRivenWeaponNames(),
+  handleAuthorized(
+    RIVENS_GET_WEAPON_NAMES,
+    assertMainRendererSender,
+    (_event, rivenMarketOnly: unknown) =>
+      rivenMarketOnly === true ? rivenMarketWeaponNames() : rivenData.getAllRivenWeaponNames(),
   );
 
   handleAuthorized(RIVENS_GET_STAT_OPTIONS, assertMainRendererSender, () =>
@@ -287,4 +317,4 @@ function register(): void {
   );
 }
 
-export { register };
+export { register, rivenMarketWeaponNames };

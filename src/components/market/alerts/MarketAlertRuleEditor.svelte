@@ -167,7 +167,7 @@
     "m-0 font-display text-[0.7rem] font-bold uppercase tracking-[0.09em] text-text-muted";
 
   $effect(() => {
-    void invoke("getRivenWeaponNames").then((names) => {
+    void invoke("getRivenWeaponNames", true).then((names) => {
       weaponNames = names;
     });
   });

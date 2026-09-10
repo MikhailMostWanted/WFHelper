@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getRivenFamilySlug, getWeaponNameByUniqueName } from "../../services/rivenData";
+import {
+  getAllRivenWeaponNames,
+  getRivenFamilySlug,
+  getWeaponNameByUniqueName,
+} from "../../services/rivenData";
 
 // warframe.market's own riven weapon list, captured from GET /v2/riven/weapons.
 // It is the only authority on the slug an auction is keyed by, and it carries
@@ -50,5 +54,21 @@ describe("getRivenFamilySlug against the warframe.market riven weapon list", () 
     }
     expect(WFM.some((entry) => entry.slug === "envoy")).toBe(false);
     expect(WFM.some((entry) => entry.slug === "bramma")).toBe(false);
+  });
+
+  it("folds a syndicate variant onto the base weapon WFM lists", () => {
+    const slugs = new Set(WFM.map((entry) => entry.slug));
+    expect(getRivenFamilySlug("Vaykor Marelok")).toBe("marelok");
+    expect(getRivenFamilySlug("Rakta Cernos")).toBe("cernos");
+    expect(getRivenFamilySlug("Synoid Gammacor")).toBe("gammacor");
+
+    const prefixed = getAllRivenWeaponNames().filter((name) =>
+      /^(Vaykor|Rakta|Secura|Sancti|Synoid|Telos) /.test(name),
+    );
+    expect(prefixed.length).toBeGreaterThan(0);
+    for (const name of prefixed) {
+      expect(slugs.has(getRivenFamilySlug(name))).toBe(true);
+      expect(slugs.has(name.toLowerCase().replace(/ /g, "_"))).toBe(false);
+    }
   });
 });

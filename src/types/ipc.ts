@@ -589,7 +589,7 @@ export interface IpcInvokeMap {
     return: RivenResult;
   };
   getRivenWeaponNames: {
-    args: [];
+    args: [rivenMarketOnly?: boolean];
     return: string[];
   };
   getRivenStatOptions: {

@@ -17,8 +17,13 @@ interface CachePayload {
   items: Record<string, string>;
 }
 
-let _memo: { fetchedAt: number; slugs: ReadonlySet<string> } | null = null;
-let _inFlight: Promise<ReadonlySet<string> | null> | null = null;
+interface RivenWeapons {
+  fetchedAt: number;
+  slugs: ReadonlySet<string>;
+}
+
+let _memo: RivenWeapons | null = null;
+let _inFlight: Promise<RivenWeapons | null> | null = null;
 let _loggedFailure = false;
 
 // An entry-less payload is treated as no cache at all: the list is only useful
@@ -65,7 +70,12 @@ function parseItems(raw: unknown): Record<string, string> | null {
   return Object.keys(items).length > 0 ? items : null;
 }
 
-async function refresh(): Promise<ReadonlySet<string> | null> {
+function memoize(fetchedAt: number, items: Record<string, string>): RivenWeapons {
+  _memo = { fetchedAt, slugs: new Set(Object.keys(items)) };
+  return _memo;
+}
+
+async function refresh(): Promise<RivenWeapons | null> {
   let items: Record<string, string> | null;
   try {
     items = parseItems(
@@ -80,23 +90,19 @@ async function refresh(): Promise<ReadonlySet<string> | null> {
     return null;
   }
   const fetchedAt = Date.now();
-  _memo = { fetchedAt, slugs: new Set(Object.keys(items)) };
+  const weapons = memoize(fetchedAt, items);
   cache.write({ fetchedAt, items });
   _loggedFailure = false;
-  return _memo.slugs;
+  return weapons;
 }
 
-/** The weapons warframe.market runs a riven market for, or null when the list
- *  could not be obtained. A stale cache is never served on a failed refresh:
- *  null fails open, while an outdated set would reject a newly listed weapon. */
-export async function getRivenWeaponSlugs(): Promise<ReadonlySet<string> | null> {
+async function load(): Promise<RivenWeapons | null> {
   const now = Date.now();
-  if (_memo && now - _memo.fetchedAt < CACHE_TTL_MS) return _memo.slugs;
+  if (_memo && now - _memo.fetchedAt < CACHE_TTL_MS) return _memo;
   if (!_memo) {
     const cached = cache.read();
     if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
-      _memo = { fetchedAt: cached.fetchedAt, slugs: new Set(Object.keys(cached.items)) };
-      return _memo.slugs;
+      return memoize(cached.fetchedAt, cached.items);
     }
   }
   if (_inFlight) return _inFlight;
@@ -104,6 +110,11 @@ export async function getRivenWeaponSlugs(): Promise<ReadonlySet<string> | null>
     _inFlight = null;
   });
   return _inFlight;
+}
+
+// A failed refresh returns null; a stale set would reject a newly listed weapon.
+export async function getRivenWeaponSlugs(): Promise<ReadonlySet<string> | null> {
+  return (await load())?.slugs ?? null;
 }
 
 /** null means the list is unavailable, so callers must fail open rather than

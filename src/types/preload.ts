@@ -198,7 +198,9 @@ export interface PreloadAPI {
   runHelperNow: () => Promise<IpcInvokeMap["runHelperNow"]["return"]>;
   downloadHelper: () => Promise<IpcInvokeMap["downloadHelper"]["return"]>;
   getRivens: () => Promise<IpcInvokeMap["getRivens"]["return"]>;
-  getRivenWeaponNames: () => Promise<IpcInvokeMap["getRivenWeaponNames"]["return"]>;
+  getRivenWeaponNames: (
+    ...args: IpcInvokeMap["getRivenWeaponNames"]["args"]
+  ) => Promise<IpcInvokeMap["getRivenWeaponNames"]["return"]>;
   getRivenStatOptions: () => Promise<IpcInvokeMap["getRivenStatOptions"]["return"]>;
   searchRivenAuctions: (
     weaponName: string,
