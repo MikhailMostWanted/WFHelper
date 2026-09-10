@@ -168,6 +168,12 @@ app.commandLine.appendSwitch("log-level", "3");
 // Software compositing avoids idle GPU use; grayscale text avoids LCD color fringes.
 // Its X11 presenter can fail under XWayland, so WFHELPER_ENABLE_GPU=1 keeps the GPU path.
 app.commandLine.appendSwitch("disable-lcd-text");
+
+// A wayland portal that never answers leaves getDisplayMedia pending; the X11 capturer
+// needs no portal. WFHELPER_PORTAL_CAPTURE=1 puts a portal-only compositor back on it.
+if (DISPLAY_BACKEND === "x11" && process.env.WFHELPER_PORTAL_CAPTURE !== "1") {
+  app.commandLine.appendSwitch("disable-features", "WebRTCPipeWireCapturer");
+}
 const GPU_ACCELERATION_ENABLED = process.env.WFHELPER_ENABLE_GPU === "1";
 if (!GPU_ACCELERATION_ENABLED) app.disableHardwareAcceleration();
 
