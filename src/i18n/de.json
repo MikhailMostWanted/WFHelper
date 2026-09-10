@@ -1940,6 +1940,7 @@
   "marketAlerts.title": "Marktalarme",
   "marketAlerts.newRule": "Neue Regel",
   "marketAlerts.allowedNegatives": "Tolerierte negative Werte",
+  "marketAlerts.excludedNegatives": "Ausgeschlossene negative Werte",
   "marketAlerts.godRollSkipped": "Nicht auf warframe.market: {stats}",
   "marketAlerts.godRollOptional": "Optional: {stats}",
   "marketAlerts.godRollPickGroup": "God-Roll auswählen",

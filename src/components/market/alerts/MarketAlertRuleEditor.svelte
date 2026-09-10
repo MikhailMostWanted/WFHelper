@@ -78,6 +78,7 @@
   let requirePositive = $state<string[]>([...(riven?.requirePositive ?? [])]);
   let requireNegative = $state<string[]>([...(riven?.requireNegative ?? [])]);
   let allowedNegatives = $state<string[]>([...(riven?.allowedNegatives ?? [])]);
+  let excludeNegatives = $state<string[]>([...(riven?.excludeNegatives ?? [])]);
   let excludeAttributes = $state<string[]>([...(riven?.excludeAttributes ?? [])]);
   let statBounds = $state<Array<{ attribute: string; min: string; max: string }>>(
     (riven?.statBounds ?? []).map((b) => ({
@@ -276,6 +277,7 @@
     };
     // An empty list is "no restriction", which the absent field already means.
     if (allowedNegatives.length > 0) match.allowedNegatives = allowedNegatives;
+    if (excludeNegatives.length > 0) match.excludeNegatives = excludeNegatives;
     if (curseMode === "required") match.hasNegative = true;
     if (curseMode === "forbidden") match.hasNegative = false;
     if (includeBidOnly) match.includeBidOnly = true;
@@ -575,6 +577,9 @@
       })}
       {@render statPicker("marketAlerts.allowedNegatives", allowedNegatives, (next) => {
         allowedNegatives = next;
+      })}
+      {@render statPicker("marketAlerts.excludedNegatives", excludeNegatives, (next) => {
+        excludeNegatives = next;
       })}
       {@render statPicker("marketAlerts.excludedStats", excludeAttributes, (next) => {
         excludeAttributes = next;

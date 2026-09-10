@@ -400,6 +400,9 @@ function matchRivenAuction(match: RivenAlertMatch, auction: AuctionView): boolea
       }
     }
   }
+  for (const stat of match.excludeNegatives ?? []) {
+    if (negatives.has(stat)) return false;
+  }
   if (match.hasNegative === true && negatives.size === 0) return false;
   if (match.hasNegative === false && negatives.size > 0) return false;
 

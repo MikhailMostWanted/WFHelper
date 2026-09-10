@@ -1939,6 +1939,7 @@
   "marketAlerts.title": "市场警报中心",
   "marketAlerts.newRule": "新建规则",
   "marketAlerts.allowedNegatives": "可接受的负面属性",
+  "marketAlerts.excludedNegatives": "排除的负面属性",
   "marketAlerts.godRollSkipped": "warframe.market 不支持：{stats}",
   "marketAlerts.godRollOptional": "加分项：{stats}",
   "marketAlerts.godRollPickGroup": "选择一组完美词条",

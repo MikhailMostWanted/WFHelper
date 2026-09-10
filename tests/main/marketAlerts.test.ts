@@ -270,6 +270,31 @@ describe("riven rule evaluation", () => {
     expect(mocks.dispatchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects a curse the rule excludes and keeps the same stat as a buff", async () => {
+    mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "cursed" }]));
+    saveOk(rivenRuleRaw({ riven: { excludeNegatives: ["zoom"] } }));
+    initEngine();
+    await runMarketAlertTickForTest();
+    expect(mocks.dispatchMock).not.toHaveBeenCalled();
+
+    // excludeAttributes would also reject +Zoom; excludeNegatives is curse-only.
+    mocks.requestMock.mockResolvedValue(
+      auctionPayload([
+        {
+          id: "buffed",
+          attributes: [
+            { url_name: "critical_chance", value: 120, positive: true },
+            { url_name: "zoom", value: 40, positive: true },
+          ],
+        },
+      ]),
+    );
+    saveOk(rivenRuleRaw({ riven: { excludeNegatives: ["zoom"] } }));
+    initEngine();
+    await runMarketAlertTickForTest();
+    expect(mocks.dispatchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects a curse outside allowedNegatives", async () => {
     mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "harmful" }]));
     saveOk(rivenRuleRaw({ riven: { allowedNegatives: ["recoil"] } }));

@@ -1957,6 +1957,7 @@
   "marketAlerts.title": "Market Alerts",
   "marketAlerts.newRule": "New rule",
   "marketAlerts.allowedNegatives": "Tolerated negative stats",
+  "marketAlerts.excludedNegatives": "Excluded negative stats",
   "marketAlerts.godRollSkipped": "Not on warframe.market: {stats}",
   "marketAlerts.godRollOptional": "Nice to have: {stats}",
   "marketAlerts.godRollPickGroup": "Pick a god roll",

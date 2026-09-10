@@ -61,6 +61,9 @@ export interface RivenAlertMatch {
    *  no restriction; a non-empty list rejects any other curse and still accepts
    *  a clean roll. requireNegative counts as tolerated without being listed. */
   allowedNegatives?: string[];
+  /** Curses the roll must not carry. A blacklist, unlike excludeAttributes,
+   *  which also rejects the stat as a buff. */
+  excludeNegatives?: string[];
   /** Attributes that must not appear on either side. */
   excludeAttributes: string[];
   /** true = the roll must carry a curse, false = must not, absent = either. */
@@ -271,6 +274,7 @@ const RIVEN_MATCH_KEYS = [
   "requirePositive",
   "requireNegative",
   "allowedNegatives",
+  "excludeNegatives",
   "excludeAttributes",
   "hasNegative",
   "minSimilarityPct",
@@ -350,6 +354,12 @@ function parseRivenMatch(value: unknown): MarketAlertParseResult<RivenAlertMatch
     const allowedNegatives = readAttributeList(value, "allowedNegatives");
     if (!allowedNegatives.ok) return fail(`riven ${allowedNegatives.error}`);
     match.allowedNegatives = allowedNegatives.value;
+  }
+
+  if (value.excludeNegatives !== undefined) {
+    const excludeNegatives = readAttributeList(value, "excludeNegatives");
+    if (!excludeNegatives.ok) return fail(`riven ${excludeNegatives.error}`);
+    match.excludeNegatives = excludeNegatives.value;
   }
 
   if (value.hasNegative !== undefined) {

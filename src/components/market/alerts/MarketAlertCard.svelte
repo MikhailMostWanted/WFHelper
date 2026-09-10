@@ -50,6 +50,7 @@
   const positives = $derived(rule.riven?.requirePositive ?? []);
   const negatives = $derived(rule.riven?.requireNegative ?? []);
   const tolerated = $derived(rule.riven?.allowedNegatives ?? []);
+  const excludedCurses = $derived(rule.riven?.excludeNegatives ?? []);
   const excluded = $derived(rule.riven?.excludeAttributes ?? []);
   const bounds = $derived(rule.riven?.statBounds ?? []);
   const kindLabel = $derived(
@@ -140,7 +141,7 @@
     </div>
   {/if}
 
-  {#if positives.length + negatives.length + tolerated.length + excluded.length + bounds.length > 0}
+  {#if positives.length + negatives.length + tolerated.length + excludedCurses.length + excluded.length + bounds.length > 0}
     <div class="flex flex-wrap gap-1" data-alert-stats>
       {#each positives as stat (stat)}
         <span class={positiveChip} title={$tr("marketAlerts.requiredPositive")}
@@ -157,6 +158,13 @@
           class={toleratedChip}
           title={$tr("marketAlerts.allowedNegatives")}
           data-alert-allowed-negative={stat}>{statLabel(stat, statOptions)}</span
+        >
+      {/each}
+      {#each excludedCurses as stat (stat)}
+        <span
+          class={excludedChip}
+          title={$tr("marketAlerts.excludedNegatives")}
+          data-alert-excluded-negative={stat}>{statLabel(stat, statOptions)}</span
         >
       {/each}
       {#each bounds as bound (bound.attribute)}
