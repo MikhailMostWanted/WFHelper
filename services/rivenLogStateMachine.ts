@@ -55,7 +55,8 @@ let _rivenPendingDialog: "roll_confirm" | "choice" | null = null;
 let _rivenSessionActive = false;
 let _rivenSessionStartedAt = 0;
 let _rivenSessionIdleTimer: ReturnType<typeof setTimeout> | null = null;
-const RIVEN_SESSION_IDLE_TIMEOUT_MS = 120_000;
+// Backstop for a missed close marker, not a screen-idle detector: only riven events reset it.
+const RIVEN_SESSION_IDLE_TIMEOUT_MS = 600_000;
 // The idle timeout cannot cap active rolling because every match resets it.
 // Force-close sessions at 30 minutes even while matches continue.
 const RIVEN_SESSION_MAX_MS = 30 * 60_000;

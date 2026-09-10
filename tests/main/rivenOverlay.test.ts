@@ -1260,8 +1260,12 @@ describe("riven session idle timeout", () => {
     processRivenPatterns(openLine, "dbwin", true);
     expect(closes).toBe(0);
 
-    // No close marker ever arrives - the 120s idle backstop must close the overlay.
+    // A long read of the panels must not close them; only the backstop may.
     vi.advanceTimersByTime(120_000);
+    expect(closes).toBe(0);
+
+    // No close marker ever arrives - the idle backstop must close the overlay.
+    vi.advanceTimersByTime(480_000);
     expect(closes).toBe(1);
   });
 });
