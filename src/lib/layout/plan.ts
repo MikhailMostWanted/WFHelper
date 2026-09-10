@@ -145,9 +145,9 @@ export function normalizeLayoutState(raw: unknown): LayoutStateV1 {
 }
 
 /** Up or down steps one slot, a number is an absolute index into this list, and
-    `{ toId }` takes the slot that section holds right now. A drag can only name
-    the section it landed on, never an index: a grid renders a subset of the
-    view, so its own indices do not line up with the full list. */
+    `{ toId }` takes the slot that section holds right now. A drag resolves its
+    own index from the full list: a grid renders a subset of the view, so the
+    grid's indices do not line up. */
 export type SectionMoveTarget = "up" | "down" | number | { toId: string };
 
 function targetIndex(
