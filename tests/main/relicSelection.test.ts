@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RELIC_RECOMMENDATIONS } from "../../config/shared/ipcChannels";
+import { getOverlayDescriptor } from "../../config/shared/overlayLayout";
 import type { OverlaySettings } from "../../config/runtime/overlaySettings";
 import { createRelicSelectionController } from "../../ipc/overlay/relicSelection";
 import { detectRelicEraFromBandText } from "../../services/rewardScannerMatch";
@@ -36,7 +37,10 @@ describe("relic selection planner", () => {
     }
   });
 
-  function makeRewardController() {
+  function makeRewardController(shape?: {
+    rarities?: readonly string[];
+    chances?: readonly number[];
+  }) {
     const relic = "/Lotus/Types/Game/Projections/LithTestIntact";
     const blueprint = "/Lotus/Types/Recipes/TestPrimeBlueprint";
     const ctx = {
@@ -54,9 +58,9 @@ describe("relic selection planner", () => {
       uniqueName: index === 1 ? null : blueprint,
       imageUrl: "https://assets.wfhelper.com/test.png",
       urlName: `test_reward_${index}`,
-      chance: 100 / 7,
+      chance: shape?.chances?.[index] ?? 100 / 7,
       ducats: 15,
-      rarity: "Common",
+      rarity: shape?.rarities?.[index] ?? "Common",
     }));
     const controller = createRelicSelectionController({
       eraStartDelayMs: 0,
@@ -98,6 +102,8 @@ describe("relic selection planner", () => {
             ownedCount: number | null;
             name: string;
             imageUrl: string | null;
+            rarity: string | null;
+            chance: number;
           }>;
         }>;
       };
@@ -136,6 +142,58 @@ describe("relic selection planner", () => {
     expect(latest().rows[0].rewards[0].ownedCount).toBe(3);
     expect(first.rows[0].rewards[0].ownedCount).toBe(2);
     expect(prices).toHaveBeenCalledTimes(priceCalls);
+  });
+
+  it("sends the six planner rewards rarity first, then by descending chance", async () => {
+    const { latest, trigger } = makeRewardController({
+      rarities: ["Common", "Uncommon", "Rare", "Common", "Uncommon", "Common", "Common"],
+      chances: [10, 20, 2, 11, 21, 12, 13],
+    });
+    await trigger();
+    const rewards = latest().rows[0].rewards;
+    expect(rewards.map((reward) => reward.rarity)).toEqual([
+      "Rare",
+      "Uncommon",
+      "Uncommon",
+      "Common",
+      "Common",
+      "Common",
+    ]);
+    expect(rewards.map((reward) => reward.name)).toEqual([
+      "Test reward 2",
+      "Test reward 4",
+      "Test reward 1",
+      "Test reward 6",
+      "Test reward 5",
+      "Test reward 3",
+    ]);
+  });
+
+  it("sends each slot the rarity the overlay editor labels it with", async () => {
+    const { latest, trigger } = makeRewardController({
+      rarities: ["Common", "Uncommon", "Rare", "Common", "Uncommon", "Common", "Common"],
+      chances: [10, 20, 2, 11, 21, 12, 13],
+    });
+    await trigger();
+    const labels = getOverlayDescriptor("planner").labels;
+    const labelled = latest().rows[0].rewards.map((_, index) =>
+      labels[`reward${index}Name`].key.replace(/^overlayEditor\.field\.reward|Name$/g, ""),
+    );
+
+    expect(labelled).toEqual(latest().rows[0].rewards.map((reward) => reward.rarity));
+  });
+
+  it("keeps the source order for rewards of equal rarity and chance", async () => {
+    const { latest, trigger } = makeRewardController();
+    await trigger();
+    expect(latest().rows[0].rewards.map((reward) => reward.name)).toEqual([
+      "Test reward 0",
+      "Test reward 1",
+      "Test reward 2",
+      "Test reward 3",
+      "Test reward 4",
+      "Test reward 5",
+    ]);
   });
 
   it("does not retain cached owned recommendations when inventory becomes unavailable", async () => {

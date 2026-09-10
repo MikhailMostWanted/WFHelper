@@ -365,6 +365,27 @@ function getCacheFileMtimeMs(fs: typeof import("node:fs"), cacheFilePath: string
   }
 }
 
+const REWARD_RARITY_RANK: Readonly<Record<string, number>> = Object.freeze({
+  rare: 0,
+  uncommon: 1,
+  common: 2,
+});
+
+function rewardRarityRank(rarity: string | null | undefined): number {
+  return REWARD_RARITY_RANK[String(rarity ?? "").toLowerCase()] ?? 3;
+}
+
+/** Rare first: the overlay editor names planner slot n after the rarity it shows. */
+function sortRewardsByRarity<T extends { rarity?: string | null; chance?: number }>(
+  rewards: readonly T[],
+): T[] {
+  return rewards.slice().sort((a, b) => {
+    const rank = rewardRarityRank(a.rarity) - rewardRarityRank(b.rarity);
+    if (rank !== 0) return rank;
+    return (b.chance ?? 0) - (a.chance ?? 0);
+  });
+}
+
 function pickBestOwnedQuality(
   group: RelicGroup,
   ownedRow: OwnedCountRow,
@@ -423,15 +444,17 @@ function pickBestOwnedQuality(
       platEv,
       ducatEv,
       vaulted: Boolean(group.vaulted),
-      rewards: normalizedRewards.slice(0, 6).map((reward) => ({
-        uniqueName: reward.uniqueName || null,
-        name: reward.name || "",
-        imageUrl: reward.imageUrl || null,
-        urlName: normalizeWfmSlugKey(reward.urlName) || null,
-        rarity: reward.rarity || null,
-        chance: reward.chance,
-        ownedCount: null,
-      })),
+      rewards: sortRewardsByRarity(normalizedRewards)
+        .slice(0, 6)
+        .map((reward) => ({
+          uniqueName: reward.uniqueName || null,
+          name: reward.name || "",
+          imageUrl: reward.imageUrl || null,
+          urlName: normalizeWfmSlugKey(reward.urlName) || null,
+          rarity: reward.rarity || null,
+          chance: reward.chance,
+          ownedCount: null,
+        })),
     };
 
     if (!best) {

@@ -91,10 +91,18 @@ type OverlayFieldLabelKey =
   | "overlayEditor.field.relicName"
   | "overlayEditor.field.reputationText"
   | "overlayEditor.field.rescanButton"
-  | "overlayEditor.field.rewardChance"
-  | "overlayEditor.field.rewardIcon"
-  | "overlayEditor.field.rewardName"
-  | "overlayEditor.field.rewardOwned"
+  | "overlayEditor.field.rewardCommonChance"
+  | "overlayEditor.field.rewardCommonIcon"
+  | "overlayEditor.field.rewardCommonName"
+  | "overlayEditor.field.rewardCommonOwned"
+  | "overlayEditor.field.rewardRareChance"
+  | "overlayEditor.field.rewardRareIcon"
+  | "overlayEditor.field.rewardRareName"
+  | "overlayEditor.field.rewardRareOwned"
+  | "overlayEditor.field.rewardUncommonChance"
+  | "overlayEditor.field.rewardUncommonIcon"
+  | "overlayEditor.field.rewardUncommonName"
+  | "overlayEditor.field.rewardUncommonOwned"
   | "overlayEditor.field.rollBadge"
   | "overlayEditor.field.rotations"
   | "overlayEditor.field.saturationLabel"
@@ -255,10 +263,6 @@ const fieldLabelKeys = {
   platinumValue: "common.platinum",
   ducatIcon: "rewardEditor.ducatIcon",
   ducatValue: "common.ducats",
-  rewardIcon: "overlayEditor.field.rewardIcon",
-  rewardName: "overlayEditor.field.rewardName",
-  rewardChance: "overlayEditor.field.rewardChance",
-  rewardOwned: "overlayEditor.field.rewardOwned",
   scanSpinner: "rewardEditor.scanSpinner",
   scanText: "rewardEditor.scanText",
   errorText: "rewardEditor.errorText",
@@ -375,6 +379,48 @@ const plannerFields = [
   "dragHint",
   "closeButton",
 ] as const;
+const rewardRarityLabelKeys = {
+  Rare: {
+    Icon: "overlayEditor.field.rewardRareIcon",
+    Name: "overlayEditor.field.rewardRareName",
+    Chance: "overlayEditor.field.rewardRareChance",
+    Owned: "overlayEditor.field.rewardRareOwned",
+  },
+  Uncommon: {
+    Icon: "overlayEditor.field.rewardUncommonIcon",
+    Name: "overlayEditor.field.rewardUncommonName",
+    Chance: "overlayEditor.field.rewardUncommonChance",
+    Owned: "overlayEditor.field.rewardUncommonOwned",
+  },
+  Common: {
+    Icon: "overlayEditor.field.rewardCommonIcon",
+    Name: "overlayEditor.field.rewardCommonName",
+    Chance: "overlayEditor.field.rewardCommonChance",
+    Owned: "overlayEditor.field.rewardCommonOwned",
+  },
+} as const;
+// Slot order matches the rarity sort in ipc/overlay/relicSelection.ts.
+const PLANNER_REWARD_SLOTS = [
+  { rarity: "Rare" },
+  { rarity: "Uncommon", number: 1 },
+  { rarity: "Uncommon", number: 2 },
+  { rarity: "Common", number: 1 },
+  { rarity: "Common", number: 2 },
+  { rarity: "Common", number: 3 },
+] as const;
+const REWARD_FIELD_ROLES = ["Icon", "Name", "Chance", "Owned"] as const;
+function plannerLabels(): OverlayDescriptor["labels"] {
+  const result = fieldLabels(plannerFields.filter((field) => !/^reward\d/.test(field)));
+  PLANNER_REWARD_SLOTS.forEach((slot, index) => {
+    for (const role of REWARD_FIELD_ROLES) {
+      result[`reward${index}${role}`] = {
+        key: rewardRarityLabelKeys[slot.rarity][role],
+        ...("number" in slot ? { number: slot.number } : {}),
+      };
+    }
+  });
+  return result;
+}
 const rivenFields = [
   "panelLabel",
   "weaponName",
@@ -490,7 +536,7 @@ const descriptors: Record<OverlayLayoutKind, OverlayDescriptor> = {
     canvas: { width: 460, height: 640 },
     fields: plannerFields,
     hiddenByDefault: plannerFields.filter((field) => /^reward\d/.test(field)),
-    labels: fieldLabels(plannerFields),
+    labels: plannerLabels(),
     variants: [
       { value: "recommendations", key: "overlayEditor.preview.recommendations" },
       { value: "missing", key: "rewardEditor.previewMissing" },

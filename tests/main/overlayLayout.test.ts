@@ -45,6 +45,30 @@ describe("overlay layout boundaries", () => {
     expect(descriptor.fields).toContain(descriptor.defaultSelectedField);
   });
 
+  it("names planner reward slots by rarity while keeping the field ids", () => {
+    const descriptor = getOverlayDescriptor("planner");
+    expect([0, 1, 2, 3, 4, 5].map((index) => descriptor.labels[`reward${index}Name`])).toEqual([
+      { key: "overlayEditor.field.rewardRareName" },
+      { key: "overlayEditor.field.rewardUncommonName", number: 1 },
+      { key: "overlayEditor.field.rewardUncommonName", number: 2 },
+      { key: "overlayEditor.field.rewardCommonName", number: 1 },
+      { key: "overlayEditor.field.rewardCommonName", number: 2 },
+      { key: "overlayEditor.field.rewardCommonName", number: 3 },
+    ]);
+    // Saved layouts key off the ids, so only the labels changed.
+    expect(descriptor.fields).toContain("reward0Icon");
+    expect(descriptor.fields).toContain("reward5Owned");
+    expect(descriptor.labels.reward3Chance).toEqual({
+      key: "overlayEditor.field.rewardCommonChance",
+      number: 1,
+    });
+    // A reward-scanner slot is a card position on screen and carries no rarity.
+    expect(getOverlayDescriptor("reward").labels.part0Icon).toEqual({
+      key: "rewardEditor.partIcon",
+      number: 1,
+    });
+  });
+
   it("keeps reward v1 layouts compatible and isolates other surfaces", () => {
     const value = {
       version: 1,
