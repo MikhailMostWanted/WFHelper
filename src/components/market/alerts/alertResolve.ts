@@ -201,10 +201,12 @@ export function criteriaChips(rule: MarketAlertRule): AlertChip[] {
       // "Required" alone says nothing about what is required, so the chip names
       // the criterion and carries the answer as its value.
       chips.push({
-        id: "curse",
-        titleKey: "marketAlerts.curse",
-        labelKey: "marketAlerts.curse",
-        textKey: riven.hasNegative ? "marketAlerts.curseRequired" : "marketAlerts.curseForbidden",
+        id: "negative",
+        titleKey: "marketAlerts.negative",
+        labelKey: "marketAlerts.negative",
+        textKey: riven.hasNegative
+          ? "marketAlerts.negativeRequired"
+          : "marketAlerts.negativeForbidden",
       });
     }
   }

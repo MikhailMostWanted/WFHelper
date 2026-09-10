@@ -86,7 +86,7 @@
       max: b.max !== undefined ? String(b.max) : "",
     })),
   );
-  let curseMode = $state<"any" | "required" | "forbidden">(
+  let negativeMode = $state<"any" | "required" | "forbidden">(
     riven?.hasNegative === true ? "required" : riven?.hasNegative === false ? "forbidden" : "any",
   );
   let similarityPct = $state(
@@ -276,8 +276,8 @@
     // An empty list is "no restriction", which the absent field already means.
     if (allowedNegatives.length > 0) match.allowedNegatives = allowedNegatives;
     if (excludeNegatives.length > 0) match.excludeNegatives = excludeNegatives;
-    if (curseMode === "required") match.hasNegative = true;
-    if (curseMode === "forbidden") match.hasNegative = false;
+    if (negativeMode === "required") match.hasNegative = true;
+    if (negativeMode === "forbidden") match.hasNegative = false;
     if (includeBidOnly) match.includeBidOnly = true;
     const optional: Array<[keyof RivenAlertMatch, number | undefined]> = [
       ["minSimilarityPct", numOrUndef(similarityPct)],
@@ -375,9 +375,17 @@
   }
 </script>
 
-{#snippet statPicker(labelKey: MessageKey, list: string[], set: (next: string[]) => void)}
+{#snippet statPicker(
+  labelKey: MessageKey,
+  list: string[],
+  set: (next: string[]) => void,
+  hintKey?: MessageKey,
+)}
   <div class="text-sm">
     <span class="text-text-secondary">{$tr(labelKey)}</span>
+    {#if hintKey}
+      <span class="ml-2 text-xs text-text-muted">{$tr(hintKey)}</span>
+    {/if}
     <div class="mt-1 flex flex-wrap items-center gap-1.5">
       {#each list as stat (stat)}
         <span class="flex items-center gap-1 rounded-full border border-border px-2 py-0.5">
@@ -517,11 +525,11 @@
     {#if kind === "riven"}
       <div class="grid gap-3 md:grid-cols-2">
         <label class="flex flex-col gap-1 text-sm">
-          <span class="text-text-secondary">{$tr("marketAlerts.curse")}</span>
-          <select class="shared-filter-select" bind:value={curseMode}>
+          <span class="text-text-secondary">{$tr("marketAlerts.negative")}</span>
+          <select class="shared-filter-select" bind:value={negativeMode}>
             <option value="any">{$tr("filters.any")}</option>
-            <option value="required">{$tr("marketAlerts.curseRequired")}</option>
-            <option value="forbidden">{$tr("marketAlerts.curseForbidden")}</option>
+            <option value="required">{$tr("marketAlerts.negativeRequired")}</option>
+            <option value="forbidden">{$tr("marketAlerts.negativeForbidden")}</option>
           </select>
         </label>
       </div>
@@ -573,12 +581,22 @@
       {@render statPicker("marketAlerts.allowedNegatives", allowedNegatives, (next) => {
         allowedNegatives = next;
       })}
-      {@render statPicker("marketAlerts.excludedNegatives", excludeNegatives, (next) => {
-        excludeNegatives = next;
-      })}
-      {@render statPicker("marketAlerts.excludedStats", excludeAttributes, (next) => {
-        excludeAttributes = next;
-      })}
+      {@render statPicker(
+        "marketAlerts.excludedNegatives",
+        excludeNegatives,
+        (next) => {
+          excludeNegatives = next;
+        },
+        "marketAlerts.excludedNegativesHint",
+      )}
+      {@render statPicker(
+        "marketAlerts.excludedStats",
+        excludeAttributes,
+        (next) => {
+          excludeAttributes = next;
+        },
+        "marketAlerts.excludedStatsHint",
+      )}
 
       <div class="text-sm">
         <span class="text-text-secondary">{$tr("marketAlerts.statBounds")}</span>
