@@ -191,9 +191,7 @@ function cleanLocTag(raw: string): string {
   return cleaned;
 }
 
-// DE states a weapon's mod class through the archetype it inherits from, not
-// through holsterCategory: Drakgoon, Convectrix and Phage holster as WIDE_RIFLE
-// and Bubonico as ARM_MOUNTED, yet all four take shotgun mods and shotgun rivens.
+// Mod class comes from the inherited archetype, not holsterCategory: Drakgoon holsters WIDE_RIFLE.
 function hasShotgunAncestor(
   uniqueName: string,
   weapons: Record<string, { parentName?: unknown }>,
@@ -334,8 +332,6 @@ export function resolveRivenType(weaponName: string): string | null {
 
   const cat = info.productCategory;
 
-  // A LongGun is a shotgun by holsterCategory, by compatibility tag or by
-  // ancestry; the tag check stays for exports that carry neither of the others.
   if (
     cat === "LongGuns" &&
     (info.holsterCategory === "SHOTGUN" ||
@@ -558,6 +554,9 @@ export interface WeaponLabelMatch {
 /** Matches whole OCR lines against the weapon list. The panel caption holds
  * nothing but a weapon name, so unlike findWeaponInText only a full-line hit
  * counts; that is what keeps FITS IN, CANCEL and stat rows from ever matching. */
+// Shortest plate line a one-letter miss may match: Akzani is six characters.
+const MIN_FUZZY_LABEL_CHARS = 5;
+
 export function findWeaponByLabelLine(lines: string[]): WeaponLabelMatch | null {
   ensureBuilt();
   let best: { name: string; exact: boolean; len: number; distance: number } | null = null;
@@ -573,22 +572,28 @@ export function findWeaponByLabelLine(lines: string[]): WeaponLabelMatch | null 
       continue;
     }
 
-    // One misread letter is tolerable on long names; short ones must be exact.
-    if (norm.length < 8 || best?.exact) continue;
+    if (norm.length < MIN_FUZZY_LABEL_CHARS || best?.exact) continue;
     const maxDistance = norm.length >= 14 ? 2 : 1;
+    let lineBest: { name: string; distance: number } | null = null;
+    let ambiguous = false;
     for (const [normalizedWeapon, displayName] of _weaponDisplayNamesNormalized) {
       if (Math.abs(normalizedWeapon.length - norm.length) > maxDistance) continue;
       const distance = levenshteinDistance(norm, normalizedWeapon);
       if (distance > maxDistance) continue;
-      // Closest read first, then the longest line; a one-letter miss must not
-      // lose to a two-letter miss found earlier in the map.
-      if (
-        !best ||
-        distance < best.distance ||
-        (distance === best.distance && norm.length > best.len)
-      ) {
-        best = { name: displayName, exact: false, len: norm.length, distance };
+      if (!lineBest || distance < lineBest.distance) {
+        lineBest = { name: displayName, distance };
+        ambiguous = false;
+      } else if (distance === lineBest.distance && displayName !== lineBest.name) {
+        ambiguous = true;
       }
+    }
+    if (!lineBest || ambiguous) continue;
+    if (
+      !best ||
+      lineBest.distance < best.distance ||
+      (lineBest.distance === best.distance && norm.length > best.len)
+    ) {
+      best = { name: lineBest.name, exact: false, len: norm.length, distance: lineBest.distance };
     }
   }
   return best ? { name: best.name, exact: best.exact } : null;

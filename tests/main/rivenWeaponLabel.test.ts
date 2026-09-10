@@ -48,10 +48,31 @@ describe("findWeaponByLabelLine", () => {
     expect(findWeaponByLabelLine(["MK1-Braton"])).toEqual({ name: "MK1-Braton", exact: true });
   });
 
-  it("tolerates one misread letter on long names only", () => {
+  it("tolerates one misread letter down to five characters", () => {
     expect(findWeaponByLabelLine(["Kuva Sobck"])).toEqual({ name: "Kuva Sobek", exact: false });
-    // Short names must be exact; "Lat0" could be too many things.
+    // Both from a field log where the plate read but the match was refused.
+    expect(findWeaponByLabelLine(["FTSIN", "vuiklok"])).toEqual({
+      name: "Vulklok",
+      exact: false,
+    });
+    expect(findWeaponByLabelLine(["FITS IN", "Akzanl"])).toEqual({
+      name: "Akzani",
+      exact: false,
+    });
+    // Four characters is still too short to guess from.
     expect(findWeaponByLabelLine(["Lat0"])).toBeNull();
+  });
+
+  it("drops a line that fits two weapons equally well", () => {
+    // "boltr" is one edit from both Bolto and Boltor.
+    expect(findWeaponByLabelLine(["boltr"])).toBeNull();
+  });
+
+  it("reads nothing out of the plate's headings and stat rows", () => {
+    expect(findWeaponByLabelLine(["FITS IN", "FTSIN", "WFTSIN"])).toBeNull();
+    expect(
+      findWeaponByLabelLine(["Multishot7", "Magazine27", "Reloado 1s", "toxicron"]),
+    ).toBeNull();
   });
 
   it("prefers the longest exact hit", () => {
