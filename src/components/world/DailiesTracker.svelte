@@ -33,6 +33,7 @@
     loadTracker,
     pruneDynamicProgress,
     removeCustomTask,
+    resetTrackerCustomization,
     saveTracker,
     setTrackerCount,
     setTrackerPeriod,
@@ -685,6 +686,15 @@
         <span class="text-xs text-text-secondary"
           >{$tr("dailies.hiddenCount", { count: String(tracker.hidden.length) })}</span
         >
+      {/if}
+      {#if editing}
+        <button
+          class="btn-secondary btn-sm"
+          data-tracker-reset
+          onclick={() => commit(resetTrackerCustomization(tracker))}
+        >
+          {$tr("settings.resetDefaults")}
+        </button>
       {/if}
       <input
         class="dailies-input dailies-name-input"

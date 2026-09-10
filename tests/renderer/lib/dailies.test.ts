@@ -8,6 +8,7 @@ import {
   loadTracker,
   pruneDynamicProgress,
   removeCustomTask,
+  resetTrackerCustomization,
   saveTracker,
   setTrackerCount,
   setTrackerPeriod,
@@ -216,6 +217,26 @@ describe("custom tasks", () => {
   it("leaves the state untouched when the id is not a custom task", () => {
     const state = emptyState();
     expect(removeCustomTask(state, "sortie")).toBe(state);
+  });
+});
+
+describe("resetTrackerCustomization", () => {
+  it("clears hidden entries and period overrides while ticks and custom tasks survive", () => {
+    let state = addCustomTask(emptyState(), "Kuva farm", "daily");
+    const id = state.custom[0].id;
+    state = setTrackerCount(state, "netracells", "weekly:x", 2);
+    state = setTrackerCount(state, id, "daily:x", 1);
+    state = toggleTrackerHidden(state, "deepArchimedea");
+    state = toggleTrackerHidden(state, "section:vendors");
+    state = setTrackerPeriod(state, "palladino", "daily");
+
+    const reset = resetTrackerCustomization(state);
+
+    expect(reset.hidden).toEqual([]);
+    expect(reset.periods).toEqual({});
+    expect(reset.progress).toEqual(state.progress);
+    expect(reset.custom).toEqual(state.custom);
+    expect(reset.seq).toBe(state.seq);
   });
 });
 

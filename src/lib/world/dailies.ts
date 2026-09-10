@@ -451,6 +451,10 @@ export function toggleTrackerHidden(state: TrackerState, id: string): TrackerSta
   return { ...state, hidden };
 }
 
+export function resetTrackerCustomization(state: TrackerState): TrackerState {
+  return { ...state, hidden: [], periods: {} };
+}
+
 export function setTrackerPeriod(
   state: TrackerState,
   id: string,
