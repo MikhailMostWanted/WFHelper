@@ -143,11 +143,11 @@
     <!-- Compact counts so nothing clips; the title carries the exact numbers. Fixed
          widths line the numbers up bar to bar. -->
     <span
-      class="material-bar__value relative min-w-[6.25rem] shrink-0 text-right text-xs tabular-nums text-text-primary"
+      class="material-bar__value relative w-[6.25rem] shrink-0 text-right text-xs tabular-nums text-text-primary"
       >{formatNumber(row.owned, $locale)} / {formatNumber(row.needed, $locale)}</span
     >
     <span
-      class="material-bar__value relative min-w-[2.75rem] shrink-0 text-right font-display text-xs tabular-nums text-text-primary"
+      class="material-bar__value relative w-[2.75rem] shrink-0 text-right font-display text-xs tabular-nums text-text-primary"
       >{percent}%</span
     >
   </div>
