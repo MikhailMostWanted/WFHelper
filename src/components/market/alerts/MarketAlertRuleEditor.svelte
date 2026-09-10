@@ -791,16 +791,6 @@
           })}
         </span>
       </label>
-      <div class="flex items-end gap-4 text-sm">
-        <label class="flex items-center gap-1.5">
-          <input type="checkbox" bind:checked={enabled} />
-          {$tr("marketAlerts.enabled")}
-        </label>
-        <label class="flex items-center gap-1.5">
-          <input type="checkbox" bind:checked={native} />
-          {$tr("marketAlerts.desktopNotification")}
-        </label>
-      </div>
       {#if kind === "item"}
         <label class="flex flex-col gap-1 text-sm">
           <span class="text-text-secondary">{$tr("marketAlerts.sellSelection")}</span>
@@ -812,6 +802,16 @@
           </select>
         </label>
       {/if}
+    </div>
+    <div class="flex flex-wrap items-center gap-4 text-sm">
+      <label class="flex items-center gap-1.5">
+        <input type="checkbox" bind:checked={enabled} />
+        {$tr("marketAlerts.enabled")}
+      </label>
+      <label class="flex items-center gap-1.5">
+        <input type="checkbox" bind:checked={native} />
+        {$tr("marketAlerts.desktopNotification")}
+      </label>
     </div>
   </section>
 
