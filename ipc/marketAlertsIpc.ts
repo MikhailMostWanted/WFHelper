@@ -22,7 +22,10 @@ import {
   MARKET_ALERTS_STATUS,
   MARKET_ALERTS_TEST_FIRE,
 } from "../config/shared/ipcChannels";
-import { MARKET_ALERT_IMPORT_MAX_BYTES } from "../config/shared/marketAlertTypes";
+import {
+  MARKET_ALERT_IMPORT_MAX_BYTES,
+  MARKET_ALERT_MAX_RULES,
+} from "../config/shared/marketAlertTypes";
 import { toNonEmptyString } from "../config/shared/stringValidation";
 import type {
   MarketAlertImportOutcome,
@@ -155,9 +158,12 @@ function register(): void {
     },
   );
 
-  handleAuthorized(MARKET_ALERTS_EXPORT, assertMainRendererSender, () =>
-    marketAlerts.exportMarketAlertRules(),
-  );
+  handleAuthorized(MARKET_ALERTS_EXPORT, assertMainRendererSender, (_event, ids?: unknown) => {
+    const wanted = Array.isArray(ids)
+      ? ids.filter((id): id is string => typeof id === "string").slice(0, MARKET_ALERT_MAX_RULES)
+      : undefined;
+    return marketAlerts.exportMarketAlertRules(wanted);
+  });
 
   handleAuthorized(
     MARKET_ALERTS_IMPORT,

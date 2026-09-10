@@ -141,7 +141,9 @@ export interface PreloadAPI {
   marketAlertsTestFire: (
     id: IpcInvokeMap["marketAlertsTestFire"]["args"][0],
   ) => Promise<IpcInvokeMap["marketAlertsTestFire"]["return"]>;
-  marketAlertsExport: () => Promise<IpcInvokeMap["marketAlertsExport"]["return"]>;
+  marketAlertsExport: (
+    ...args: IpcInvokeMap["marketAlertsExport"]["args"]
+  ) => Promise<IpcInvokeMap["marketAlertsExport"]["return"]>;
   marketAlertsImport: (
     text: IpcInvokeMap["marketAlertsImport"]["args"][0],
   ) => Promise<IpcInvokeMap["marketAlertsImport"]["return"]>;

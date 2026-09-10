@@ -17,8 +17,11 @@
     statOptions = [],
     lastHitAt = null,
     testing = false,
+    selected,
+    onSelect,
     onToggle,
     onEdit,
+    onDuplicate,
     onDelete,
     onTest,
     onOpenBulkSell,
@@ -29,8 +32,11 @@
     statOptions?: RivenStatOption[];
     lastHitAt?: string | null;
     testing?: boolean;
+    selected: boolean;
+    onSelect: (rule: MarketAlertRule, selected: boolean) => void;
     onToggle: (rule: MarketAlertRule) => void;
     onEdit: (rule: MarketAlertRule) => void;
+    onDuplicate: (rule: MarketAlertRule) => void;
     onDelete: (rule: MarketAlertRule) => void;
     onTest: (rule: MarketAlertRule) => void;
     /** Item rules only; riven and baro rules have nothing to sell. */
@@ -103,6 +109,16 @@
       </div>
       <span class="truncate text-xs text-text-secondary" title={targetName}>{targetName}</span>
     </div>
+
+    <input
+      type="checkbox"
+      class="mt-0.5 shrink-0"
+      checked={selected}
+      title={$tr("marketAlerts.selectForExport")}
+      aria-label={$tr("marketAlerts.selectForExport")}
+      data-alert-select={rule.id}
+      onchange={(event) => onSelect(rule, event.currentTarget.checked)}
+    />
 
     <label class="alert-switch shrink-0" title={$tr("marketAlerts.enabled")}>
       <input
@@ -205,6 +221,11 @@
         onclick={() => onTest(rule)}>{$tr("marketAlerts.testFire")}</button
       >
       <button class="btn-secondary btn-sm" onclick={() => onEdit(rule)}>{$tr("market.edit")}</button
+      >
+      <button
+        class="btn-secondary btn-sm"
+        data-alert-duplicate={rule.id}
+        onclick={() => onDuplicate(rule)}>{$tr("marketAlerts.duplicate")}</button
       >
       <button
         class="btn-danger btn-sm h-7 w-7 px-0 text-sm font-black"

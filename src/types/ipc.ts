@@ -488,7 +488,7 @@ export interface IpcInvokeMap {
     return: MarketAlertTestFireResult;
   };
   marketAlertsExport: {
-    args: [];
+    args: [ids?: string[]];
     return: string;
   };
   marketAlertsImport: {

@@ -9,6 +9,7 @@
   import ItemImage from "../../ItemImage.svelte";
   import { openBulkSellForAlertRule, setAlertSellLink } from "./alertBulkSell.js";
   import { resolveAlertTarget, resolveAlertThumb } from "./alertResolve.js";
+  import { MARKET_ALERT_MAX_NAME_CHARS } from "../../../../config/shared/marketAlertTypes.js";
   import type {
     MarketAlertBinding,
     MarketAlertEngineStatus,
@@ -19,6 +20,7 @@
 
   let rules = $state<MarketAlertRule[]>([]);
   let bindings = $state<Record<string, MarketAlertBinding>>({});
+  let selectedIds = $state<string[]>([]);
   let hits = $state<MarketAlertHit[]>([]);
   let status = $state<MarketAlertEngineStatus | null>(null);
   let statOptions = $state<RivenStatOption[]>([]);
@@ -41,6 +43,8 @@
     ]);
     rules = list.rules;
     bindings = list.bindings;
+    const live = new Set(list.rules.map((rule) => rule.id));
+    selectedIds = selectedIds.filter((id) => live.has(id));
     hits = hitList;
     status = engineStatus;
   }
@@ -149,14 +153,45 @@
     if (saved) await refresh();
   }
 
+  function selectRule(rule: MarketAlertRule, selected: boolean): void {
+    selectedIds = selected
+      ? [...selectedIds.filter((id) => id !== rule.id), rule.id]
+      : selectedIds.filter((id) => id !== rule.id);
+  }
+
+  async function duplicateRule(rule: MarketAlertRule): Promise<void> {
+    const { id: _id, ...copy } = structuredClone($state.snapshot(rule));
+    const result = await invoke("marketAlertsSave", {
+      rule: {
+        ...copy,
+        // A copy starts quiet: two identical rules firing at once is never wanted.
+        enabled: false,
+        name: $tr("marketAlerts.copyName", { name: rule.name }).slice(
+          0,
+          MARKET_ALERT_MAX_NAME_CHARS,
+        ),
+      },
+      // The binding is $state too, and a proxy fails the IPC structured clone.
+      ...(bindings[rule.id] ? { binding: $state.snapshot(bindings[rule.id]) } : {}),
+    });
+    if (!result.ok) {
+      addToast({ level: "warning", message: result.error ?? $tr("marketAlerts.saveFailed") });
+      return;
+    }
+    await refresh();
+  }
+
   async function clearHits(): Promise<void> {
     if (!(await confirmWithDialog($tr("marketAlerts.clearHitsConfirm"), $tr))) return;
     await invoke("marketAlertsClearHits");
     hits = [];
   }
 
-  async function exportRules(): Promise<void> {
-    exportText = await invoke("marketAlertsExport");
+  async function exportRules(onlySelected = false): Promise<void> {
+    exportText = await invoke(
+      "marketAlertsExport",
+      ...(onlySelected ? ([$state.snapshot(selectedIds)] as const) : ([] as const)),
+    );
     importOpen = false;
     exportOpen = true;
   }
@@ -212,10 +247,20 @@
 
 <div class="flex flex-col gap-4" data-testid="market-alerts-view">
   <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-    <button class="btn-primary btn-sm" onclick={newRule}>{$tr("marketAlerts.newRule")}</button>
+    <button class="btn-primary btn-sm" data-alert-new-rule onclick={newRule}
+      >{$tr("marketAlerts.newRule")}</button
+    >
     <button class="btn-secondary btn-sm" onclick={() => void exportRules()}
       >{$tr("marketAlerts.export")}</button
     >
+    {#if selectedIds.length > 0}
+      <button
+        class="btn-secondary btn-sm"
+        data-alert-export-selected
+        onclick={() => void exportRules(true)}
+        >{$tr("marketAlerts.exportSelected", { count: selectedIds.length })}</button
+      >
+    {/if}
     <button class="btn-secondary btn-sm" onclick={toggleImport}>{$tr("marketAlerts.import")}</button
     >
 
@@ -314,8 +359,11 @@
             ? formatTime(lastHitByRuleId.get(card.rule.id) ?? "")
             : null}
           testing={testFiring === card.rule.id}
+          selected={selectedIds.includes(card.rule.id)}
+          onSelect={selectRule}
           onToggle={(rule) => void toggleRule(rule)}
           onEdit={editRule}
+          onDuplicate={(rule) => void duplicateRule(rule)}
           onDelete={(rule) => void deleteRule(rule)}
           onTest={(rule) => void testFire(rule)}
           onOpenBulkSell={openBulkSell}

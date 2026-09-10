@@ -832,6 +832,18 @@ describe("engine plumbing", () => {
     expect(listMarketAlertRules().rules).toHaveLength(1);
   });
 
+  it("exports nothing for an explicitly empty selection", () => {
+    saveOk(rivenRuleRaw({ id: "rule-a" }));
+    saveOk(rivenRuleRaw({ id: "rule-b" }));
+    const all = JSON.parse(exportMarketAlertRules()) as { rules: Array<{ id: string }> };
+    expect(all.rules.map((rule) => rule.id)).toEqual(["rule-a", "rule-b"]);
+    const one = JSON.parse(exportMarketAlertRules(["rule-b"])) as { rules: Array<{ id: string }> };
+    expect(one.rules.map((rule) => rule.id)).toEqual(["rule-b"]);
+    // A selection the user emptied must not fall back to the whole list.
+    const none = JSON.parse(exportMarketAlertRules([])) as { rules: unknown[] };
+    expect(none.rules).toHaveLength(0);
+  });
+
   it("skips disabled and baro rules", async () => {
     mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "x" }]));
     saveOk(rivenRuleRaw({ enabled: false }));

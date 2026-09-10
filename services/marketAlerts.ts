@@ -887,8 +887,14 @@ export async function testFireMarketAlertRule(id: string): Promise<MarketAlertTe
   }
 }
 
-export function exportMarketAlertRules(): string {
-  return JSON.stringify(buildMarketAlertExport(state().rules), null, 2);
+/** Exports every rule, or only the ids given, so a user can share one alert
+ *  without handing over the rest of their list. An empty id list is a selection
+ *  of nothing, never a request for everything. */
+export function exportMarketAlertRules(ids?: readonly string[]): string {
+  const rules = state().rules;
+  const wanted = ids ? new Set(ids) : null;
+  const picked = wanted ? rules.filter((rule) => wanted.has(rule.id)) : rules;
+  return JSON.stringify(buildMarketAlertExport(picked), null, 2);
 }
 
 export function importMarketAlertRules(text: unknown): MarketAlertImportOutcome {
