@@ -346,9 +346,12 @@ function buildRivenSearchPath(match: RivenAlertMatch): string {
   let path = `/auctions/search?type=riven&weapon_url_name=${encodeURIComponent(match.weaponUrlName)}`;
   // The stat keys are a server-side AND and WFM ignores `similarity`, so only an
   // all-required rule may push its positives; a partial-match rule would have the
-  // rolls it wants filtered out. Every required curse must be present either way.
+  // rolls it wants filtered out. A demanded curse narrows the query the same way,
+  // but only when the list names one: two would AND into a roll that cannot exist.
   const pushPositive = (match.minSimilarityPct ?? 100) >= 100;
-  path += rivenStatSearchParams(pushPositive ? match.requirePositive : [], match.requireNegative);
+  const allowed = match.allowedNegatives ?? [];
+  const pushNegative = match.hasNegative === true && allowed.length === 1 ? allowed : [];
+  path += rivenStatSearchParams(pushPositive ? match.requirePositive : [], pushNegative);
   if (match.polarity) path += `&polarity=${match.polarity}`;
   if (match.minMasteryRank !== undefined) path += `&mastery_rank_min=${match.minMasteryRank}`;
   if (match.maxMasteryRank !== undefined) path += `&mastery_rank_max=${match.maxMasteryRank}`;
@@ -383,21 +386,12 @@ function matchRivenAuction(match: RivenAlertMatch, auction: AuctionView): boolea
     match.requirePositive.length > 0 ? (requiredHits / match.requirePositive.length) * 100 : 100;
   if (requiredPct < (match.minSimilarityPct ?? 100)) return false;
 
-  for (const stat of match.requireNegative) {
-    if (!negatives.has(stat)) return false;
-  }
   for (const stat of match.excludeAttributes) {
     if (positives.has(stat) || negatives.has(stat)) return false;
   }
-  // A tolerated-curse list bounds what a curse may be, not whether one exists;
-  // a clean roll passes and hasNegative still decides if one is wanted at all.
   if (match.allowedNegatives && match.allowedNegatives.length > 0) {
     for (const stat of negatives) {
-      // A curse the rule asked for is tolerated without being listed twice; the
-      // list only bounds the curses the user did not ask for.
-      if (!match.allowedNegatives.includes(stat) && !match.requireNegative.includes(stat)) {
-        return false;
-      }
+      if (!match.allowedNegatives.includes(stat)) return false;
     }
   }
   for (const stat of match.excludeNegatives ?? []) {

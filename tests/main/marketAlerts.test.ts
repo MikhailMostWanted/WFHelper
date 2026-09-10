@@ -262,9 +262,26 @@ describe("riven rule evaluation", () => {
     expect(mocks.dispatchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("accepts the curse the rule requires without listing it as tolerated", async () => {
+  it("demands a curse through hasNegative plus the allowed list", async () => {
     mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "required-curse" }]));
-    saveOk(rivenRuleRaw({ riven: { requireNegative: ["zoom"], allowedNegatives: ["recoil"] } }));
+    saveOk(rivenRuleRaw({ riven: { hasNegative: true, allowedNegatives: ["zoom"] } }));
+    initEngine();
+    await runMarketAlertTickForTest();
+    expect(mocks.dispatchMock).toHaveBeenCalledTimes(1);
+
+    mocks.requestMock.mockResolvedValue(
+      auctionPayload([
+        {
+          id: "other-curse",
+          attributes: [
+            { url_name: "critical_chance", value: 120, positive: true },
+            { url_name: "critical_damage", value: 90, positive: true },
+            { url_name: "recoil", value: -40, positive: false },
+          ],
+        },
+      ]),
+    );
+    saveOk(rivenRuleRaw({ riven: { hasNegative: true, allowedNegatives: ["zoom"] } }));
     initEngine();
     await runMarketAlertTickForTest();
     expect(mocks.dispatchMock).toHaveBeenCalledTimes(1);
@@ -277,7 +294,6 @@ describe("riven rule evaluation", () => {
     await runMarketAlertTickForTest();
     expect(mocks.dispatchMock).not.toHaveBeenCalled();
 
-    // excludeAttributes would also reject +Zoom; excludeNegatives is curse-only.
     mocks.requestMock.mockResolvedValue(
       auctionPayload([
         {
@@ -324,7 +340,8 @@ describe("riven rule evaluation", () => {
       rivenRuleRaw({
         riven: {
           requirePositive: ["critical_chance", "critical_damage"],
-          requireNegative: ["zoom"],
+          hasNegative: true,
+          allowedNegatives: ["zoom"],
           polarity: "madurai",
           minMasteryRank: 9,
           maxMasteryRank: 15,
@@ -350,16 +367,14 @@ describe("riven rule evaluation", () => {
     expect(mocks.requestMock.mock.calls[0][2]).toEqual({ priority: "background" });
   });
 
-  it("sends every required negative as one comma list", async () => {
+  it("keeps a two-curse whitelist out of the query and filters it locally", async () => {
     mocks.requestMock.mockResolvedValue(auctionPayload([]));
-    saveOk(rivenRuleRaw({ riven: { requireNegative: ["zoom", "recoil"] } }));
+    saveOk(rivenRuleRaw({ riven: { hasNegative: true, allowedNegatives: ["zoom", "recoil"] } }));
     initEngine();
     await runMarketAlertTickForTest();
 
     const requestPath = mocks.requestMock.mock.calls[0][1] as string;
-    // A repeated key would silently drop the second curse: WFM keeps the first.
-    expect(requestPath).toContain("negative_stats=zoom%2Crecoil");
-    expect(requestPath.match(/negative_stats=/g)).toHaveLength(1);
+    expect(requestPath).not.toContain("negative_stats=");
   });
 
   it("stops pushing positive_stats once similarity allows a partial match", async () => {
@@ -832,6 +847,46 @@ describe("engine plumbing", () => {
     expect(listMarketAlertRules().rules).toHaveLength(1);
   });
 
+  it("keeps a rules file written before requireNegative was retired", () => {
+    const stateFile = path.join(tmpDir, "market-alert-rules.json");
+    fs.writeFileSync(
+      stateFile,
+      JSON.stringify({
+        schema: 1,
+        rules: [
+          {
+            id: "legacy",
+            name: "Legacy Boar",
+            kind: "riven",
+            enabled: true,
+            cooldownMinutes: 60,
+            riven: {
+              weaponUrlName: "boar",
+              requirePositive: ["multishot"],
+              requireNegative: ["recoil"],
+              excludeAttributes: [],
+              statBounds: [],
+            },
+          },
+        ],
+        bindings: { legacy: { native: true } },
+        ownedCounts: {},
+      }),
+      "utf8",
+    );
+
+    const { rules } = listMarketAlertRules();
+    expect(rules).toHaveLength(1);
+    expect(rules[0].riven?.allowedNegatives).toEqual(["recoil"]);
+    expect(rules[0].riven?.hasNegative).toBe(true);
+    expect(getMarketAlertEngineStatus().rulesRecoveredAt).toBeNull();
+
+    saveOk(rivenRuleRaw({ id: "second", name: "Second" }));
+    const rewritten = fs.readFileSync(stateFile, "utf8");
+    expect(rewritten).not.toContain("requireNegative");
+    expect(rewritten).toContain("legacy");
+  });
+
   it("exports nothing for an explicitly empty selection", () => {
     saveOk(rivenRuleRaw({ id: "rule-a" }));
     saveOk(rivenRuleRaw({ id: "rule-b" }));
@@ -839,7 +894,6 @@ describe("engine plumbing", () => {
     expect(all.rules.map((rule) => rule.id)).toEqual(["rule-a", "rule-b"]);
     const one = JSON.parse(exportMarketAlertRules(["rule-b"])) as { rules: Array<{ id: string }> };
     expect(one.rules.map((rule) => rule.id)).toEqual(["rule-b"]);
-    // A selection the user emptied must not fall back to the whole list.
     const none = JSON.parse(exportMarketAlertRules([])) as { rules: unknown[] };
     expect(none.rules).toHaveLength(0);
   });

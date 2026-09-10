@@ -55,14 +55,8 @@ export interface RivenAlertMatch {
   weaponUrlName: string;
   /** Buffs the roll should carry; minSimilarityPct relaxes how many. */
   requirePositive: string[];
-  /** Curses that must all be present. */
-  requireNegative: string[];
-  /** Curses the roll is allowed to carry besides the required ones. Empty means
-   *  no restriction; a non-empty list rejects any other curse and still accepts
-   *  a clean roll. requireNegative counts as tolerated without being listed. */
+  /** The only curses the roll may carry; a clean roll still passes, hasNegative decides that. */
   allowedNegatives?: string[];
-  /** Curses the roll must not carry. A blacklist, unlike excludeAttributes,
-   *  which also rejects the stat as a buff. */
   excludeNegatives?: string[];
   /** Attributes that must not appear on either side. */
   excludeAttributes: string[];
@@ -272,7 +266,6 @@ function isSlug(value: unknown): value is string {
 const RIVEN_MATCH_KEYS = [
   "weaponUrlName",
   "requirePositive",
-  "requireNegative",
   "allowedNegatives",
   "excludeNegatives",
   "excludeAttributes",
@@ -291,6 +284,9 @@ const RIVEN_MATCH_KEYS = [
   "maxRerolls",
   "minEndoPerPlat",
 ] as const;
+
+/** Pre-rename key every shipped rule still carries, accepted on the way in only. */
+const RIVEN_INPUT_KEYS = [...RIVEN_MATCH_KEYS, "requireNegative"] as const;
 
 function parseStatBounds(value: unknown): MarketAlertParseResult<RivenStatBound[]> {
   if (value === undefined) return { ok: true, value: [] };
@@ -327,14 +323,12 @@ function parseStatBounds(value: unknown): MarketAlertParseResult<RivenStatBound[
 
 function parseRivenMatch(value: unknown): MarketAlertParseResult<RivenAlertMatch> {
   if (!isPlainObject(value)) return fail("riven must be an object");
-  const unknownKey = rejectUnknownKeys(value, RIVEN_MATCH_KEYS);
+  const unknownKey = rejectUnknownKeys(value, RIVEN_INPUT_KEYS);
   if (unknownKey) return fail(`riven ${unknownKey}`);
   if (!isSlug(value.weaponUrlName)) return fail("riven weaponUrlName is not a slug");
 
   const requirePositive = readAttributeList(value, "requirePositive");
   if (!requirePositive.ok) return fail(`riven ${requirePositive.error}`);
-  const requireNegative = readAttributeList(value, "requireNegative");
-  if (!requireNegative.ok) return fail(`riven ${requireNegative.error}`);
   const excludeAttributes = readAttributeList(value, "excludeAttributes");
   if (!excludeAttributes.ok) return fail(`riven ${excludeAttributes.error}`);
 
@@ -344,7 +338,6 @@ function parseRivenMatch(value: unknown): MarketAlertParseResult<RivenAlertMatch
   const match: RivenAlertMatch = {
     weaponUrlName: value.weaponUrlName,
     requirePositive: requirePositive.value,
-    requireNegative: requireNegative.value,
     excludeAttributes: excludeAttributes.value,
     statBounds: statBounds.value,
   };
@@ -366,6 +359,25 @@ function parseRivenMatch(value: unknown): MarketAlertParseResult<RivenAlertMatch
     if (typeof value.hasNegative !== "boolean") return fail("riven hasNegative must be a boolean");
     match.hasNegative = value.hasNegative;
   }
+
+  // A riven carries at most one curse, so requireNegative only ever meant one curse.
+  if (value.requireNegative !== undefined) {
+    const legacy = readAttributeList(value, "requireNegative");
+    if (!legacy.ok) return fail(`riven ${legacy.error}`);
+    if (legacy.value.length > 0) {
+      if (match.hasNegative === false) {
+        return fail("riven requireNegative contradicts hasNegative");
+      }
+      const merged = [...(match.allowedNegatives ?? [])];
+      for (const stat of legacy.value) if (!merged.includes(stat)) merged.push(stat);
+      if (merged.length > MARKET_ALERT_MAX_ATTRIBUTES) {
+        return fail("riven allowedNegatives has too many entries");
+      }
+      match.allowedNegatives = merged;
+      if (value.hasNegative === undefined) match.hasNegative = true;
+    }
+  }
+
   if (value.includeBidOnly !== undefined) {
     if (typeof value.includeBidOnly !== "boolean") {
       return fail("riven includeBidOnly must be a boolean");
@@ -415,11 +427,8 @@ function parseRivenMatch(value: unknown): MarketAlertParseResult<RivenAlertMatch
     }
   }
 
-  if (match.hasNegative === false && match.requireNegative.length > 0) {
-    return fail("riven hasNegative false contradicts requireNegative");
-  }
   for (const attribute of match.excludeAttributes) {
-    if (match.requirePositive.includes(attribute) || match.requireNegative.includes(attribute)) {
+    if (match.requirePositive.includes(attribute)) {
       return fail("riven excludeAttributes contradicts a required attribute");
     }
   }

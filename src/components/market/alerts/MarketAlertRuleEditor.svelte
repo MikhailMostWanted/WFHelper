@@ -76,7 +76,6 @@
   let weaponInput = $state(existingWeaponSlug ? titleFromSlug(existingWeaponSlug) : "");
   let weaponDirty = $state(false);
   let requirePositive = $state<string[]>([...(riven?.requirePositive ?? [])]);
-  let requireNegative = $state<string[]>([...(riven?.requireNegative ?? [])]);
   let allowedNegatives = $state<string[]>([...(riven?.allowedNegatives ?? [])]);
   let excludeNegatives = $state<string[]>([...(riven?.excludeNegatives ?? [])]);
   let excludeAttributes = $state<string[]>([...(riven?.excludeAttributes ?? [])]);
@@ -271,7 +270,6 @@
       // empty the rule fails the slug check instead of alerting on nothing.
       weaponUrlName: existingWeaponSlug,
       requirePositive,
-      requireNegative,
       excludeAttributes,
       statBounds: bounds,
     };
@@ -571,9 +569,6 @@
 
       {@render statPicker("marketAlerts.requiredPositive", requirePositive, (next) => {
         requirePositive = next;
-      })}
-      {@render statPicker("marketAlerts.requiredNegative", requireNegative, (next) => {
-        requireNegative = next;
       })}
       {@render statPicker("marketAlerts.allowedNegatives", allowedNegatives, (next) => {
         allowedNegatives = next;

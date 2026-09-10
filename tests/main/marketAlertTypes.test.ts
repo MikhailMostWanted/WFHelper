@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   MARKET_ALERT_IMPORT_MAX_BYTES,
+  MARKET_ALERT_MAX_ATTRIBUTES,
   MARKET_ALERT_MAX_RULES,
   buildMarketAlertExport,
   parseMarketAlertBinding,
@@ -127,12 +128,6 @@ describe("parseMarketAlertRule", () => {
 
   it("rejects contradictory riven criteria", () => {
     expect(
-      parseMarketAlertRule(
-        rivenRule({ riven: { hasNegative: false, requireNegative: ["zoom"] } }),
-        "id",
-      ).ok,
-    ).toBe(false);
-    expect(
       parseMarketAlertRule(rivenRule({ riven: { excludeAttributes: ["critical_chance"] } }), "id")
         .ok,
     ).toBe(false);
@@ -142,7 +137,7 @@ describe("parseMarketAlertRule", () => {
     ).toBe(false);
   });
 
-  it("keeps allowedNegatives optional and lets a required curse stay off the list", () => {
+  it("keeps allowedNegatives optional and drops duplicates", () => {
     const bare = parseMarketAlertRule(rivenRule(), "id");
     expect(bare.ok && bare.value.riven?.allowedNegatives).toBeUndefined();
     const set = parseMarketAlertRule(
@@ -150,16 +145,71 @@ describe("parseMarketAlertRule", () => {
       "id",
     );
     expect(set.ok && set.value.riven?.allowedNegatives).toEqual(["zoom", "recoil"]);
-    // A curse the rule demands does not have to be repeated as tolerated.
-    expect(
-      parseMarketAlertRule(
-        rivenRule({ riven: { allowedNegatives: ["recoil"], requireNegative: ["zoom"] } }),
-        "id",
-      ).ok,
-    ).toBe(true);
     expect(
       parseMarketAlertRule(rivenRule({ riven: { allowedNegatives: ["not_a_stat"] } }), "id").ok,
     ).toBe(false);
+  });
+
+  it("migrates the legacy requireNegative key instead of dropping the rule", () => {
+    const empty = parseMarketAlertRule(rivenRule({ riven: { requireNegative: [] } }), "id");
+    expect(empty.ok).toBe(true);
+    if (!empty.ok) return;
+    expect(empty.value.riven).not.toHaveProperty("requireNegative");
+    expect(empty.value.riven?.allowedNegatives).toBeUndefined();
+    expect(empty.value.riven?.hasNegative).toBeUndefined();
+
+    const one = parseMarketAlertRule(rivenRule({ riven: { requireNegative: ["recoil"] } }), "id");
+    expect(one.ok).toBe(true);
+    if (!one.ok) return;
+    expect(one.value.riven).not.toHaveProperty("requireNegative");
+    expect(one.value.riven?.allowedNegatives).toEqual(["recoil"]);
+    expect(one.value.riven?.hasNegative).toBe(true);
+
+    const merged = parseMarketAlertRule(
+      rivenRule({ riven: { allowedNegatives: ["zoom"], requireNegative: ["recoil", "zoom"] } }),
+      "id",
+    );
+    expect(merged.ok && merged.value.riven?.allowedNegatives).toEqual(["zoom", "recoil"]);
+
+    expect(
+      parseMarketAlertRule(
+        rivenRule({ riven: { hasNegative: false, requireNegative: ["recoil"] } }),
+        "id",
+      ).ok,
+    ).toBe(false);
+    const explicit = parseMarketAlertRule(
+      rivenRule({ riven: { hasNegative: true, requireNegative: ["recoil"] } }),
+      "id",
+    );
+    expect(explicit.ok && explicit.value.riven?.hasNegative).toBe(true);
+  });
+
+  it("refuses an oversized allowedNegatives union rather than truncating it", () => {
+    const stats = [
+      "recoil",
+      "zoom",
+      "ammo_maximum",
+      "damage_vs_corpus",
+      "damage_vs_grineer",
+      "damage_vs_infested",
+      "projectile_speed",
+      "punch_through",
+    ];
+    expect(stats).toHaveLength(MARKET_ALERT_MAX_ATTRIBUTES);
+    const atCap = parseMarketAlertRule(
+      rivenRule({ riven: { allowedNegatives: stats.slice(0, 7), requireNegative: [stats[7]] } }),
+      "id",
+    );
+    expect(atCap.ok && atCap.value.riven?.allowedNegatives).toHaveLength(
+      MARKET_ALERT_MAX_ATTRIBUTES,
+    );
+    const overCap = parseMarketAlertRule(
+      rivenRule({ riven: { allowedNegatives: stats, requireNegative: ["critical_chance"] } }),
+      "id",
+    );
+    expect(overCap.ok).toBe(false);
+    if (overCap.ok) return;
+    expect(overCap.error).toContain("too many entries");
   });
 
   it("bounds every numeric field", () => {
@@ -231,6 +281,41 @@ describe("export and import", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value[0].id).toBe("fresh-0");
+  });
+
+  it("imports an export the shipped app produced before the key was renamed", () => {
+    // Verbatim copy of docs-local/live-acceptance/qa-alert-export.json (local only).
+    const shipped = JSON.stringify({
+      schema: 1,
+      exportedAt: "2026-09-08T11:36:40.871Z",
+      rules: [
+        {
+          id: "83a1a78d-e508-4d9b-91c6-7795ef82457f",
+          name: "QA-20260908-prefill-export",
+          kind: "riven",
+          enabled: false,
+          cooldownMinutes: 60,
+          riven: {
+            weaponUrlName: "boar",
+            requirePositive: ["multishot", "status_chance"],
+            requireNegative: [],
+            excludeAttributes: [],
+            statBounds: [],
+            allowedNegatives: ["impact_damage", "recoil"],
+          },
+        },
+      ],
+    });
+    const result = parseMarketAlertImport(shipped, (i) => `fresh-${i}`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value[0].riven).not.toHaveProperty("requireNegative");
+    expect(result.value[0].riven?.allowedNegatives).toEqual(["impact_damage", "recoil"]);
+    const again = parseMarketAlertImport(
+      JSON.stringify(buildMarketAlertExport(result.value)),
+      (i) => `again-${i}`,
+    );
+    expect(again.ok).toBe(true);
   });
 
   it("rejects oversized imports before parsing", () => {
