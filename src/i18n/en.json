@@ -1871,6 +1871,7 @@
   "workbench.cancel": "Cancel run",
   "workbench.cancelling": "Cancelling after current order",
   "workbench.runProgress": "{done}/{total} orders placed",
+  "workbench.lastRunAt": "Last run, finished {at}",
   "workbench.error.overCap": "Selection exceeds the per-run limit of {cap} rows",
   "workbench.error.emptyPlan": "Nothing executable selected",
   "workbench.error.unpricedRows": "{count} selected rows have no price",

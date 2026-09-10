@@ -1853,6 +1853,7 @@
   "workbench.cancel": "取消执行",
   "workbench.cancelling": "当前挂单完成后取消",
   "workbench.runProgress": "已完成 {done}/{total} 个挂单",
+  "workbench.lastRunAt": "上次运行，完成于 {at}",
   "workbench.error.overCap": "所选超出单次执行上限 {cap} 行",
   "workbench.error.emptyPlan": "未选择可执行的行",
   "workbench.error.unpricedRows": "{count} 个已选行没有价格",

@@ -19,7 +19,7 @@
   import { safeToList, SAFETY_REASON_KEYS } from "../../lib/inventory/safetyRules.js";
   import { setRootOf } from "../../lib/inventory/fullSets.js";
   import { confirmWithDialog, invoke, tradeInvoke } from "../../lib/ipc.js";
-  import { tr, type MessageKey } from "../../lib/i18n.js";
+  import { locale, tr, type MessageKey } from "../../lib/i18n.js";
   import { fetchItemOrderBookBySlug } from "../../lib/wfm/orderBook.js";
   import {
     DEFAULT_DAMPING_RULE,
@@ -486,9 +486,37 @@
     }
   }
 
-  const doneCount = $derived(
-    mainState?.run?.rows.filter((row) => row.status === "done").length ?? 0,
+  const run = $derived(mainState?.run ?? null);
+  const doneCount = $derived(run?.rows.filter((row) => row.status === "done").length ?? 0);
+  const runFinishedAt = $derived(run?.finishedAt ?? null);
+  const runFinishedLabel = $derived(
+    runFinishedAt != null ? new Date(runFinishedAt).toLocaleString($locale) : "",
   );
+
+  // Only a run this modal watched start needs the refresh below; one that
+  // finished earlier is already covered by the openQueue fetch.
+  let watchedRunPlanId: string | null = null;
+  let refreshedRunPlanId: string | null = null;
+
+  /** Rows still carry the pre-run order set, so a second press would plan a
+   *  create for an order the run just placed. */
+  async function refreshOrdersAfterRun(): Promise<void> {
+    if (!(await loadOwnOrders())) return;
+    rows = attachExistingOrders(rows, myOrders);
+  }
+
+  $effect(() => {
+    const progress = run;
+    if (!progress) return;
+    if (progress.finishedAt == null) {
+      watchedRunPlanId = progress.planId;
+      return;
+    }
+    if (running || !loggedIn) return;
+    if (watchedRunPlanId !== progress.planId || refreshedRunPlanId === progress.planId) return;
+    refreshedRunPlanId = progress.planId;
+    void refreshOrdersAfterRun();
+  });
 </script>
 
 <ModalShell ariaLabel={t("workbench.title")} {onClose}>
@@ -758,21 +786,29 @@
         </div>
       {/if}
 
-      {#if mainState?.run}
+      {#if run}
         <div
           class="rounded-[var(--radius-md)] border border-border bg-surface-card p-2.5 text-xs"
           data-workbench-progress
+          data-workbench-run-state={runFinishedAt != null ? "finished" : "running"}
         >
           <div class="mb-1 font-semibold">
+            {#if runFinishedAt != null}
+              <!-- Undated, a run from hours ago reads as the current listings,
+                   so a finished block is stamped as history. -->
+              <span class="text-text-muted">
+                {t("workbench.lastRunAt", { at: runFinishedLabel })} ·
+              </span>
+            {/if}
             {t("workbench.runProgress", {
               done: doneCount,
-              total: mainState.run.rows.length,
+              total: run.rows.length,
             })}
-            {#if mainState.run.stopReason}
-              · {t(STOP_REASON_KEYS[mainState.run.stopReason])}
+            {#if run.stopReason}
+              · {t(STOP_REASON_KEYS[run.stopReason])}
             {/if}
           </div>
-          {#each mainState.run.rows as row (row.rowId)}
+          {#each run.rows as row (row.rowId)}
             <div class="flex items-center gap-2">
               <span class="min-w-0 flex-1 truncate">{row.itemName}</span>
               <span
@@ -833,6 +869,7 @@
           class="btn-primary px-6 py-2.5 text-base"
           disabled={!loggedIn ||
             !ordersReady ||
+            ordersBusy ||
             running ||
             reviewRequired ||
             unpricedCount > 0 ||

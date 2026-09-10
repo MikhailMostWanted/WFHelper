@@ -1854,6 +1854,7 @@
   "workbench.cancel": "Lauf abbrechen",
   "workbench.cancelling": "Abbruch nach aktuellem Angebot",
   "workbench.runProgress": "{done}/{total} Angebote platziert",
+  "workbench.lastRunAt": "Letzter Lauf, beendet {at}",
   "workbench.error.overCap": "Auswahl überschreitet das Limit von {cap} Zeilen pro Lauf",
   "workbench.error.emptyPlan": "Nichts Ausführbares ausgewählt",
   "workbench.error.unpricedRows": "{count} ausgewählte Zeilen haben keinen Preis",
