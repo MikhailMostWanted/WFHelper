@@ -13,6 +13,7 @@ import { rivenStatSearchParams } from "./wfmRivenSearch";
 import { getWfmSchedulerHealth } from "./wfmScheduler";
 import { dispatch } from "./notificationChannels";
 import { normalizeErrorMessage } from "../config/shared/errors";
+import { titleCase } from "../config/shared/textNormalize";
 import {
   extractWfmOrderList,
   parseOrderPlatform,
@@ -346,8 +347,7 @@ function buildRivenSearchPath(match: RivenAlertMatch): string {
   let path = `/auctions/search?type=riven&weapon_url_name=${encodeURIComponent(match.weaponUrlName)}`;
   // The stat keys are a server-side AND and WFM ignores `similarity`, so only an
   // all-required rule may push its positives; a partial-match rule would have the
-  // rolls it wants filtered out. A demanded curse narrows the query the same way,
-  // but only when the list names one: two would AND into a roll that cannot exist.
+  // rolls it wants filtered out. Only a one-entry curse list is safe: two would AND.
   const pushPositive = (match.minSimilarityPct ?? 100) >= 100;
   const allowed = match.allowedNegatives ?? [];
   const pushNegative = match.hasNegative === true && allowed.length === 1 ? allowed : [];
@@ -425,7 +425,19 @@ function matchRivenAuction(match: RivenAlertMatch, auction: AuctionView): boolea
   return true;
 }
 
+function rivenStatText(auction: AuctionView): string {
+  return auction.attributes
+    .map(
+      (attr) =>
+        // WFM ships a negative as a negative value or as a magnitude; the flag decides.
+        `${attr.positive ? "+" : "-"}${Math.abs(attr.value)}% ` +
+        titleCase(attr.urlName.replace(/_/g, " ")),
+    )
+    .join(", ");
+}
+
 function rivenHit(rule: MarketAlertRule, auction: AuctionView): MarketAlertHit {
+  const stats = rivenStatText(auction);
   const endo = rivenDissolveEndo(auction.masteryLevel, auction.modRank, auction.rerolls);
   const ratio = rivenEndoPerPlat(
     auction.masteryLevel,
@@ -440,8 +452,8 @@ function rivenHit(rule: MarketAlertRule, auction: AuctionView): MarketAlertHit {
     at: new Date().toISOString(),
     kind: "riven",
     title: `Riven: ${rule.name}`,
-    // English on purpose, like every stored hit string.
     detail:
+      `${stats ? `${stats} - ` : ""}` +
       `${auction.platinum}p${auction.bidOnly ? " starting bid" : ""} - ` +
       `MR${auction.masteryLevel} r${auction.modRank} ` +
       `${auction.rerolls} rerolls - ${endo} endo` +
@@ -881,9 +893,6 @@ export async function testFireMarketAlertRule(id: string): Promise<MarketAlertTe
   }
 }
 
-/** Exports every rule, or only the ids given, so a user can share one alert
- *  without handing over the rest of their list. An empty id list is a selection
- *  of nothing, never a request for everything. */
 export function exportMarketAlertRules(ids?: readonly string[]): string {
   const rules = state().rules;
   const wanted = ids ? new Set(ids) : null;

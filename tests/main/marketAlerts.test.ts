@@ -224,6 +224,19 @@ describe("riven rule evaluation", () => {
     expect(hits[0].endoPerPlat).toBeCloseTo(5.2, 1);
   });
 
+  it("leads the hit with every stat on the roll, curses signed by the flag", async () => {
+    mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "abc123", buyout: 100 }]));
+    saveOk(rivenRuleRaw());
+    initEngine();
+    await runMarketAlertTickForTest();
+
+    const hits = getMarketAlertHits();
+    expect(hits[0].detail).toBe(
+      "+120% Critical Chance, +90% Critical Damage, -40% Zoom - 100p - MR14 r8 5 rerolls - " +
+        "7353 endo (73.5/plat)",
+    );
+  });
+
   it("matches attributes by exact url_name, never substring", async () => {
     // The slide-attack slug contains "critical_chance"; substring matching is
     // the documented failure mode and must not fire here.
