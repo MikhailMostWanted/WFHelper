@@ -178,6 +178,14 @@
   );
 
   const totals = $derived(planTotals(rows));
+  const previewFailures = $derived(
+    (preview?.rows ?? [])
+      .filter((row) => !row.ok)
+      .map((row) => ({
+        ...row,
+        name: rows.find((queued) => queued.rowId === row.rowId)?.itemName ?? row.rowId,
+      })),
+  );
   const unpricedCount = $derived(unpricedSelectedRows(rows).length);
   const mainState = $derived($workbenchState);
   const running = $derived(mainState?.phase === "running" || mainState?.phase === "cancelling");
@@ -821,27 +829,14 @@
         </div>
       {/if}
 
-      {#if preview}
+      {#if previewFailures.length > 0}
         <div
           class="rounded-[var(--radius-md)] border border-border bg-surface-card p-2.5 text-xs"
           data-workbench-preview
         >
-          <div>
-            {t("workbench.previewResult", {
-              units: preview.totalUnits,
-              platinum: preview.totalPlatinum,
-            })}
-            {#if !preview.ok}
-              <span class="text-danger">
-                {preview.planError
-                  ? t(PLAN_ERROR_KEYS[preview.planError])
-                  : t("workbench.previewInvalid")}
-              </span>
-            {/if}
-          </div>
-          {#each preview.rows.filter((row) => !row.ok) as row (row.rowId)}
+          {#each previewFailures as row (row.rowId)}
             <div class="text-danger">
-              {row.rowId}: {t(ROW_ERROR_KEYS[row.reason ?? "bad-quantity"])}
+              {row.name}: {t(ROW_ERROR_KEYS[row.reason ?? "bad-quantity"])}
             </div>
           {/each}
         </div>
@@ -907,6 +902,22 @@
       {#if unpricedCount > 0}
         <span class="text-sm text-danger" data-workbench-unpriced>
           {t("workbench.error.unpricedRows", { count: unpricedCount })}
+        </span>
+      {/if}
+      {#if preview}
+        <span
+          class={preview.ok ? "text-sm text-text-secondary" : "text-sm text-danger"}
+          data-workbench-preview-summary={preview.ok ? "ok" : "invalid"}
+        >
+          {t("workbench.previewResult", {
+            units: preview.totalUnits,
+            platinum: preview.totalPlatinum,
+          })}
+          {#if !preview.ok}
+            {preview.planError
+              ? t(PLAN_ERROR_KEYS[preview.planError])
+              : t("workbench.previewInvalid")}
+          {/if}
         </span>
       {/if}
       <div class="ml-auto flex items-center gap-2">
