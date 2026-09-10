@@ -236,7 +236,7 @@
         role="dialog"
         aria-label={$tr("appearance.inspector")}
         tabindex="-1"
-        class="pointer-events-auto absolute flex w-[19rem] flex-col gap-2 rounded-[var(--radius-lg)] border border-border-strong bg-bg-surface p-3 shadow-[0_10px_36px_rgba(0,0,0,0.55)]"
+        class="pointer-events-auto absolute flex w-[19rem] flex-col gap-2 rounded-[var(--radius-lg)] border border-border-strong bg-bg-surface p-3 shadow-[var(--ui-panel-shadow)]"
         style={popoverStyle}
         onkeydown={trapFocus}
       >

@@ -67,7 +67,7 @@
 
 <ModalShell ariaLabel={$tr("analysis.editTitle")} {onClose}>
   <div
-    class="relative z-10 flex w-[min(32rem,92vw)] flex-col gap-3 rounded-[var(--radius-xl)] border border-border-strong bg-bg-surface p-4 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+    class="relative z-10 flex w-[min(32rem,92vw)] flex-col gap-3 rounded-[var(--radius-xl)] border border-border-strong bg-bg-surface p-4 shadow-[var(--ui-panel-shadow)]"
     data-analysis-row-editor={event.id}
   >
     <div class="flex flex-col gap-1">

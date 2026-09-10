@@ -376,7 +376,7 @@
                   />
                   {#if itemDropdown.length > 0}
                     <div
-                      class="absolute top-[calc(100%+4px)] left-0 right-0 z-20 max-h-[220px] overflow-y-auto rounded-lg border border-border-strong bg-bg-surface shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+                      class="absolute top-[calc(100%+4px)] left-0 right-0 z-20 max-h-[220px] overflow-y-auto rounded-lg border border-border-strong bg-bg-surface shadow-[var(--ui-panel-shadow)]"
                     >
                       {#each itemDropdown as item}
                         <button

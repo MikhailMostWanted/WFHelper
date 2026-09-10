@@ -150,7 +150,7 @@
             {@const rewards = getPopoverRewards(rg)}
             {@const owned = isOwned(rg.key)}
             <div
-              class="my-2 rounded-lg border border-border-strong bg-bg-raised px-3 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+              class="my-2 rounded-lg border border-border-strong bg-bg-raised px-3 py-2.5 shadow-[var(--ui-panel-shadow)]"
             >
               <div class="flex items-center gap-2 pb-2 mb-2 border-b border-border">
                 <img

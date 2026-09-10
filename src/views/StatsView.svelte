@@ -494,7 +494,7 @@
 {#if tooltip}
   <div
     data-stats-tooltip
-    class="fixed pointer-events-none rounded-[var(--radius-sm)] border border-border-strong bg-bg-raised px-[10px] py-1 text-xs text-text-primary whitespace-nowrap z-[1100] shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+    class="fixed pointer-events-none rounded-[var(--radius-sm)] border border-border-strong bg-bg-raised px-[10px] py-1 text-xs text-text-primary whitespace-nowrap z-[1100] shadow-[var(--ui-panel-shadow)]"
     style="left:{tooltip.x + 14}px; top:{tooltip.y - 38}px"
     aria-hidden="true"
   >
@@ -525,7 +525,7 @@
     }}
   >
     <div
-      class="relative z-10 flex h-[72vh] w-[86vw] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-border-strong bg-bg-surface p-4 pb-3 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+      class="relative z-10 flex h-[72vh] w-[86vw] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-border-strong bg-bg-surface p-4 pb-3 shadow-[var(--ui-panel-shadow)]"
     >
       <div class="mb-3 flex shrink-0 items-center justify-between">
         <span

@@ -323,7 +323,7 @@
   <div class="pointer-events-none {wrapperCls}">
     <button
       type="button"
-      class="pointer-events-auto inline-flex items-center justify-center rounded border border-border bg-bg-deep/85 text-text-secondary shadow-[0_0_6px_rgba(0,0,0,0.9)] transition-colors hover:text-text-primary focus-visible:text-text-primary {full
+      class="pointer-events-auto inline-flex items-center justify-center rounded border border-border bg-bg-deep/85 text-text-secondary shadow-[var(--ui-panel-shadow)] transition-colors hover:text-text-primary focus-visible:text-text-primary {full
         ? 'p-2'
         : 'p-1'}"
       title={$tr("rivens.copyChatTag")}
@@ -336,7 +336,7 @@
     {#if listing}
       <button
         type="button"
-        class="pointer-events-auto inline-flex items-center justify-center rounded border border-border bg-bg-deep/85 font-display font-bold leading-none text-text-secondary shadow-[0_0_6px_rgba(0,0,0,0.9)] transition-colors hover:text-text-primary focus-visible:text-text-primary {full
+        class="pointer-events-auto inline-flex items-center justify-center rounded border border-border bg-bg-deep/85 font-display font-bold leading-none text-text-secondary shadow-[var(--ui-panel-shadow)] transition-colors hover:text-text-primary focus-visible:text-text-primary {full
           ? 'px-2.5 text-sm'
           : 'px-1.5 py-1 text-[0.625rem]'}"
         title={$tr("rivens.copyWtsLine")}
@@ -350,7 +350,7 @@
     {#if listing && full}
       <button
         type="button"
-        class="pointer-events-auto self-center inline-flex items-center justify-center rounded-full border border-accent bg-bg-deep/85 p-1.5 shadow-[0_0_6px_rgba(0,0,0,0.9)]"
+        class="pointer-events-auto self-center inline-flex items-center justify-center rounded-full border border-accent bg-bg-deep/85 p-1.5 shadow-[var(--ui-panel-shadow)]"
         title={$tr("rivens.listedPrice", { plat: listing.platinum })}
         aria-label={$tr("rivens.listedPrice", { plat: listing.platinum })}
         onclick={() => (selectedRiven = riven)}

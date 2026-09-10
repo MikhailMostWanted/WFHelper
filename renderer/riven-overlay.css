@@ -46,15 +46,12 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.72);
 }
 
 /* "New Roll" panel variant */
 #panel.is-new {
   border-color: color-mix(in oklab, var(--accent) 55%, transparent);
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.72),
-    0 0 0 1px color-mix(in oklab, var(--accent) 18%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 18%, transparent);
 }
 
 /* Header */

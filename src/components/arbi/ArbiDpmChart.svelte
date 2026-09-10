@@ -55,7 +55,7 @@
 
 {#if tooltip}
   <div
-    class="pointer-events-none fixed z-[500] whitespace-nowrap rounded-[var(--radius-sm)] border border-border-strong bg-bg-raised px-2.5 py-1 text-xs text-text-primary shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+    class="pointer-events-none fixed z-[500] whitespace-nowrap rounded-[var(--radius-sm)] border border-border-strong bg-bg-raised px-2.5 py-1 text-xs text-text-primary shadow-[var(--ui-panel-shadow)]"
     style="left:{tooltip.x + 14}px; top:{tooltip.y - 34}px"
     aria-hidden="true"
   >

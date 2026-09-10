@@ -46,7 +46,7 @@
 
 <ModalShell ariaLabel={$tr("analysis.importTitle")} {onClose}>
   <div
-    class="relative z-10 flex max-h-[80vh] w-[min(44rem,92vw)] flex-col gap-3 overflow-hidden rounded-[var(--radius-xl)] border border-border-strong bg-bg-surface p-4 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+    class="relative z-10 flex max-h-[80vh] w-[min(44rem,92vw)] flex-col gap-3 overflow-hidden rounded-[var(--radius-xl)] border border-border-strong bg-bg-surface p-4 shadow-[var(--ui-panel-shadow)]"
     data-analysis-import-dialog
   >
     <div class="flex flex-col gap-1">
