@@ -393,7 +393,11 @@ function matchRivenAuction(match: RivenAlertMatch, auction: AuctionView): boolea
   // a clean roll passes and hasNegative still decides if one is wanted at all.
   if (match.allowedNegatives && match.allowedNegatives.length > 0) {
     for (const stat of negatives) {
-      if (!match.allowedNegatives.includes(stat)) return false;
+      // A curse the rule asked for is tolerated without being listed twice; the
+      // list only bounds the curses the user did not ask for.
+      if (!match.allowedNegatives.includes(stat) && !match.requireNegative.includes(stat)) {
+        return false;
+      }
     }
   }
   if (match.hasNegative === true && negatives.size === 0) return false;

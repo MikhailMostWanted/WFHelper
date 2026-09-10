@@ -265,13 +265,6 @@
       if (max !== undefined) bound.max = max;
       bounds.push(bound);
     }
-    if (
-      allowedNegatives.length > 0 &&
-      requireNegative.some((stat) => !allowedNegatives.includes(stat))
-    ) {
-      error = { key: "marketAlerts.allowedNegativesConflict" };
-      return null;
-    }
     const match: RivenAlertMatch = {
       // Replaced by main when a weapon display name travels with the save; left
       // empty the rule fails the slug check instead of alerting on nothing.

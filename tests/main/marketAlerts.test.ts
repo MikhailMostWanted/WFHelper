@@ -262,6 +262,14 @@ describe("riven rule evaluation", () => {
     expect(mocks.dispatchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("accepts the curse the rule requires without listing it as tolerated", async () => {
+    mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "required-curse" }]));
+    saveOk(rivenRuleRaw({ riven: { requireNegative: ["zoom"], allowedNegatives: ["recoil"] } }));
+    initEngine();
+    await runMarketAlertTickForTest();
+    expect(mocks.dispatchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects a curse outside allowedNegatives", async () => {
     mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "harmful" }]));
     saveOk(rivenRuleRaw({ riven: { allowedNegatives: ["recoil"] } }));

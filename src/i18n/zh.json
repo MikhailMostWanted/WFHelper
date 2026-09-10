@@ -1937,7 +1937,6 @@
   "workbench.signInHint": "未登录时可以定价和预览，但发布出售信息需要先在市场标签页登录 warframe.market。",
   "marketAlerts.title": "市场警报中心",
   "marketAlerts.newRule": "新建规则",
-  "marketAlerts.allowedNegativesConflict": "必需的负面属性不在可接受列表中",
   "marketAlerts.allowedNegatives": "可接受的负面属性",
   "marketAlerts.godRollSkipped": "warframe.market 不支持：{stats}",
   "marketAlerts.godRollOptional": "加分项：{stats}",

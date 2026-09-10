@@ -142,7 +142,7 @@ describe("parseMarketAlertRule", () => {
     ).toBe(false);
   });
 
-  it("keeps allowedNegatives optional and rejects a required curse outside it", () => {
+  it("keeps allowedNegatives optional and lets a required curse stay off the list", () => {
     const bare = parseMarketAlertRule(rivenRule(), "id");
     expect(bare.ok && bare.value.riven?.allowedNegatives).toBeUndefined();
     const set = parseMarketAlertRule(
@@ -150,12 +150,13 @@ describe("parseMarketAlertRule", () => {
       "id",
     );
     expect(set.ok && set.value.riven?.allowedNegatives).toEqual(["zoom", "recoil"]);
+    // A curse the rule demands does not have to be repeated as tolerated.
     expect(
       parseMarketAlertRule(
         rivenRule({ riven: { allowedNegatives: ["recoil"], requireNegative: ["zoom"] } }),
         "id",
       ).ok,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       parseMarketAlertRule(rivenRule({ riven: { allowedNegatives: ["not_a_stat"] } }), "id").ok,
     ).toBe(false);

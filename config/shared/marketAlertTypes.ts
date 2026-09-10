@@ -57,8 +57,9 @@ export interface RivenAlertMatch {
   requirePositive: string[];
   /** Curses that must all be present. */
   requireNegative: string[];
-  /** Curses the roll is allowed to carry. Empty means no restriction; a
-   *  non-empty list rejects any other curse and still accepts a clean roll. */
+  /** Curses the roll is allowed to carry besides the required ones. Empty means
+   *  no restriction; a non-empty list rejects any other curse and still accepts
+   *  a clean roll. requireNegative counts as tolerated without being listed. */
   allowedNegatives?: string[];
   /** Attributes that must not appear on either side. */
   excludeAttributes: string[];
@@ -410,13 +411,6 @@ function parseRivenMatch(value: unknown): MarketAlertParseResult<RivenAlertMatch
   for (const attribute of match.excludeAttributes) {
     if (match.requirePositive.includes(attribute) || match.requireNegative.includes(attribute)) {
       return fail("riven excludeAttributes contradicts a required attribute");
-    }
-  }
-  if (match.allowedNegatives && match.allowedNegatives.length > 0) {
-    for (const attribute of match.requireNegative) {
-      if (!match.allowedNegatives.includes(attribute)) {
-        return fail("riven requireNegative is outside allowedNegatives");
-      }
     }
   }
   return { ok: true, value: match };

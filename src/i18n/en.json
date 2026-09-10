@@ -1955,7 +1955,6 @@
   "workbench.signInHint": "Pricing and preview work signed out, but listing needs a warframe.market sign-in in the Market tab.",
   "marketAlerts.title": "Market Alerts",
   "marketAlerts.newRule": "New rule",
-  "marketAlerts.allowedNegativesConflict": "A required negative stat is not in the tolerated list",
   "marketAlerts.allowedNegatives": "Tolerated negative stats",
   "marketAlerts.godRollSkipped": "Not on warframe.market: {stats}",
   "marketAlerts.godRollOptional": "Nice to have: {stats}",
