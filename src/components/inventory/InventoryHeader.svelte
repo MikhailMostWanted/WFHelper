@@ -103,7 +103,7 @@
           title={$tr("inventory.selectModeHint")}
           on:click={onToggleSelectionMode}
         >
-          {$tr("inventory.selectMode")}
+          {$tr("workbench.title")}
         </button>
       {/if}
       {#if filtersEnabled}
