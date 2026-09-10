@@ -16,6 +16,8 @@ const DECLINE_COOLDOWN_MS = 60_000;
 const SOURCE_ERROR_COOLDOWN_MS = 5_000;
 // The portal picker is interactive; give the user time to answer.
 const STREAM_START_TIMEOUT_MS = 120_000;
+// A portal with no backend leaves getSources pending forever; a live one answers under 1s.
+const SOURCE_LOOKUP_TIMEOUT_MS = 8_000;
 const GRAB_TIMEOUT_MS = 5_000;
 // Windows GDI does this in ~30ms; anything past this is worth a line.
 const SLOW_GRAB_LOG_MS = 250;
@@ -28,6 +30,7 @@ let _starting: Promise<boolean> | null = null;
 let _handlerInstalled = false;
 let _cooldownUntil = 0;
 let _sourceLookupFailed = false;
+let _sourceLookupTimedOut = false;
 let _lastFailure: string | null = null;
 
 function _now(): number {
@@ -44,37 +47,75 @@ function pickCaptureSource<T extends { id: string; name: string }>(
   return sources.find((source) => source.id.startsWith("screen:")) ?? sources[0] ?? null;
 }
 
+interface CaptureSourceLookup<T> {
+  source: T | null;
+  timedOut: boolean;
+  elapsedMs: number;
+}
+
+async function lookupCaptureSource<T extends { id: string; name: string }>(
+  getSources: () => Promise<readonly T[]>,
+  timeoutMs: number = SOURCE_LOOKUP_TIMEOUT_MS,
+): Promise<CaptureSourceLookup<T>> {
+  const askedAt = _now();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const expiry = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => resolve("timeout"), timeoutMs);
+  });
+  try {
+    const outcome = await Promise.race([getSources(), expiry]);
+    if (outcome === "timeout") return { source: null, timedOut: true, elapsedMs: _now() - askedAt };
+    log.info(
+      `[LinuxCapture] compositor offered ${outcome.length} source(s) after ${_now() - askedAt}ms`,
+    );
+    return { source: pickCaptureSource(outcome), timedOut: false, elapsedMs: _now() - askedAt };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function _installDisplayMediaHandler(win: BrowserWindowType): Promise<void> {
   if (_handlerInstalled) return;
   const { desktopCapturer } = await import("electron");
-  // Routes the page's getDisplayMedia; getSources() opens the Wayland picker.
   win.webContents.session.setDisplayMediaRequestHandler(
     (_request, callback) => {
-      // A portal that never answers hangs here; the timing makes that visible in the log.
-      const askedAt = _now();
       log.info("[LinuxCapture] display media requested, asking the compositor for sources");
-      desktopCapturer
-        .getSources({ types: ["window", "screen"], thumbnailSize: { width: 0, height: 0 } })
-        .then((sources) => {
-          log.info(
-            `[LinuxCapture] compositor offered ${sources.length} source(s) after ${_now() - askedAt}ms`,
+      void (async () => {
+        type CaptureSource = Awaited<ReturnType<typeof desktopCapturer.getSources>>[number];
+        let video: CaptureSource | null = null;
+        try {
+          const { source, timedOut } = await lookupCaptureSource(() =>
+            desktopCapturer.getSources({
+              types: ["window", "screen"],
+              thumbnailSize: { width: 0, height: 0 },
+            }),
           );
-          const source = pickCaptureSource(sources);
-          if (!source) {
+          if (timedOut) {
+            _sourceLookupFailed = true;
+            _sourceLookupTimedOut = true;
+            log.warn(
+              `[LinuxCapture] no source list within ${SOURCE_LOOKUP_TIMEOUT_MS}ms` +
+                " - the desktop portal is not answering",
+            );
+          } else if (!source) {
             _sourceLookupFailed = true;
             log.warn("[LinuxCapture] no capture source offered by the compositor");
-            callback({} as never);
-            return;
+          } else {
+            _sourceLookupFailed = false;
+            log.info("[LinuxCapture] capturing source:", source.name || source.id);
+            video = source;
           }
-          _sourceLookupFailed = false;
-          log.info("[LinuxCapture] capturing source:", source.name || source.id);
-          callback({ video: source });
-        })
-        .catch((err) => {
+        } catch (err) {
           _sourceLookupFailed = true;
           log.warn("[LinuxCapture] getSources failed:", normalizeErrorMessage(err));
-          callback({} as never);
-        });
+        }
+        // One call only: a refused request throws, and a second call kills the main process.
+        try {
+          callback(video ? { video } : ({} as never));
+        } catch (err) {
+          log.warn("[LinuxCapture] display media request refused:", normalizeErrorMessage(err));
+        }
+      })();
     },
     { useSystemPicker: true },
   );
@@ -161,15 +202,23 @@ async function _ensureStream(): Promise<boolean> {
   if (!_starting) {
     _starting = (async () => {
       _sourceLookupFailed = false;
+      _sourceLookupTimedOut = false;
       const win = await _createWindow();
       if (!win) return false;
       _win = win;
       _streamGeneration += 1;
       const live = await _waitForLiveStream(win);
       if (!live) {
-        const cooldownMs = _sourceLookupFailed ? SOURCE_ERROR_COOLDOWN_MS : DECLINE_COOLDOWN_MS;
+        const cooldownMs =
+          _sourceLookupFailed && !_sourceLookupTimedOut
+            ? SOURCE_ERROR_COOLDOWN_MS
+            : DECLINE_COOLDOWN_MS;
         _cooldownUntil = _now() + cooldownMs;
-        const reason = _sourceLookupFailed ? "no capture source" : "portal declined/failed";
+        const reason = _sourceLookupTimedOut
+          ? "no answer from the desktop portal"
+          : _sourceLookupFailed
+            ? "no capture source"
+            : "portal declined/failed";
         _lastFailure = reason;
         log.warn(
           `[LinuxCapture] stream not acquired (${reason}) - cooling down ${Math.round(cooldownMs / 1000)}s`,
@@ -313,4 +362,10 @@ export function disposeLinuxStreamCapture(): void {
   _resetBlankTracking();
 }
 
-export const __test__ = { pickCaptureSource, isUsableFrame, isBlankFrame, shouldDropBlankStream };
+export const __test__ = {
+  pickCaptureSource,
+  lookupCaptureSource,
+  isUsableFrame,
+  isBlankFrame,
+  shouldDropBlankStream,
+};

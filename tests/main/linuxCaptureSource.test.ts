@@ -1,7 +1,16 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 import { __test__ } from "../../services/linuxStreamCapture";
 
-const { pickCaptureSource, isUsableFrame, isBlankFrame, shouldDropBlankStream } = __test__;
+const {
+  pickCaptureSource,
+  lookupCaptureSource,
+  isUsableFrame,
+  isBlankFrame,
+  shouldDropBlankStream,
+} = __test__;
 
 function rawFrame(width: number, height: number, byteLength = width * height * 4) {
   return { width, height, pixels: new Uint8ClampedArray(byteLength) };
@@ -10,6 +19,20 @@ function rawFrame(width: number, height: number, byteLength = width * height * 4
 const SCREEN = { id: "screen:0:0", name: "Screen 1" };
 const GAME = { id: "window:12345:0", name: "Warframe" };
 const OTHER = { id: "window:999:0", name: "Firefox" };
+
+describe("display media request handler", () => {
+  const source = fs.readFileSync(
+    path.join(process.cwd(), "services/linuxStreamCapture.ts"),
+    "utf8",
+  );
+
+  it("answers the request exactly once", () => {
+    const handler =
+      source.match(/setDisplayMediaRequestHandler\([\s\S]*?\n {4}\{ useSystemPicker/)?.[0] ?? "";
+    expect(handler).not.toBe("");
+    expect(handler.match(/(?<!\/\/[^\n]*)\bcallback\(/g) ?? []).toHaveLength(1);
+  });
+});
 
 describe("linux capture source", () => {
   it("prefers the Warframe window over the screen", () => {
@@ -61,5 +84,29 @@ describe("raw stream frames", () => {
     // A loading screen after real frames must not cost a portal re-prompt.
     expect(shouldDropBlankStream(3, true)).toBe(false);
     expect(shouldDropBlankStream(999, true)).toBe(false);
+  });
+});
+
+describe("capture source lookup", () => {
+  it("gives up when the compositor never answers", async () => {
+    const pending = new Promise<never>(() => {});
+    await expect(lookupCaptureSource(() => pending, 20)).resolves.toMatchObject({
+      source: null,
+      timedOut: true,
+    });
+  });
+
+  it("picks a source when the lookup answers in time", async () => {
+    const answered = await lookupCaptureSource(async () => [SCREEN, GAME], 1_000);
+    expect(answered.source).toBe(GAME);
+    expect(answered.timedOut).toBe(false);
+  });
+
+  it("leaves a failed lookup to the caller", async () => {
+    await expect(
+      lookupCaptureSource(async () => {
+        throw new Error("dbus refused");
+      }, 1_000),
+    ).rejects.toThrow("dbus refused");
   });
 });
