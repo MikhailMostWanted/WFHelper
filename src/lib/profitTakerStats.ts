@@ -273,13 +273,18 @@ export function ptBestRunIds(runs: readonly PtRunRecord[]): ReadonlySet<string> 
   );
 }
 
-export function formatPtTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return "\u2014";
+export function formatPtTime(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) return "\u2014";
   const millis = Math.round(seconds * 1000);
   if (!Number.isSafeInteger(millis)) return "\u2014";
   if (millis < 60000) return (millis / 1000).toFixed(3);
   const minutes = Math.floor(millis / 60000);
   return `${minutes}:${((millis % 60000) / 1000).toFixed(3).padStart(6, "0")}`;
+}
+
+export function formatPtLength(seconds: number | null): string {
+  const text = seconds === null ? "\u2014" : formatPtTime(seconds);
+  return text.includes(":") || text === "\u2014" ? text : `${text}s`;
 }
 
 export function formatPtSeconds(seconds: number | null): string {

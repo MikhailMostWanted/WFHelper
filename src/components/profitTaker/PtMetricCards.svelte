@@ -1,6 +1,11 @@
 <script lang="ts">
   import { tr } from "../../lib/i18n.js";
-  import { formatPtSeconds, PT_METRIC_KEYS, type PtMetric } from "../../lib/profitTakerStats.js";
+  import {
+    formatPtLength,
+    formatPtTime,
+    PT_METRIC_KEYS,
+    type PtMetric,
+  } from "../../lib/profitTakerStats.js";
 
   let {
     rows,
@@ -26,6 +31,8 @@
 
 <div class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6" data-pt-metric-cards>
   {#each rows as row (row.metric)}
+    {@const value = formatPtTime(row.value)}
+    {@const unit = formatPtLength(row.value) !== value}
     <section
       class="min-w-0 rounded-xl border border-border bg-bg-surface p-4"
       data-pt-stat={row.metric}
@@ -73,8 +80,8 @@
       >
         <span
           data-pt-stat-value={row.metric}
-          data-pt-mean={mode === "mean" ? row.metric : undefined}>{formatPtSeconds(row.value)}</span
-        ><span class="ml-0.5 text-sm font-normal text-text-muted">s</span>
+          data-pt-mean={mode === "mean" ? row.metric : undefined}>{value}</span
+        >{#if unit}<span class="ml-0.5 text-sm font-normal text-text-muted">s</span>{/if}
       </div>
       {#if row.detail}<p
           class="mb-0 mt-2 text-xs {row.detail.good ? 'text-success' : 'text-text-muted'}"

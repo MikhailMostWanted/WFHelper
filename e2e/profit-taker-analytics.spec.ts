@@ -24,6 +24,13 @@ const METRICS = {
   pylon: "24.573",
 } as const;
 
+/** Mirrors formatPtTime, which is what a metric card's value span holds. */
+function cardText(seconds: string): string {
+  const value = Number(seconds);
+  if (value < 60) return seconds;
+  return `${Math.floor(value / 60)}:${(value % 60).toFixed(3).padStart(6, "0")}`;
+}
+
 function recordedRun(): PtRunRecord {
   const parser = createProfitTakerParser();
   const lines = fs
@@ -225,7 +232,7 @@ test.describe("Profit-Taker analytics", () => {
     await openPt(page);
     await page.locator(`[data-pt-run="${BASE.id}"]`).click();
     for (const [metric, seconds] of Object.entries(METRICS)) {
-      await expect(page.locator(`[data-pt-stat-value="${metric}"]`)).toHaveText(seconds);
+      await expect(page.locator(`[data-pt-stat-value="${metric}"]`)).toHaveText(cardText(seconds));
     }
     for (const [index, seconds] of ["51.001", "60.729", "99.922", "112.971"].entries()) {
       await expect(
@@ -254,9 +261,11 @@ test.describe("Profit-Taker analytics", () => {
     await page.locator("[data-pt-notes]").fill("Driver note for the recorded run");
     const direction = (await page.locator("[data-pt-prev]").isEnabled()) ? "prev" : "next";
     await page.locator(`[data-pt-${direction}]`).click();
-    await expect(page.locator('[data-pt-stat-value="total"]')).not.toHaveText("112.971");
+    await expect(page.locator('[data-pt-stat-value="total"]')).not.toHaveText(
+      cardText(METRICS.total),
+    );
     await page.locator(`[data-pt-${direction === "prev" ? "next" : "prev"}]`).click();
-    await expect(page.locator('[data-pt-stat-value="total"]')).toHaveText("112.971");
+    await expect(page.locator('[data-pt-stat-value="total"]')).toHaveText(cardText(METRICS.total));
     await expect(page.locator("[data-pt-notes]")).toHaveValue("Driver note for the recorded run");
     await setDisplayLanguage(page, "de");
     await openPt(page);
@@ -307,7 +316,7 @@ test.describe("Profit-Taker analytics", () => {
     await page.locator('[data-pt-subtab="analytics"]').click();
     for (const [metric, seconds] of Object.entries(METRICS)) {
       await expect(page.locator(`[data-pt-mean="${metric}"]`)).toHaveText(
-        (Number(seconds) * 0.875).toFixed(3),
+        cardText((Number(seconds) * 0.875).toFixed(3)),
       );
     }
     await expect(page.locator("[data-pt-unknown-squad]")).toBeVisible();
@@ -336,27 +345,29 @@ test.describe("Profit-Taker analytics", () => {
     await page.locator("[data-pt-filter-squad]").selectOption("4");
     for (const [metric, seconds] of Object.entries(METRICS)) {
       const expected = (Number(seconds) * 1.1).toFixed(3);
-      await expect(page.locator(`[data-pt-mean="${metric}"]`)).toHaveText(expected);
+      await expect(page.locator(`[data-pt-mean="${metric}"]`)).toHaveText(cardText(expected));
     }
     await page.locator("[data-pt-filter-from]").fill("2026-09-02");
     await page.locator("[data-pt-filter-to]").fill("2026-09-02");
-    await expect(page.locator('[data-pt-mean="total"]')).toHaveText("135.565");
+    await expect(page.locator('[data-pt-mean="total"]')).toHaveText(cardText("135.565"));
     await expect(page.locator(`[data-pt-chart-run="${BASE.id}"]`)).toHaveCount(0);
     const point = page.locator(`[data-pt-chart-run="${SLOWER.id}"]`).first();
     await expect(point).toBeVisible();
     await point.focus();
     await point.press("Enter");
-    await expect(page.locator('[data-pt-stat-value="total"]')).toHaveText("135.565");
+    await expect(page.locator('[data-pt-stat-value="total"]')).toHaveText(cardText("135.565"));
     await expect(page.locator(`[data-pt-baseline] option[value="${BASE.id}"]`)).toHaveCount(1);
     await page.locator("[data-pt-detail-back]").click();
     await expect(page.locator("[data-pt-analytics-scope]")).toBeVisible();
     await page.locator("[data-pt-filter-from]").fill("");
     await page.locator("[data-pt-filter-to]").fill("");
     await page.locator("[data-pt-filter-squad]").selectOption("solo");
-    await expect(page.locator('[data-pt-mean="total"]')).toHaveText("90.377");
+    await expect(page.locator('[data-pt-mean="total"]')).toHaveText(cardText("90.377"));
     await expect(page.locator("[data-pt-chart-run]")).toHaveCount(1);
     await page.locator("[data-pt-filter-squad]").selectOption("unknown");
-    await expect(page.locator('[data-pt-mean="total"]')).toHaveText(UNKNOWN.durationSec.toFixed(3));
+    await expect(page.locator('[data-pt-mean="total"]')).toHaveText(
+      cardText(UNKNOWN.durationSec.toFixed(3)),
+    );
     await expect(page.locator("[data-pt-chart-run]")).toHaveCount(1);
     await expect(page.locator("[data-pt-unknown-squad]")).toBeVisible();
     await page.screenshot({
@@ -376,6 +387,8 @@ test.describe("Profit-Taker analytics", () => {
     await expect(page.locator("[data-pt-exclusion]")).toBeVisible();
     await expect(page.locator("[data-pt-baseline]")).toHaveCount(0);
     await expect(page.locator('[data-pt-phase="3"] [data-pt-phase-pylon]')).not.toHaveText(/\d/);
+    await expect(page.locator('[data-pt-stat-value="pylon"]')).toHaveText("—");
+    await expect(page.locator('[data-pt-stat="pylon"]')).not.toHaveText(/—\s*s/);
     await page.screenshot({ path: testInfo.outputPath("pt-bugged-detail.png"), fullPage: true });
     await page.locator("[data-pt-detail-back]").click();
     await page.locator("[data-pt-filter-status]").selectOption("all");
@@ -397,7 +410,7 @@ test.describe("Profit-Taker analytics", () => {
     expect(bounds).not.toBeNull();
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1100);
     await page.locator(`[data-pt-chart-run="${BASE.id}"] [data-pt-chart-point="total"]`).click();
-    await expect(page.locator('[data-pt-stat-value="total"]')).toHaveText("112.971");
+    await expect(page.locator('[data-pt-stat-value="total"]')).toHaveText(cardText(METRICS.total));
     expect(await page.locator("#content").innerText()).not.toMatch(/NaN|Infinity/);
     expect(errors).toEqual([]);
   });

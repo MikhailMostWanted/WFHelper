@@ -1,7 +1,7 @@
 <script lang="ts">
   import { locale, tr } from "../../lib/i18n.js";
   import {
-    formatPtSeconds,
+    formatPtLength,
     ptMetricSummary,
     ptMetricValue,
     ptSquadSize,
@@ -109,7 +109,7 @@
         metric: row.metric,
         value: row.mean,
         detail: {
-          text: `${$tr("common.median")}: ${formatPtSeconds(row.median)}s | ${$tr("pt.analytics.fastestFiltered")}: ${formatPtSeconds(row.best)}s`,
+          text: `${$tr("common.median")}: ${formatPtLength(row.median)} | ${$tr("pt.analytics.fastestFiltered")}: ${formatPtLength(row.best)}`,
           good: false,
         },
       }))}
@@ -180,7 +180,7 @@
               data-pt-chart-run={run.id}
               role="button"
               tabindex={enabled.length ? 0 : -1}
-              aria-label={`${dateLabel(run.startedAt, $locale)}: ${formatPtSeconds(run.durationSec)}s`}
+              aria-label={`${dateLabel(run.startedAt, $locale)}: ${formatPtLength(run.durationSec)}`}
               class="cursor-pointer outline-none"
               onfocus={() => (selectedId = run.id)}
               onmouseenter={() => (selectedId = run.id)}
@@ -197,9 +197,9 @@
                   stroke={selectedId === run.id ? "var(--text-primary)" : "var(--bg-surface)"}
                   stroke-width="1.5"
                   ><title
-                    >{$tr(PT_METRIC_KEYS[metric])}: {formatPtSeconds(
+                    >{$tr(PT_METRIC_KEYS[metric])}: {formatPtLength(
                       ptMetricValue(run, metric),
-                    )}s</title
+                    )}</title
                   ></circle
                 >
               {/each}
@@ -231,7 +231,7 @@
           {#each enabled as metric}<span class="text-text-muted"
               >{$tr(PT_METRIC_KEYS[metric])}
               <strong class="font-mono text-text-secondary"
-                >{formatPtSeconds(ptMetricValue(selected, metric))}s</strong
+                >{formatPtLength(ptMetricValue(selected, metric))}</strong
               ></span
             >{/each}
           <button

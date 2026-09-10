@@ -6,6 +6,7 @@ import { createProfitTakerParser } from "../../services/profitTakerParser";
 import type { PtRunRecord } from "../../config/shared/profitTakerTypes";
 import {
   PT_METRICS,
+  formatPtLength,
   formatPtTime,
   ptBestRunIds,
   ptComparison,
@@ -279,6 +280,10 @@ describe("Profit-Taker comparison data", () => {
     expect(formatPtTime(59.9999)).toBe("1:00.000");
     expect(formatPtTime(112.971)).toBe("1:52.971");
     expect(formatPtTime(NaN)).toBe("—");
+    expect(formatPtLength(41.5)).toBe("41.500s");
+    expect(formatPtLength(112.971)).toBe("1:52.971");
+    expect(formatPtLength(null)).toBe("—");
+    expect(formatPtLength(NaN)).toBe("—");
     expect(formatPtTime(Infinity)).toBe("—");
   });
 });
