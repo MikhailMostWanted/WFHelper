@@ -27,7 +27,7 @@ vi.mock("../../ipc/overlay/rivenScanImage", () => {
   };
 });
 
-import { recognizeRivenCardStats } from "../../ipc/overlay/rivenScanOcr";
+import { isIncompleteRivenRead, recognizeRivenCardStats } from "../../ipc/overlay/rivenScanOcr";
 
 describe("recognizeRivenCardStats", () => {
   // A test that pins its own confidence rule or queues reads with Once must not
@@ -94,5 +94,121 @@ describe("recognizeRivenCardStats", () => {
 
     expect(result.lowConfidence).toBe(false);
     expect(result.stats).toHaveLength(2);
+  });
+});
+
+describe("isIncompleteRivenRead", () => {
+  const stat = (name: string, positive: boolean) => ({ name, positive, value: 10 });
+
+  it("accepts the shapes a riven can actually roll", () => {
+    expect(isIncompleteRivenRead([stat("Damage", true), stat("Multishot", true)])).toBe(false);
+    expect(
+      isIncompleteRivenRead([
+        stat("Damage", true),
+        stat("Multishot", true),
+        stat("Critical Chance", false),
+      ]),
+    ).toBe(false);
+  });
+
+  it("rejects a read that kept a curse but lost a buff", () => {
+    expect(isIncompleteRivenRead([stat("Damage", true), stat("Zoom", false)])).toBe(true);
+    expect(isIncompleteRivenRead([stat("Damage", true)])).toBe(true);
+  });
+
+  it("leaves an empty read to the empty-scan path", () => {
+    expect(isIncompleteRivenRead([])).toBe(false);
+  });
+
+  it("rejects two buffs when a third stat-shaped line went unread", () => {
+    const twoBuffs = [
+      { name: "Damage to Corpus", positive: true, value: 1.36, multiplier: true },
+      { name: "Critical Chance for Slide Attack", positive: true, value: 108 },
+    ];
+    expect(isIncompleteRivenRead(twoBuffs, true)).toBe(true);
+    expect(isIncompleteRivenRead(twoBuffs, false)).toBe(false);
+  });
+
+  it("keeps a whole three-stat card even when a line went unread", () => {
+    expect(
+      isIncompleteRivenRead(
+        [stat("Damage", true), stat("Multishot", true), stat("Zoom", false)],
+        true,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("recognizeRivenCardStats completeness gate", () => {
+  beforeEach(() => {
+    recognizeStatAreaMock.mockReset();
+    lowConfidenceMock.mockReset();
+    lowConfidenceMock.mockImplementation(() => false);
+  });
+
+  it("returns an error instead of a card missing one of its buffs", async () => {
+    const read = {
+      lines: [
+        { text: "+120.5% Damage", confidence: 0.99 },
+        { text: "-72.3% Critical Chance", confidence: 0.99 },
+      ],
+      text: "+120.5% Damage\n-72.3% Critical Chance",
+      minConfidence: 0.99,
+      yoloBoxCount: 4,
+    };
+    recognizeStatAreaMock.mockResolvedValue(read);
+
+    const result = await recognizeRivenCardStats(
+      {} as never,
+      { x: 0, y: 0, width: 1, height: 1 },
+      { generation: 1, isStale: () => false, label: "test" },
+    );
+
+    expect(result.stats).toEqual([]);
+    expect(result.lowConfidence).toBe(true);
+  });
+
+  it("keeps a curse-free two-buff card when the crop caught a signed fragment", async () => {
+    recognizeStatAreaMock.mockResolvedValue({
+      lines: [
+        { text: "+104.6% Critical Damage", confidence: 0.99 },
+        { text: "+2.3 Range", confidence: 0.99 },
+        { text: "+1 5%", confidence: 0.99 },
+      ],
+      text: "+104.6% Critical Damage\n+2.3 Range\n+1 5%",
+      minConfidence: 0.99,
+      yoloBoxCount: 5,
+    });
+
+    const result = await recognizeRivenCardStats(
+      {} as never,
+      { x: 0, y: 0, width: 1, height: 1 },
+      { generation: 1, isStale: () => false, label: "test" },
+    );
+
+    expect(result.stats).toHaveLength(2);
+    expect(result.lowConfidence).toBe(false);
+  });
+
+  it("retries two buffs when the unread line carried a stat name too", async () => {
+    recognizeStatAreaMock.mockResolvedValue({
+      lines: [
+        { text: "+104.6% Critical Damage", confidence: 0.99 },
+        { text: "+2.3 Range", confidence: 0.99 },
+        { text: "x1.36 Dmagt Grneea", confidence: 0.99 },
+      ],
+      text: "+104.6% Critical Damage\n+2.3 Range\nx1.36 Dmagt Grneea",
+      minConfidence: 0.99,
+      yoloBoxCount: 6,
+    });
+
+    const result = await recognizeRivenCardStats(
+      {} as never,
+      { x: 0, y: 0, width: 1, height: 1 },
+      { generation: 1, isStale: () => false, label: "test" },
+    );
+
+    expect(result.stats).toEqual([]);
+    expect(result.lowConfidence).toBe(true);
   });
 });

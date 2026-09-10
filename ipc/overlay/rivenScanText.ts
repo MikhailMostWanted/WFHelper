@@ -384,6 +384,14 @@ function looksStatLike(line: string): boolean {
   return /[+\-–]\s*\d/.test(line) || /\bx\s*\d/i.test(line);
 }
 
+// A value with no name is a glare-split piece of a line the read kept, not a lost stat.
+const MIN_DROPPED_STAT_NAME_CHARS = 3;
+
+export function looksLikeWholeStatLine(line: string): boolean {
+  if (!looksStatLike(line)) return false;
+  return (line.match(/[A-Za-z]/g)?.length ?? 0) >= MIN_DROPPED_STAT_NAME_CHARS;
+}
+
 function parseStatsFromLines(text: string, dropped?: string[]): RivenStat[] {
   const lines = collapseOrphanValueLines(text.split(/\r?\n/));
   const results: RivenStat[] = [];

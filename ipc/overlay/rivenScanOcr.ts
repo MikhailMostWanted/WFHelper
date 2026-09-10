@@ -19,10 +19,28 @@ import {
   type RivenFallbackCrop,
   type RivenScanCropRect,
 } from "./rivenScanImage";
-import { parseRivenStats, type RivenParseDiagnostics, type RivenStat } from "./rivenScanText";
+import {
+  looksLikeWholeStatLine,
+  parseRivenStats,
+  type RivenParseDiagnostics,
+  type RivenStat,
+} from "./rivenScanText";
 
 const log = withScope("rivenScan");
 export const MIN_ACCEPTABLE_RIVEN_STATS = 2;
+// Every riven rolls at least two buffs, with or without a curse.
+const MIN_ACCEPTABLE_RIVEN_BUFFS = 2;
+
+export function isIncompleteRivenRead(
+  stats: readonly RivenStat[],
+  droppedWholeStatLine = false,
+): boolean {
+  if (stats.length === 0) return false;
+  if (stats.length < MIN_ACCEPTABLE_RIVEN_STATS) return true;
+  if (stats.filter((stat) => stat.positive).length < MIN_ACCEPTABLE_RIVEN_BUFFS) return true;
+  // A three-line card whose top line washed out still shows two buffs; the dropped line is the tell.
+  return stats.length < 3 && droppedWholeStatLine;
+}
 const MAX_LOW_CONFIDENCE_RETRIES = 2;
 const LOW_CONFIDENCE_RETRY_DELAY_MS = 300;
 
@@ -140,6 +158,7 @@ export async function recognizeRivenCardStats(
   let parseMs = 0;
   let ocrCalls = 0;
   let droppedAnyLine = false;
+  let droppedWholeStatLine = false;
 
   for (let attempt = 0; attempt <= MAX_LOW_CONFIDENCE_RETRIES; attempt += 1) {
     if (options.isStale(options.generation)) {
@@ -225,6 +244,7 @@ export async function recognizeRivenCardStats(
         bestStats = stats;
         bestText = ocrResult.text;
         droppedAnyLine = diagnostics.droppedLines.length > 0;
+        droppedWholeStatLine = diagnostics.droppedLines.some(looksLikeWholeStatLine);
       }
 
       if (stats.length >= MIN_ACCEPTABLE_RIVEN_STATS) {
@@ -255,8 +275,7 @@ export async function recognizeRivenCardStats(
     bestResult && bestStats.length >= MIN_ACCEPTABLE_RIVEN_STATS && hasLowConfidenceLine(bestResult)
       ? bestResult
       : null;
-  // Rivens have at least two stats; a lone survivor is a misread.
-  const belowStatMinimum = bestStats.length > 0 && bestStats.length < MIN_ACCEPTABLE_RIVEN_STATS;
+  const belowStatMinimum = isIncompleteRivenRead(bestStats, droppedWholeStatLine);
 
   // Every scan, not only empty ones: a confident read of a badly cropped card
   // looks perfect in the log, so the image is the only evidence that settles it.
@@ -293,9 +312,10 @@ export async function recognizeRivenCardStats(
 
   if (belowStatMinimum) {
     if (options.label) {
+      const buffs = bestStats.filter((stat) => stat.positive).length;
       log.warn(
-        `[RivenScan] YOLO+PaddleOCR ${options.label}: only ${bestStats.length} stat(s) read, ` +
-          `below the ${MIN_ACCEPTABLE_RIVEN_STATS} minimum - returning error`,
+        `[RivenScan] YOLO+PaddleOCR ${options.label}: incomplete card read ` +
+          `(${bestStats.length} stat(s), ${buffs} buff(s)) - returning error`,
       );
     }
     return { text: bestText, titleText: "", footerText: "", stats: [], lowConfidence: true };
