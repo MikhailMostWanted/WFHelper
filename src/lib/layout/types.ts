@@ -23,11 +23,14 @@ export interface SectionDescriptor {
   canPopout?: boolean;
 }
 
+export type LayoutColumn = 0 | 1;
+
 export interface SectionState {
   id: string;
   span: SectionSpan;
   hidden: boolean;
   collapsed: boolean;
+  column?: LayoutColumn;
 }
 
 export interface ViewLayout {

@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  columnOf,
   mergeViewLayout,
   moveSectionInList,
   nextSpan,
   normalizeLayoutState,
+  placeSectionColumns,
   planSections,
 } from "../../../../src/lib/layout/plan.js";
-import type { SectionDescriptor, SectionState } from "../../../../src/lib/layout/types.js";
+import type {
+  LayoutColumn,
+  SectionDescriptor,
+  SectionState,
+} from "../../../../src/lib/layout/types.js";
 import { VIEW_NAMES } from "../../../../src/types/views.js";
 
 const DESCRIPTORS: SectionDescriptor[] = [
@@ -47,6 +53,17 @@ const state = (id: string, patch: Partial<SectionState> = {}): SectionState => (
   collapsed: false,
   ...patch,
 });
+
+const placed = (
+  id: string,
+  column: LayoutColumn,
+  patch: Partial<SectionState> = {},
+): SectionState => state(id, { column, ...patch });
+
+const columns = (sections: readonly SectionState[]): Record<string, LayoutColumn> =>
+  Object.fromEntries(sections.map((section) => [section.id, columnOf(section)]));
+
+const ids = (sections: readonly SectionState[]): string[] => sections.map((section) => section.id);
 
 describe("mergeViewLayout", () => {
   it("returns registry defaults when nothing is stored", () => {
@@ -199,6 +216,26 @@ describe("normalizeLayoutState", () => {
     expect(Object.keys(normalized.views)).toEqual(["world"]);
   });
 
+  it("keeps a stored column and drops one that is not a column", () => {
+    const normalized = normalizeLayoutState({
+      version: 1,
+      views: {
+        world: {
+          wide: {
+            sections: [
+              { id: "world.cycles", span: 1, column: 1 },
+              { id: "world.timers", span: 1, column: 7 },
+              { id: "world.fissures", span: 1, column: 0 },
+            ],
+          },
+        },
+      },
+    });
+    expect((normalized.views.world?.wide?.sections ?? []).map((section) => section.column)).toEqual(
+      [1, undefined, 0],
+    );
+  });
+
   it("drops a view key that is not arrangeable", () => {
     const sections = [{ id: "world.cycles", span: 1, hidden: false, collapsed: false }];
     const normalized = normalizeLayoutState({
@@ -266,14 +303,60 @@ describe("moveSectionInList", () => {
     ]);
   });
 
-  it("reaches the other column by naming the section it landed on", () => {
-    // planSections gives the left column the first ceil(n/2), so a drop on the
-    // last section is the only way out of the left column.
-    const four = [state("a"), state("b"), state("c"), state("d")];
-    const rows = planSections(moveSectionInList(four, "a", { toId: "d" }), "wide");
+  it("takes the column of the section it landed on", () => {
+    const four = [placed("a", 0), placed("b", 0), placed("c", 1), placed("d", 1)];
+    const moved = moveSectionInList(four, "a", { toId: "d" });
+    expect(ids(moved)).toEqual(["b", "c", "d", "a"]);
+    expect(columns(moved)).toEqual({ a: 1, b: 0, c: 1, d: 1 });
+  });
+
+  it("keeps its own column when it lands on a full-width section", () => {
+    const list = [placed("a", 1), placed("b", 0), state("wide", { span: "full", column: 0 })];
+    const moved = moveSectionInList(list, "a", { toId: "wide" });
+    expect(ids(moved)).toEqual(["b", "wide", "a"]);
+    expect(columnOf(moved[2] as SectionState)).toBe(1);
+  });
+});
+
+describe("moveSectionInList across columns", () => {
+  const four = [placed("a", 0), placed("b", 0), placed("c", 1), placed("d", 1)];
+
+  it("moves only the dragged section when the drop crosses the boundary", () => {
+    const moved = moveSectionInList(four, "d", { index: 1, column: 0 });
+    expect(ids(moved)).toEqual(["a", "d", "b", "c"]);
+    expect(columns(moved)).toEqual({ a: 0, b: 0, c: 1, d: 0 });
+    expect(columns(four)).toEqual({ a: 0, b: 0, c: 1, d: 1 });
+  });
+
+  it("lands at the bottom of the column it was dropped into", () => {
+    const moved = moveSectionInList(four, "a", { index: 3, column: 1 });
+    const rows = planSections(moved, "wide");
     if (rows[0]?.kind !== "columns") throw new Error("expected a columns row");
-    expect(rows[0].columns[0]?.map((slot) => slot.id)).toEqual(["b", "c"]);
-    expect(rows[0].columns[1]?.map((slot) => slot.id)).toEqual(["d", "a"]);
+    expect(rows[0].columns[0]?.map((slot) => slot.id)).toEqual(["b"]);
+    expect(rows[0].columns[1]?.map((slot) => slot.id)).toEqual(["c", "d", "a"]);
+  });
+
+  it("changes the column without changing the order", () => {
+    const moved = moveSectionInList(four, "b", { index: 1, column: 1 });
+    expect(ids(moved)).toEqual(["a", "b", "c", "d"]);
+    const rows = planSections(moved, "wide");
+    if (rows[0]?.kind !== "columns") throw new Error("expected a columns row");
+    expect(rows[0].columns[0]?.map((slot) => slot.id)).toEqual(["a"]);
+    expect(rows[0].columns[1]?.map((slot) => slot.id)).toEqual(["b", "c", "d"]);
+  });
+
+  it("swaps both slots for an arrow step across the boundary", () => {
+    const moved = moveSectionInList(four, "b", "down");
+    expect(ids(moved)).toEqual(["a", "c", "b", "d"]);
+    expect(columns(moved)).toEqual({ a: 0, b: 1, c: 0, d: 1 });
+    expect(columns(moveSectionInList(moved, "b", "up"))).toEqual(columns(four));
+    expect(ids(moveSectionInList(moved, "b", "up"))).toEqual(ids(four));
+  });
+
+  it("leaves the columns alone for an arrow step inside one column", () => {
+    const moved = moveSectionInList(four, "c", "down");
+    expect(ids(moved)).toEqual(["a", "b", "d", "c"]);
+    expect(columns(moved)).toEqual({ a: 0, b: 0, c: 1, d: 1 });
   });
 });
 
@@ -291,8 +374,155 @@ describe("nextSpan", () => {
   });
 });
 
+describe("placeSectionColumns", () => {
+  it("cuts a run nobody placed in half, the way the old build rendered it", () => {
+    const run = [state("a"), state("b"), state("c"), state("d"), state("e")];
+    expect(columns(placeSectionColumns(run))).toEqual({ a: 0, b: 0, c: 0, d: 1, e: 1 });
+  });
+
+  it("cuts each run between full-width sections on its own", () => {
+    const rows = placeSectionColumns([
+      state("a"),
+      state("b"),
+      state("wide", { span: "full" }),
+      state("c"),
+      state("d"),
+    ]);
+    expect(columns(rows)).toEqual({ a: 0, b: 1, wide: 0, c: 0, d: 1 });
+  });
+
+  it("counts only the sections the old cut would have counted", () => {
+    const rows = placeSectionColumns([
+      state("a"),
+      state("b", { hidden: true }),
+      state("c"),
+      state("d"),
+    ]);
+    expect(columns(rows)).toEqual({ a: 0, b: 0, c: 0, d: 1 });
+  });
+
+  it("gives a section added by an update the column of its neighbour", () => {
+    const rows = placeSectionColumns([placed("a", 0), state("new"), placed("c", 1)]);
+    expect(columns(rows)).toEqual({ a: 0, new: 0, c: 1 });
+  });
+
+  it("takes the column below when a new section leads the run", () => {
+    expect(columns(placeSectionColumns([state("new"), placed("b", 1)]))).toEqual({
+      new: 1,
+      b: 1,
+    });
+  });
+
+  it("leaves a placed run untouched", () => {
+    const stored = [placed("a", 1), placed("b", 1), placed("c", 0)];
+    expect(columns(placeSectionColumns(stored))).toEqual({ a: 1, b: 1, c: 0 });
+  });
+});
+
+describe("a stored layout written before columns were explicit", () => {
+  const LEGACY: SectionDescriptor[] = ["a", "b", "c", "d"].map((name) => ({
+    id: `world.${name}`,
+    view: "world",
+    labelKey: "world.planetCycles",
+    defaultSpan: 1,
+  }));
+
+  const legacyStored = {
+    version: 1 as const,
+    sections: ["a", "b", "c", "d"].map((name) => state(`world.${name}`)),
+  };
+
+  it("loads into the arrangement the halving cut gave it", () => {
+    const before = planSections(legacyStored.sections, "wide");
+    const merged = mergeViewLayout(legacyStored, LEGACY);
+    const after = planSections(merged.sections, "wide");
+    expect(after).toEqual(before);
+    if (after[0]?.kind !== "columns") throw new Error("expected a columns row");
+    expect(after[0].columns[0]?.map((slot) => slot.id)).toEqual(["world.a", "world.b"]);
+    expect(after[0].columns[1]?.map((slot) => slot.id)).toEqual(["world.c", "world.d"]);
+  });
+
+  it("comes back out of storage with a column on every section", () => {
+    const normalized = normalizeLayoutState({
+      version: 1,
+      views: { world: { wide: { sections: legacyStored.sections } } },
+    });
+    const merged = mergeViewLayout(normalized.views.world?.wide ?? null, LEGACY);
+    expect(columns(merged.sections)).toEqual({
+      "world.a": 0,
+      "world.b": 0,
+      "world.c": 1,
+      "world.d": 1,
+    });
+  });
+
+  it("cuts the run by the spans the registry gives it, not the ones on disk", () => {
+    const stored = {
+      version: 1,
+      views: {
+        world: {
+          wide: {
+            sections: ["world.cycles", "world.timers", "world.circuit", "world.bounties"].map(
+              (id) => ({ id, hidden: false, collapsed: false }),
+            ),
+          },
+        },
+      },
+    };
+    const normalized = normalizeLayoutState(stored);
+    const merged = mergeViewLayout(normalized.views.world?.wide ?? null, DESCRIPTORS);
+    expect(columns(merged.sections)).toEqual({
+      "world.cycles": 0,
+      "world.timers": 1,
+      "world.circuit": 0,
+      "world.bounties": 0,
+    });
+  });
+});
+
+describe("a single-column breakpoint", () => {
+  const stored = [placed("a", 1), placed("b", 0), placed("c", 1)];
+
+  it("stacks every section in one column whatever they were placed in", () => {
+    const rows = planSections(stored, "narrow");
+    expect(rows).toHaveLength(1);
+    if (rows[0]?.kind !== "columns") throw new Error("expected a columns row");
+    expect(rows[0].columns[0]?.map((slot) => slot.id)).toEqual(["a", "b", "c"]);
+    expect(rows[0].columns[1]).toEqual([]);
+  });
+
+  it("round-trips the columns it does not use, so widening finds them again", () => {
+    const normalized = normalizeLayoutState({
+      version: 1,
+      views: { world: { narrow: { sections: stored }, wide: { sections: stored } } },
+    });
+    const narrow = normalized.views.world?.narrow?.sections ?? [];
+    expect(columns(narrow)).toEqual({ a: 1, b: 0, c: 1 });
+    expect(columns(normalized.views.world?.wide?.sections ?? [])).toEqual({ a: 1, b: 0, c: 1 });
+  });
+});
+
 describe("planSections", () => {
   const single = [state("a"), state("b"), state("c"), state("d"), state("e")];
+
+  it("puts each section in the column it was placed in", () => {
+    const rows = planSections(
+      [placed("a", 1), placed("b", 0), placed("c", 1), placed("d", 0)],
+      "wide",
+    );
+    if (rows[0]?.kind !== "columns") throw new Error("expected a columns row");
+    expect(rows[0].columns[0]?.map((slot) => slot.id)).toEqual(["b", "d"]);
+    expect(rows[0].columns[1]?.map((slot) => slot.id)).toEqual(["a", "c"]);
+    expect(rows[0].columns[1]?.[0]?.firstInColumn).toBe(true);
+    expect(rows[0].columns[1]?.[1]?.firstInColumn).toBe(false);
+  });
+
+  it("renders an empty column when every section was placed in one", () => {
+    const rows = planSections([placed("a", 1), placed("b", 1)], "wide");
+    if (rows[0]?.kind !== "columns") throw new Error("expected a columns row");
+    expect(rows[0].columns[0]).toEqual([]);
+    expect(rows[0].columns[1]?.map((slot) => slot.id)).toEqual(["a", "b"]);
+  });
 
   it("stacks everything in one column when narrow", () => {
     const rows = planSections(single, "narrow");

@@ -4,9 +4,11 @@ import { presetById } from "../config/layoutPresets.js";
 import { isSafeMode } from "../lib/customCss/safeMode.js";
 import { sectionsFor } from "../lib/layout/registry.js";
 import {
+  columnOf,
   mergeViewLayout,
   moveSectionInList,
   normalizeLayoutState,
+  placeSectionColumns,
   type SectionMoveTarget,
 } from "../lib/layout/plan.js";
 import {
@@ -98,7 +100,7 @@ export function endUndoGroup(): void {
   if (!open) return;
   const next = get(state);
   // Every commit allocates, so identity would record a drag that ended where it
-  // started. A group only ever covers moveSection, so the order is the change.
+  // started. A group only ever covers moveSection, so order and column are the change.
   if (orderKey(open.base, open) === orderKey(next, open)) return;
   record(open.base, next);
 }
@@ -108,7 +110,7 @@ function orderKey(
   at: { view: LayoutView; breakpoint: LayoutBreakpoint },
 ): string {
   return sectionsOf(current, at.view, at.breakpoint)
-    .map((section) => section.id)
+    .map((section) => `${section.id}:${String(columnOf(section))}`)
     .join("|");
 }
 
@@ -283,7 +285,7 @@ export function applyPreset(presetId: string, views?: readonly LayoutView[]): vo
     const layout =
       descriptors.length > 0
         ? mergeViewLayout({ version: 1, sections }, descriptors)
-        : { version: 1 as const, sections };
+        : { version: 1 as const, sections: placeSectionColumns(sections) };
     nextViews[view] = Object.fromEntries(
       BREAKPOINTS.map((breakpoint) => [breakpoint, layout]),
     ) as Partial<Record<LayoutBreakpoint, ViewLayout>>;

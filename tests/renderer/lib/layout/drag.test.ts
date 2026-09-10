@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { dropIndex, resolveDropTarget } from "../../../../src/lib/layout/drag.js";
-import { moveSectionInList } from "../../../../src/lib/layout/plan.js";
-import type { SectionState } from "../../../../src/lib/layout/types.js";
+import {
+  columnPlacement,
+  dropPlacement,
+  resolveDropTarget,
+} from "../../../../src/lib/layout/drag.js";
+import { columnOf, moveSectionInList, planSections } from "../../../../src/lib/layout/plan.js";
+import type { LayoutColumn, SectionState } from "../../../../src/lib/layout/types.js";
 
 interface Drag {
   id: string;
@@ -86,50 +90,89 @@ describe("resolveDropTarget", () => {
   });
 });
 
-describe("dropIndex", () => {
-  const order = ["a", "b", "c", "d"];
+const section = (
+  id: string,
+  column: LayoutColumn,
+  span: SectionState["span"] = 1,
+): SectionState => ({
+  id,
+  span,
+  hidden: false,
+  collapsed: false,
+  column,
+});
+
+describe("dropPlacement", () => {
+  const order: SectionState[] = [
+    section("a", 0),
+    section("b", 0),
+    section("c", 1),
+    section("d", 1),
+  ];
 
   it("lands before a target the pointer is in the upper half of", () => {
-    expect(dropIndex(order, "d", "b", false)).toBe(1);
-    expect(dropIndex(order, "a", "c", false)).toBe(1);
+    expect(dropPlacement(order, "d", "b", false)).toEqual({ index: 1, column: 0 });
+    expect(dropPlacement(order, "a", "c", false)).toEqual({ index: 1, column: 1 });
   });
 
   it("lands after a target the pointer is in the lower half of", () => {
-    expect(dropIndex(order, "d", "b", true)).toBe(2);
-    expect(dropIndex(order, "a", "c", true)).toBe(2);
+    expect(dropPlacement(order, "d", "b", true)).toEqual({ index: 2, column: 0 });
+    expect(dropPlacement(order, "a", "c", true)).toEqual({ index: 2, column: 1 });
+  });
+
+  it("takes the column of the section it was dropped on", () => {
+    expect(dropPlacement(order, "b", "c", false)).toEqual({ index: 1, column: 1 });
+    expect(dropPlacement(order, "c", "b", true)).toEqual({ index: 2, column: 0 });
+  });
+
+  it("keeps its own column when the target owns its whole row", () => {
+    const withWide = [section("a", 0), section("wide", 0, "full"), section("c", 1)];
+    expect(dropPlacement(withWide, "c", "wide", false)).toEqual({ index: 1, column: 1 });
   });
 
   it("reports a drop that changes nothing", () => {
-    // Upper half of the next section down, and lower half of the one above:
-    // both mean "stay where you are".
-    expect(dropIndex(order, "a", "b", false)).toBeNull();
-    expect(dropIndex(order, "b", "a", true)).toBeNull();
+    expect(dropPlacement(order, "a", "b", false)).toBeNull();
+    expect(dropPlacement(order, "b", "a", true)).toBeNull();
   });
 
   it("ignores an id the list does not hold", () => {
-    expect(dropIndex(order, "zz", "b", false)).toBeNull();
-    expect(dropIndex(order, "a", "zz", false)).toBeNull();
+    expect(dropPlacement(order, "zz", "b", false)).toBeNull();
+    expect(dropPlacement(order, "a", "zz", false)).toBeNull();
+  });
+});
+
+describe("columnPlacement", () => {
+  const emptied: SectionState[] = [section("a", 1), section("b", 1), section("c", 1)];
+
+  it("puts a section back into a column nothing is left in", () => {
+    const before = planSections(emptied, "wide");
+    if (before[0]?.kind !== "columns") throw new Error("expected a columns row");
+    expect(before[0].columns[0]).toEqual([]);
+
+    const placement = columnPlacement(emptied, "b", 0);
+    expect(placement).toEqual({ index: 1, column: 0 });
+    const rows = planSections(moveSectionInList(emptied, "b", placement ?? 0), "wide");
+    if (rows[0]?.kind !== "columns") throw new Error("expected a columns row");
+    expect(rows[0].columns[0]?.map((slot) => slot.id)).toEqual(["b"]);
+    expect(rows[0].columns[1]?.map((slot) => slot.id)).toEqual(["a", "c"]);
+  });
+
+  it("reports nothing for a section already in that column or an id it has not", () => {
+    expect(columnPlacement(emptied, "b", 1)).toBeNull();
+    expect(columnPlacement(emptied, "zz", 0)).toBeNull();
   });
 });
 
 describe("drag drop applied to the section list", () => {
-  const list: SectionState[] = ["a", "b", "c", "d"].map((id) => ({
-    id,
-    span: 1,
-    hidden: false,
-    collapsed: false,
-  }));
+  const list: SectionState[] = [section("a", 0), section("b", 0), section("c", 1), section("d", 1)];
 
-  const dropped = (id: string, targetId: string, after: boolean): string[] => {
-    const at = dropIndex(
-      list.map((section) => section.id),
-      id,
-      targetId,
-      after,
-    );
-    if (at === null) return list.map((section) => section.id);
-    return moveSectionInList(list, id, at).map((section) => section.id);
+  const drop = (id: string, targetId: string, after: boolean): SectionState[] => {
+    const placement = dropPlacement(list, id, targetId, after);
+    return placement === null ? list : moveSectionInList(list, id, placement);
   };
+
+  const dropped = (id: string, targetId: string, after: boolean): string[] =>
+    drop(id, targetId, after).map((entry) => entry.id);
 
   it("moves a section exactly one place when it is dragged past one neighbour", () => {
     expect(dropped("a", "b", true)).toEqual(["b", "a", "c", "d"]);
@@ -148,5 +191,22 @@ describe("drag drop applied to the section list", () => {
 
   it("reaches the last slot from above", () => {
     expect(dropped("a", "d", true)).toEqual(["b", "c", "d", "a"]);
+  });
+
+  it("moves only the dragged section when the drop crosses the boundary", () => {
+    const moved = drop("a", "c", false);
+    expect(moved.map((entry) => `${entry.id}:${String(columnOf(entry))}`)).toEqual([
+      "b:0",
+      "a:1",
+      "c:1",
+      "d:1",
+    ]);
+  });
+
+  it("lands under the last section of a column instead of atop the next one", () => {
+    const rows = planSections(drop("a", "d", true), "wide");
+    if (rows[0]?.kind !== "columns") throw new Error("expected a columns row");
+    expect(rows[0].columns[0]?.map((slot) => slot.id)).toEqual(["b"]);
+    expect(rows[0].columns[1]?.map((slot) => slot.id)).toEqual(["c", "d", "a"]);
   });
 });

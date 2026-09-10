@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 
 import {
   closeElectronTestHarness,
@@ -179,9 +179,7 @@ test.describe("Per-view layout editing", () => {
     await expect(page.locator("[data-layout-presets]")).toHaveCount(0);
   });
 
-  // The reported bug: dragging Darvo's Deal across the column boundary died the
-  // moment the move remounted the handle that was holding the pointer capture.
-  test("dragging a World section into the other column moves it, and one Undo puts it back", async () => {
+  test("dragging a World section into the other column moves only it, and one Undo puts it back", async () => {
     // Viewport emulation, not setBounds: at the 1280 default the world grid
     // measures under LAYOUT_NARROW_MAX_PX and renders a single column.
     await setLayoutViewport(page, 1800, 950);
@@ -208,15 +206,20 @@ test.describe("Per-view layout editing", () => {
       );
     const columnOf = async (id: string): Promise<string> =>
       (await columns()).find((entry) => entry.id === id)?.column ?? "";
+    const bystanders = async (): Promise<Record<string, string>> =>
+      Object.fromEntries(
+        (await columns())
+          .filter((entry) => entry.id !== "world.darvo")
+          .map((entry) => [entry.id, entry.column]),
+      );
 
     const before = await columnOf("world.darvo");
     expect(before === "1" || before === "2").toBe(true);
-    // Aim at the far end of the other column: the split is the run's midpoint, so
-    // a section next to it can be pushed across while the drag walks past it.
-    const others = (await columns()).filter(
+    const settledBystanders = await bystanders();
+    const facing = (await columns()).filter(
       (entry) => entry.column === (before === "1" ? "2" : "1"),
     );
-    const target = before === "1" ? others[others.length - 1] : others[0];
+    const target = before === "1" ? facing[facing.length - 1] : facing[0];
     if (!target) throw new Error("the world grid rendered only one column of sections");
 
     const center = async (id: string): Promise<{ x: number; y: number }> => {
@@ -256,13 +259,57 @@ test.describe("Per-view layout editing", () => {
     await page.mouse.move(settled.x, settled.y, { steps: 12 });
     await page.mouse.up();
 
-    await expect.poll(() => columnOf("world.darvo")).not.toBe(before);
+    await expect.poll(() => columnOf("world.darvo")).toBe(target.column);
+    expect(await bystanders()).toEqual(settledBystanders);
 
     // One gesture is one undo step, however many sections it crossed.
     await page.locator("[data-layout-undo]").click();
     await expect.poll(() => columnOf("world.darvo")).toBe(before);
+    expect(await bystanders()).toEqual(settledBystanders);
 
     if ((await toggle.getAttribute("aria-pressed")) === "true") await toggle.click();
+    await setLayoutViewport(page, 1280, 820);
+  });
+
+  test("a column with nothing left in it still takes a section back", async () => {
+    await setLayoutViewport(page, 1800, 950);
+    const grid = page.locator('[data-layout-grid="stats"]');
+    await expect(grid).toHaveAttribute("data-layout-breakpoint", "wide");
+
+    await startEditing();
+    await page.locator('[data-layout-span-cycle="stats.summary"]').click();
+    await page.locator('[data-layout-span-cycle="stats.charts"]').click();
+
+    const column = (index: number): Locator => grid.locator(`[data-layout-column="${index}"]`);
+    const inColumn = (index: number): Promise<string[]> =>
+      column(index)
+        .locator("[data-layout-section]")
+        .evaluateAll((els) => els.map((el) => el.getAttribute("data-layout-section") ?? ""));
+    await expect.poll(() => inColumn(0)).toEqual(["stats.summary", "stats.charts"]);
+
+    const dragSideways = async (id: string, onto: Locator): Promise<void> => {
+      const handle = page.locator(`[data-layout-handle="${id}"]`);
+      await handle.hover();
+      await page.mouse.down();
+      const box = await onto.boundingBox();
+      const from = await handle.boundingBox();
+      if (!box || !from) throw new Error(`no box for the ${id} drag`);
+      await page.mouse.move(box.x + box.width / 2, from.y + from.height / 2, { steps: 12 });
+      await page.mouse.up();
+    };
+
+    await dragSideways("stats.summary", column(1));
+    await expect.poll(() => inColumn(1)).toEqual(["stats.summary"]);
+
+    await dragSideways("stats.charts", page.locator('[data-layout-section="stats.summary"]'));
+    await expect.poll(() => inColumn(1)).toHaveLength(2);
+    await expect(column(0)).toHaveCount(1);
+    expect(await inColumn(0)).toEqual([]);
+
+    await dragSideways("stats.charts", column(0));
+    await expect.poll(() => inColumn(0)).toEqual(["stats.charts"]);
+
+    await stopEditing();
     await setLayoutViewport(page, 1280, 820);
   });
 

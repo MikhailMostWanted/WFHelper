@@ -7,7 +7,8 @@ import {
   moveSection,
   sectionsOf,
 } from "../../stores/layout.js";
-import type { LayoutBreakpoint, LayoutView } from "./types.js";
+import { columnOf } from "./plan.js";
+import type { LayoutBreakpoint, LayoutColumn, LayoutView, SectionState } from "./types.js";
 
 const draggingId = writable<string | null>(null);
 
@@ -31,7 +32,6 @@ let active: ActiveDrag | null = null;
 
 interface DropHit {
   id: string;
-  /** Pointer sits below the section's midpoint, so the drop lands under it. */
   after: boolean;
 }
 
@@ -39,7 +39,7 @@ function cellOf(hit: DropHit): string {
   return `${hit.id}|${hit.after ? "after" : "before"}`;
 }
 
-/** Drop rule for one pointer position. A null hit leaves the layout alone;
+/** Drop rule for one pointer position. A null target leaves the layout alone;
     landing back on the dragged section forgets the last drop cell so the user
     can re-enter it. */
 export function resolveDropTarget(
@@ -56,21 +56,35 @@ export function resolveDropTarget(
   return { targetId: hit.id, after: hit.after, lastCell: cell };
 }
 
-/** Absolute index for the drop, or null when it would not move anything. The
-    dragged section is spliced out before the insert, so a target below it has
-    already shifted up by one; correcting again would skip a slot. */
-export function dropIndex(
-  order: readonly string[],
+/** The dragged section is spliced out before the insert, so a target below it
+    has already shifted up. */
+export function dropPlacement(
+  sections: readonly SectionState[],
   id: string,
   targetId: string,
   after: boolean,
-): number | null {
-  const from = order.indexOf(id);
-  const to = order.indexOf(targetId);
-  if (from < 0 || to < 0) return null;
+): { index: number; column: LayoutColumn } | null {
+  const from = sections.findIndex((section) => section.id === id);
+  const to = sections.findIndex((section) => section.id === targetId);
+  const moving = sections[from];
+  const landing = sections[to];
+  if (!moving || !landing) return null;
+  const column = landing.span === 1 ? columnOf(landing) : columnOf(moving);
   const shifted = from < to ? to - 1 : to;
-  const at = after ? shifted + 1 : shifted;
-  return at === from ? null : at;
+  const index = after ? shifted + 1 : shifted;
+  if (index === from && column === columnOf(moving)) return null;
+  return { index, column };
+}
+
+export function columnPlacement(
+  sections: readonly SectionState[],
+  id: string,
+  column: LayoutColumn,
+): { index: number; column: LayoutColumn } | null {
+  const from = sections.findIndex((section) => section.id === id);
+  const moving = sections[from];
+  if (!moving || columnOf(moving) === column) return null;
+  return { index: from, column };
 }
 
 function isBelowMidpoint(section: Element, clientY: number): boolean {
@@ -79,26 +93,46 @@ function isBelowMidpoint(section: Element, clientY: number): boolean {
   return clientY > rect.top + rect.height / 2;
 }
 
+function columnUnder(drag: ActiveDrag, hit: Element | null): LayoutColumn | null {
+  if (!drag.grid) return null;
+  const column = hit?.closest("[data-layout-column]") ?? null;
+  if (!column || column.closest("[data-layout-grid]") !== drag.grid) return null;
+  const index = Number(column.getAttribute("data-layout-column"));
+  return index === 0 || index === 1 ? index : null;
+}
+
 function onPointerMove(event: PointerEvent): void {
   if (!active || event.pointerId !== active.pointerId) return;
+  const drag = active;
   const hit = document.elementFromPoint(event.clientX, event.clientY);
   const section = hit?.closest("[data-layout-section]") ?? null;
   const targetId = section?.getAttribute("data-layout-section") ?? null;
+  const apply = (placement: { index: number; column: LayoutColumn } | null): void => {
+    if (placement) moveSection(drag.view, drag.breakpoint, drag.id, placement);
+  };
+  const sections = (): SectionState[] => sectionsOf(get(layoutState), drag.view, drag.breakpoint);
+
+  if (!section || !targetId) {
+    const column = columnUnder(drag, hit);
+    if (column === null) return;
+    const cell = `column|${String(column)}`;
+    if (cell === drag.lastCell) return;
+    drag.lastCell = cell;
+    apply(columnPlacement(sections(), drag.id, column));
+    return;
+  }
+
   // A section rendered outside a grid (the stats trade rail) has no grid to
   // compare, so its id scope is the only fence.
-  const sameGrid = active.grid === null || section?.closest("[data-layout-grid]") === active.grid;
+  const sameGrid = drag.grid === null || section.closest("[data-layout-grid]") === drag.grid;
   const decision = resolveDropTarget(
-    active,
-    section && targetId ? { id: targetId, after: isBelowMidpoint(section, event.clientY) } : null,
+    drag,
+    { id: targetId, after: isBelowMidpoint(section, event.clientY) },
     sameGrid,
   );
-  active.lastCell = decision.lastCell;
+  drag.lastCell = decision.lastCell;
   if (!decision.targetId) return;
-  const order = sectionsOf(get(layoutState), active.view, active.breakpoint).map(
-    (entry) => entry.id,
-  );
-  const at = dropIndex(order, active.id, decision.targetId, decision.after);
-  if (at !== null) moveSection(active.view, active.breakpoint, active.id, at);
+  apply(dropPlacement(sections(), drag.id, decision.targetId, decision.after));
 }
 
 function onPointerUp(event: PointerEvent): void {

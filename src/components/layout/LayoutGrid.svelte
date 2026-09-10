@@ -82,9 +82,14 @@
         </LayoutSection>
       </div>
     {:else}
+      <!-- An empty wide column still renders so a section dragged out of it can be dropped back. -->
       {#each row.columns as column, columnIndex (columnIndex)}
-        {#if column.length > 0}
-          <div class="flex min-w-0 flex-col {columnGapClass}" style="grid-column:{columnIndex + 1}">
+        {#if column.length > 0 || (breakpoint === "wide" && !solo)}
+          <div
+            class="flex min-w-0 flex-col {columnGapClass}"
+            style="grid-column:{columnIndex + 1}"
+            data-layout-column={breakpoint === "wide" ? columnIndex : undefined}
+          >
             {#each column as placement (placement.id)}
               <LayoutSection
                 {view}

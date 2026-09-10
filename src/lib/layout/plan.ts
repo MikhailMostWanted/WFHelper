@@ -1,6 +1,7 @@
 import { VIEW_NAMES } from "../../types/views.js";
 import type {
   LayoutBreakpoint,
+  LayoutColumn,
   LayoutStateV1,
   LayoutView,
   SectionDescriptor,
@@ -17,6 +18,57 @@ const BREAKPOINTS: readonly LayoutBreakpoint[] = ["narrow", "wide"];
 
 function isSpan(value: unknown): value is SectionSpan {
   return value === 1 || value === 2 || value === "full";
+}
+
+function isColumn(value: unknown): value is LayoutColumn {
+  return value === 0 || value === 1;
+}
+
+export function columnOf(section: SectionState): LayoutColumn {
+  return section.column === 1 ? 1 : 0;
+}
+
+function inColumns(section: SectionState): boolean {
+  return section.span === 1;
+}
+
+function carryColumns(run: readonly SectionState[], reverse: boolean): void {
+  let carry: LayoutColumn | undefined;
+  for (let step = 0; step < run.length; step += 1) {
+    const section = run[reverse ? run.length - 1 - step : step];
+    if (!section) continue;
+    if (section.column !== undefined) carry = section.column;
+    else if (carry !== undefined) section.column = carry;
+  }
+}
+
+function placeRun(run: readonly SectionState[]): void {
+  if (run.length === 0) return;
+  if (run.every((section) => section.column === undefined)) {
+    const visible = run.filter((section) => !section.hidden);
+    const split = Math.ceil(visible.length / 2);
+    visible.forEach((section, index) => {
+      section.column = index < split ? 0 : 1;
+    });
+  }
+  carryColumns(run, false);
+  carryColumns(run, true);
+  for (const section of run) {
+    if (section.column === undefined) section.column = 0;
+  }
+}
+
+export function placeSectionColumns(sections: readonly SectionState[]): SectionState[] {
+  const next = sections.map((section) => ({ ...section }));
+  let start = 0;
+  for (let index = 0; index <= next.length; index += 1) {
+    const section = next[index];
+    if (section && inColumns(section)) continue;
+    placeRun(next.slice(start, index));
+    if (section && section.column === undefined) section.column = 0;
+    start = index + 1;
+  }
+  return next;
 }
 
 function spanRank(span: SectionSpan): number {
@@ -52,21 +104,20 @@ function normalizeSection(raw: SectionState, descriptor: SectionDescriptor): Sec
     span: clampSpan(isSpan(raw.span) ? raw.span : descriptor.defaultSpan, descriptor.minSpan),
     hidden: descriptor.canHide === false ? false : raw.hidden === true,
     collapsed: descriptor.canCollapse === true ? raw.collapsed === true : false,
+    ...(isColumn(raw.column) ? { column: raw.column } : {}),
   };
 }
 
 /** Unknown ids drop, missing ids return at their default position, spans clamp
-    up to minSpan. An empty registry means the view module has not loaded yet, so
-    the stored order passes through untouched rather than being wiped. */
+    up to minSpan and every section comes back with a column. An empty registry
+    means the view module has not loaded yet, so the stored order passes through
+    untouched rather than being wiped. */
 export function mergeViewLayout(
   stored: ViewLayout | null | undefined,
   descriptors: readonly SectionDescriptor[],
 ): ViewLayout {
   if (descriptors.length === 0) {
-    return {
-      version: 1,
-      sections: stored ? stored.sections.map((section) => ({ ...section })) : [],
-    };
+    return { version: 1, sections: placeSectionColumns(stored?.sections ?? []) };
   }
   const byId = new Map(descriptors.map((descriptor) => [descriptor.id, descriptor]));
   const sections: SectionState[] = [];
@@ -91,7 +142,7 @@ export function mergeViewLayout(
     seen.add(descriptor.id);
     sections.splice(insertAt, 0, defaultSectionState(descriptor));
   });
-  return { version: 1, sections };
+  return { version: 1, sections: placeSectionColumns(sections) };
 }
 
 function readSections(raw: unknown): SectionState[] | null {
@@ -101,15 +152,24 @@ function readSections(raw: unknown): SectionState[] | null {
   const sections: SectionState[] = [];
   for (const entry of list) {
     if (!entry || typeof entry !== "object") continue;
-    const record = entry as { id?: unknown; span?: unknown; hidden?: unknown; collapsed?: unknown };
+    const record = entry as {
+      id?: unknown;
+      span?: unknown;
+      hidden?: unknown;
+      collapsed?: unknown;
+      column?: unknown;
+    };
     if (typeof record.id !== "string" || record.id === "") continue;
     sections.push({
       id: record.id,
       span: isSpan(record.span) ? record.span : 1,
       hidden: record.hidden === true,
       collapsed: record.collapsed === true,
+      ...(isColumn(record.column) ? { column: record.column } : {}),
     });
   }
+  // Placing columns here would read pre-merge ids and spans, both of which shift
+  // the cut; mergeViewLayout places the merged list instead.
   return sections;
 }
 
@@ -144,23 +204,19 @@ export function normalizeLayoutState(raw: unknown): LayoutStateV1 {
   return state;
 }
 
-/** Up or down steps one slot, a number is an absolute index into this list, and
-    `{ toId }` takes the slot that section holds right now. A drag resolves its
-    own index from the full list: a grid renders a subset of the view, so the
-    grid's indices do not line up. */
-export type SectionMoveTarget = "up" | "down" | number | { toId: string };
+/** Every index is into the full section list; a grid renders a subset, so its own
+    indices do not line up. */
+export type SectionMoveTarget =
+  | "up"
+  | "down"
+  | number
+  | { toId: string }
+  | { index: number; column: LayoutColumn };
 
-function targetIndex(
-  sections: readonly SectionState[],
-  from: number,
-  target: SectionMoveTarget,
-): number | null {
-  if (target === "up") return from - 1;
-  if (target === "down") return from + 1;
-  if (typeof target === "number") return target;
-  const at = sections.findIndex((section) => section.id === target.toId);
-  // An id nothing matches must not clamp to the front of the list.
-  return at < 0 ? null : at;
+function crossesColumns(moving: SectionState, neighbour: SectionState): boolean {
+  if (!inColumns(moving) || !inColumns(neighbour)) return false;
+  if (moving.column === undefined || neighbour.column === undefined) return false;
+  return moving.column !== neighbour.column;
 }
 
 /** Pure reorder; see SectionMoveTarget for the accepted targets. */
@@ -171,10 +227,33 @@ export function moveSectionInList(
 ): SectionState[] {
   const next = sections.map((section) => ({ ...section }));
   const from = next.findIndex((section) => section.id === id);
-  if (from < 0) return next;
-  const requested = targetIndex(next, from, target);
-  if (requested === null) return next;
-  return moveIndex(next, from, requested);
+  const moving = next[from];
+  if (!moving) return next;
+
+  if (target === "up" || target === "down") {
+    const at = target === "up" ? from - 1 : from + 1;
+    const neighbour = next[at];
+    if (neighbour && crossesColumns(moving, neighbour)) {
+      const held = columnOf(moving);
+      moving.column = columnOf(neighbour);
+      neighbour.column = held;
+    }
+    return moveIndex(next, from, at);
+  }
+
+  if (typeof target === "number") return moveIndex(next, from, target);
+
+  if ("index" in target) {
+    moving.column = target.column;
+    return moveIndex(next, from, target.index);
+  }
+
+  const at = next.findIndex((section) => section.id === target.toId);
+  // An id nothing matches must not clamp to the front of the list.
+  if (at < 0) return next;
+  const landing = next[at];
+  if (landing && inColumns(landing) && landing.column !== undefined) moving.column = landing.column;
+  return moveIndex(next, from, at);
 }
 
 interface LayoutSlot {
@@ -191,15 +270,13 @@ function toSlot(section: SectionState, firstInColumn: boolean): LayoutSlot {
   return { id: section.id, span: section.span, collapsed: section.collapsed, firstInColumn };
 }
 
-/** Flat order to grid rows. Single-span sections fill the left column first so
-    each column reads top to bottom; anything wider takes a row of its own. */
 export function planSections(
   sections: readonly SectionState[],
   breakpoint: LayoutBreakpoint,
   available?: ReadonlySet<string>,
 ): LayoutRow[] {
-  const visible = sections.filter(
-    (section) => !section.hidden && (!available || available.has(section.id)),
+  const visible = placeSectionColumns(
+    sections.filter((section) => !section.hidden && (!available || available.has(section.id))),
   );
   if (visible.length === 0) return [];
   if (breakpoint === "narrow") {
@@ -210,18 +287,16 @@ export function planSections(
   let run: SectionState[] = [];
   const flush = (): void => {
     if (run.length === 0) return;
-    const split = Math.ceil(run.length / 2);
+    const left = run.filter((s) => columnOf(s) === 0);
+    const right = run.filter((s) => columnOf(s) === 1);
     rows.push({
       kind: "columns",
-      columns: [
-        run.slice(0, split).map((s, i) => toSlot(s, i === 0)),
-        run.slice(split).map((s, i) => toSlot(s, i === 0)),
-      ],
+      columns: [left, right].map((column) => column.map((s, i) => toSlot(s, i === 0))),
     });
     run = [];
   };
   for (const section of visible) {
-    if (section.span === 1) {
+    if (inColumns(section)) {
       run.push(section);
       continue;
     }

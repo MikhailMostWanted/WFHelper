@@ -238,6 +238,25 @@ describe("undo groups", () => {
     expect(get(mod.canUndo)).toBe(false);
   });
 
+  it("records a drag that only crossed the column boundary", async () => {
+    const mod = await loadStore();
+    const before = ids(mod);
+    mod.beginUndoGroup("world", "wide", "world.fissures");
+    mod.moveSection("world", "wide", "world.fissures", { index: 2, column: 0 });
+    mod.endUndoGroup();
+
+    expect(writes).toBe(1);
+    expect(ids(mod)).toEqual(before);
+    const moved = get(mod.layoutFor("world", "wide"));
+    expect(moved.find((s) => s.id === "world.fissures")?.column).toBe(0);
+    expect(moved.find((s) => s.id === "world.timers")?.column).toBe(0);
+
+    mod.undo();
+    expect(get(mod.layoutFor("world", "wide")).find((s) => s.id === "world.fissures")?.column).toBe(
+      1,
+    );
+  });
+
   it("groups the moves a pointer drag makes under the drag's own key", async () => {
     const mod = await loadStore();
     const drag = await import("../../../src/lib/layout/drag.js");
