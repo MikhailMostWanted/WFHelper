@@ -188,6 +188,8 @@ function register(): void {
     try {
       const dir = getScanDebugDir();
       await fs.promises.mkdir(dir, { recursive: true });
+      // Logged either way: on Linux openPath can report success with nothing opened.
+      log.info(`[SystemIPC] opening scan-debug folder: ${dir}`);
       const openErr = await shell.openPath(dir);
       if (openErr) log.warn(`[SystemIPC] openPath(scan-debug) failed: ${openErr}`);
       return { ok: !openErr };
@@ -201,6 +203,7 @@ function register(): void {
     try {
       const dir = getLogDirectory();
       if (!dir) return { ok: false };
+      log.info(`[SystemIPC] opening log folder: ${dir}`);
       const openErr = await shell.openPath(dir);
       if (openErr) log.warn(`[SystemIPC] openPath(logs) failed: ${openErr}`);
       return { ok: !openErr };
