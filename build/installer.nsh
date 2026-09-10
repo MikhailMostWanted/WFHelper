@@ -1,11 +1,13 @@
 !include nsDialogs.nsh
 !include LogicLib.nsh
 
-!macro customHeader
-  !define MUI_LANGDLL_REGISTRY_ROOT "HKCU"
-  !define MUI_LANGDLL_REGISTRY_KEY "Software\WFHelper"
-  !define MUI_LANGDLL_REGISTRY_VALUENAME "InstallerLanguage"
-!macroend
+; Top level, not customHeader: this file is included ahead of the generated
+; script, while customHeader is inserted after the install page has expanded
+; MUI_LANGDLL_SAVELANGUAGE. Defined there, the language dialog reads the value
+; but nothing ever writes it, so it asks again on every interactive install.
+!define MUI_LANGDLL_REGISTRY_ROOT "HKCU"
+!define MUI_LANGDLL_REGISTRY_KEY "Software\WFHelper"
+!define MUI_LANGDLL_REGISTRY_VALUENAME "InstallerLanguage"
 
 !macro customUnInstall
   ${IfNot} ${isUpdated}
