@@ -31,6 +31,7 @@ type OverlayCtx = {
   overlayWindow: import("electron").BrowserWindow | null;
   plannerOverlayWindow?: import("electron").BrowserWindow | null;
   overlayInteractionHotkeyRegistered: string | null;
+  rivenRescanHotkeyRegistered: string | null;
   overlayInteractiveMode: boolean;
 };
 
@@ -50,6 +51,7 @@ type OverlaySettingsControllerOptions = {
   defaults: OverlaySettingsDict;
   onRelicRewardTrigger: (source?: string) => void;
   onToggleOverlayInteractionMode: (source?: string) => void;
+  onRivenRescanTrigger: (source?: string) => void;
   configureWarframeLifecycle: (enabled: boolean) => Promise<void>;
 };
 
@@ -102,6 +104,7 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
     defaults,
     onRelicRewardTrigger,
     onToggleOverlayInteractionMode,
+    onRivenRescanTrigger,
   } = options;
 
   function normalizeFissureAlerts(
@@ -214,6 +217,11 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
           ? defaults.interactionHotkey
           : (candidate.interactionHotkey ?? defaults.interactionHotkey),
         String(defaults.interactionHotkey),
+      ),
+      rivenRescanHotkeyEnabled: booleanSetting("rivenRescanHotkeyEnabled"),
+      rivenRescanHotkey: normalizeHotkey(
+        candidate.rivenRescanHotkey ?? defaults.rivenRescanHotkey,
+        String(defaults.rivenRescanHotkey),
       ),
       worldNotificationsEnabled: booleanSetting("worldNotificationsEnabled"),
       cycleAlerts: normalizeCycleAlerts(candidate.cycleAlerts, defaults.cycleAlerts),
@@ -343,9 +351,20 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
     ctx.overlayInteractionHotkeyRegistered = null;
   }
 
+  function unregisterRivenRescanHotkey(): void {
+    if (!ctx.rivenRescanHotkeyRegistered) return;
+    try {
+      globalShortcut.unregister(ctx.rivenRescanHotkeyRegistered);
+    } catch (err) {
+      log.warn("[RivenRescanHotkey] unregister failed:", normalizeErrorMessage(err));
+    }
+    ctx.rivenRescanHotkeyRegistered = null;
+  }
+
   function unregisterOverlayHotkey(): void {
     unregisterOverlayTriggerHotkey();
     unregisterOverlayInteractionHotkey();
+    unregisterRivenRescanHotkey();
   }
 
   function registerOverlayTriggerHotkey(): boolean {
@@ -406,6 +425,32 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
     }
   }
 
+  function registerRivenRescanHotkey(): boolean {
+    unregisterRivenRescanHotkey();
+
+    if (!ctx.overlaySettings.rivenRescanHotkeyEnabled) {
+      log.info("[RivenRescanHotkey] disabled");
+      return false;
+    }
+
+    const accelerator = String(ctx.overlaySettings.rivenRescanHotkey || "");
+    if (!accelerator) return false;
+
+    try {
+      const ok = globalShortcut.register(accelerator, () => onRivenRescanTrigger("hotkey"));
+      if (!ok) {
+        log.warn("[RivenRescanHotkey] register failed:", accelerator);
+        return false;
+      }
+      ctx.rivenRescanHotkeyRegistered = accelerator;
+      log.info("[RivenRescanHotkey] registered:", accelerator);
+      return true;
+    } catch (err) {
+      log.warn("[RivenRescanHotkey] invalid shortcut:", accelerator, normalizeErrorMessage(err));
+      return false;
+    }
+  }
+
   // Hotkeys are only held while Warframe runs; main drives this via setHotkeysActive.
   let hotkeysActive = false;
 
@@ -416,7 +461,8 @@ export function createOverlaySettingsController(options: OverlaySettingsControll
     }
     const triggerOk = registerOverlayTriggerHotkey();
     const interactionOk = registerOverlayInteractionHotkey();
-    return triggerOk || interactionOk;
+    const rescanOk = registerRivenRescanHotkey();
+    return triggerOk || interactionOk || rescanOk;
   }
 
   function setHotkeysActive(active: boolean): void {

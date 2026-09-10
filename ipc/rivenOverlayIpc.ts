@@ -38,7 +38,7 @@ import {
 } from "../config/runtime/overlaySettings";
 import { resolveWarframeUiScale } from "../services/eeLogPath";
 
-import { forceEndRivenSession } from "../services/eeLogMonitor";
+import { forceEndRivenSession, resumeRivenSession } from "../services/eeLogMonitor";
 import { isAllowedExternalHost } from "../config/runtime/security";
 import {
   OVERLAY_INTERACTION_MODE,
@@ -368,8 +368,7 @@ const INITIAL_SCAN_DELAY_MS = 200;
 const ROLL_SCAN_DELAY_MS = 2850;
 const CHOICE_RESCAN_DELAY_MS = 1200;
 
-// The reveal animation scrambles the CURRENT card's text into the new stats and
-// can outlast ROLL_SCAN_DELAY_MS on slow machines; rescan while it matches.
+// The reveal animation can outlast ROLL_SCAN_DELAY_MS on a slow machine.
 const ROLL_STALE_RESCAN_DELAY_MS = 1100;
 const MAX_ROLL_STALE_RESCANS = 2;
 
@@ -773,6 +772,33 @@ export function onRivenChatView(): void {
   triggerInitialScan("chat");
 }
 
+function rescanVisibleRivenCard(): void {
+  rollScanGeneration.invalidate();
+  // A label read still in flight would resolve late over the fresh variant.
+  _rivenSessionToken += 1;
+  rivenScan.abortRivenScans();
+  clearRivenScanTimers();
+  _rivenHasRollResult = false;
+  _rivenNewRollStats = [];
+  sendToRivenWindows(RIVEN_RESCAN);
+  triggerInitialScan(_rivenScanLayout);
+}
+
+export function onRivenManualRescan(source = "hotkey"): void {
+  if (!isRivenOverlayEnabled()) {
+    log.info("[OverlayRoute] riven rescan ignored - the riven overlay is off");
+    return;
+  }
+  log.info(`[OverlayRoute] trigger=riven-rescan source=${source}`);
+  resumeRivenSession();
+  // Starting a session here would zero the roll count and blank the stats.
+  if (isAnyRivenWindowVisible()) {
+    rescanVisibleRivenCard();
+    return;
+  }
+  onRivenSessionOpen();
+}
+
 export function onRivenSessionOpen(): void {
   if (!isRivenOverlayEnabled()) return;
   log.info("[OverlayRoute] trigger=riven-session");
@@ -935,16 +961,7 @@ export function register(): void {
   onAuthorized(RIVEN_RESCAN_REQUEST, assertRivenOverlayRendererSender, () => {
     if (!isAnyRivenWindowVisible()) return;
     log.info("[OverlayRoute] trigger=riven-manual-rescan");
-    rollScanGeneration.invalidate();
-    // Discards a still-in-flight pre-rescan label read: resolving late, it
-    // would overwrite the fresh variant with the pre-switch one.
-    _rivenSessionToken += 1;
-    rivenScan.abortRivenScans();
-    clearRivenScanTimers();
-    _rivenHasRollResult = false;
-    _rivenNewRollStats = [];
-    sendToRivenWindows(RIVEN_RESCAN);
-    triggerInitialScan(_rivenScanLayout);
+    rescanVisibleRivenCard();
   });
 
   onAuthorized(

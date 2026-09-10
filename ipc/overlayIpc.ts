@@ -284,6 +284,7 @@ const settingsController = createOverlaySettingsController({
   defaults: OVERLAY_SETTINGS_DEFAULTS,
   onRelicRewardTrigger,
   onToggleOverlayInteractionMode: toggleOverlayInteractionMode,
+  onRivenRescanTrigger: rivenOverlayIpc.onRivenManualRescan,
   configureWarframeLifecycle,
 });
 

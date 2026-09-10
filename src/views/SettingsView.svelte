@@ -226,6 +226,8 @@
     "hotkey",
     "interactionHotkeyEnabled",
     "interactionHotkey",
+    "rivenRescanHotkeyEnabled",
+    "rivenRescanHotkey",
   ] as const;
 
   type OverlayForm = Pick<typeof OVERLAY_DEFAULTS, (typeof OVERLAY_FORM_KEYS)[number]>;
@@ -464,7 +466,7 @@
     return parts.join("+");
   }
 
-  type HotkeyField = "hotkey" | "interactionHotkey" | "tradeRepHotkey";
+  type HotkeyField = "hotkey" | "interactionHotkey" | "rivenRescanHotkey" | "tradeRepHotkey";
 
   function recordHotkey(field: HotkeyField, e: KeyboardEvent): void {
     const accel = captureAccelerator(e);
@@ -1154,6 +1156,34 @@
                 disabled={!form.interactionHotkeyEnabled}
                 placeholder={$tr("settings.interactionHotkeyPlaceholder")}
                 on:keydown={(e) => recordHotkey("interactionHotkey", e)}
+                on:change={autoSave}
+                class="settings-input"
+              />
+            </SettingsRow>
+
+            <SettingsRow
+              label={$tr("settings.rivenRescanHotkeyEnabled")}
+              hint={$tr("settings.rivenRescanHotkeyHint")}
+              dataSetting="riven-rescan-hotkey-enabled"
+            >
+              <input
+                type="checkbox"
+                bind:checked={form.rivenRescanHotkeyEnabled}
+                on:change={autoSave}
+              />
+            </SettingsRow>
+
+            <SettingsRow
+              label={$tr("settings.rivenRescanHotkey")}
+              inputRow
+              dataSetting="riven-rescan-hotkey"
+            >
+              <input
+                type="text"
+                bind:value={form.rivenRescanHotkey}
+                disabled={!form.rivenRescanHotkeyEnabled}
+                placeholder={$tr("settings.interactionHotkeyPlaceholder")}
+                on:keydown={(e) => recordHotkey("rivenRescanHotkey", e)}
                 on:change={autoSave}
                 class="settings-input"
               />

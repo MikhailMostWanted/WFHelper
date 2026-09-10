@@ -46,6 +46,8 @@ export interface OverlaySettings {
   hotkey: string;
   interactionHotkeyEnabled: boolean;
   interactionHotkey: string;
+  rivenRescanHotkeyEnabled: boolean;
+  rivenRescanHotkey: string;
   worldNotificationsEnabled: boolean;
   cycleAlerts: CycleAlerts;
   cycleAlertMinutesBefore: number;
@@ -125,6 +127,8 @@ export const OVERLAY_SETTINGS_DEFAULTS = Object.freeze({
   hotkey: "F8",
   interactionHotkeyEnabled: true,
   interactionHotkey: "F7",
+  rivenRescanHotkeyEnabled: true,
+  rivenRescanHotkey: "F6",
   worldNotificationsEnabled: true,
   cycleAlerts: Object.freeze({
     earth: false,

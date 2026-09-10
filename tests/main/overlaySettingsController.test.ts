@@ -8,6 +8,7 @@ function buildController() {
     overlaySettings: { ...OVERLAY_SETTINGS_DEFAULTS, hotkey: "Control+Alt+R" },
     overlayHotkeyRegistered: null,
     overlayInteractionHotkeyRegistered: null,
+    rivenRescanHotkeyRegistered: null,
   };
 
   const registerCallbacks = new Map<string, () => void>();
@@ -40,6 +41,7 @@ function buildController() {
     },
     onRelicRewardTrigger: vi.fn(),
     onToggleOverlayInteractionMode: vi.fn(),
+    onRivenRescanTrigger: vi.fn(),
     configureWarframeLifecycle: vi.fn(async (_enabled: boolean) => {}),
   };
 
@@ -456,6 +458,30 @@ describe("overlay settings controller", () => {
 
     registerCallbacks.get("Control+Alt+R")?.();
     expect(deps.onRelicRewardTrigger).toHaveBeenCalledWith("hotkey");
+  });
+
+  it("registers the riven rescan hotkey and releases it with the others", () => {
+    const { controller, deps, ctx, registerCallbacks } = buildController();
+    controller.setHotkeysActive(true);
+
+    const accelerator = String(OVERLAY_SETTINGS_DEFAULTS.rivenRescanHotkey);
+    expect(ctx.rivenRescanHotkeyRegistered).toBe(accelerator);
+    registerCallbacks.get(accelerator)?.();
+    expect(deps.onRivenRescanTrigger).toHaveBeenCalledWith("hotkey");
+
+    controller.setHotkeysActive(false);
+    expect(deps.globalShortcut.unregister).toHaveBeenCalledWith(accelerator);
+    expect(ctx.rivenRescanHotkeyRegistered).toBeNull();
+  });
+
+  it("keeps a cleared riven rescan hotkey on its default instead of unbinding it", () => {
+    const { controller } = buildController();
+    expect(controller.normalizeOverlaySettings({ rivenRescanHotkey: "" }).rivenRescanHotkey).toBe(
+      OVERLAY_SETTINGS_DEFAULTS.rivenRescanHotkey,
+    );
+    expect(controller.normalizeOverlaySettings({ rivenRescanHotkey: "f6" }).rivenRescanHotkey).toBe(
+      "F6",
+    );
   });
 
   it("holds no global shortcut until the game gate opens, releases when it closes", () => {

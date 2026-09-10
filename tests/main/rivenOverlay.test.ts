@@ -6,6 +6,7 @@ import { RIVEN_PATTERNS } from "../../services/eeLogMonitor";
 import {
   processRivenPatterns,
   resetRivenState,
+  resumeRivenSession,
   setRivenCallbacks,
 } from "../../services/rivenLogStateMachine";
 import {
@@ -30,6 +31,22 @@ describe("riven overlay startup", () => {
       /createRivenOverlayWindows\(\{ show: true \}\)[\s\S]*?triggerInitialScan\(\)/,
     );
     expect(sessionOpen).not.toContain("show: false");
+  });
+
+  it("re-reads the card in place instead of restarting the session on the hotkey", () => {
+    const rescan =
+      rivenOverlayIpcSource.match(/export function onRivenManualRescan\([\s\S]*?\n\}/)?.[0] ?? "";
+    expect(rescan).toMatch(/isAnyRivenWindowVisible\(\)[\s\S]*?rescanVisibleRivenCard\(\)/);
+    expect(rescan).toMatch(/rescanVisibleRivenCard\(\);\n\s*return;/);
+  });
+
+  it("shares one rescan body between the hotkey and the overlay button", () => {
+    const body =
+      rivenOverlayIpcSource.match(
+        /function rescanVisibleRivenCard\(\): void \{([\s\S]*?)\n\}/,
+      )?.[1] ?? "";
+    expect(body).toContain("sendToRivenWindows(RIVEN_RESCAN)");
+    expect(body).not.toContain("startSession");
   });
 
   it("reuses keep-mapped panels instead of rebuilding them on reopen", () => {
@@ -1260,13 +1277,89 @@ describe("riven session idle timeout", () => {
     processRivenPatterns(openLine, "dbwin", true);
     expect(closes).toBe(0);
 
-    // A long read of the panels must not close them; only the backstop may.
     vi.advanceTimersByTime(120_000);
     expect(closes).toBe(0);
 
-    // No close marker ever arrives - the idle backstop must close the overlay.
     vi.advanceTimersByTime(480_000);
     expect(closes).toBe(1);
+  });
+});
+
+describe("manual riven session resume", () => {
+  const closeLine = "Sys [Info]: NpcManager::ClearAgents() ReadyToCreateAgents = false";
+  const openLine =
+    "Sys [Info]: Created /Lotus/Interface/OmegaRerollSelection.swf @ 0x12345678 of class OmegaRerollSelectionScreen";
+  const cycleLine =
+    "Script [Info]: Dialog.lua: Dialog::CreateOkCancel(description=Are you sure you want to cycle Kuva Bramma for 3,500?, leftItem=OK";
+  const localisedDialogLine =
+    "Script [Info]: Dialog.lua: Dialog::CreateOkCancel(description=Voulez-vous vraiment recycler Kuva Bramma pour 3 500 ?, leftItem=OK";
+  const sendResultOk = "Script [Info]: Dialog.lua: Dialog::SendResult(4)";
+
+  afterEach(() => {
+    resetRivenState();
+    vi.useRealTimers();
+  });
+
+  it("makes close markers count again for a screen whose open marker is spent", () => {
+    resetRivenState();
+    const closes = vi.fn();
+    setRivenCallbacks({ onRivenSessionClose: closes });
+
+    processRivenPatterns(closeLine, "dbwin", true);
+    expect(closes).not.toHaveBeenCalled();
+
+    resumeRivenSession();
+    processRivenPatterns(closeLine, "dbwin", true);
+    expect(closes).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the pending confirm box of a live session", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-11T12:00:00Z"));
+    resetRivenState();
+    const rollConfirmed = vi.fn();
+    const choiceConfirmed = vi.fn();
+    setRivenCallbacks({
+      onRivenRollConfirmed: rollConfirmed,
+      onRivenChoiceConfirmed: choiceConfirmed,
+    });
+
+    processRivenPatterns(openLine, "dbwin", true);
+    processRivenPatterns(cycleLine, "dbwin", true);
+    resumeRivenSession();
+    processRivenPatterns(sendResultOk, "dbwin", true);
+
+    expect(rollConfirmed).toHaveBeenCalledTimes(1);
+    expect(choiceConfirmed).not.toHaveBeenCalled();
+  });
+
+  it("keeps the cycle/choice alternation of a live session", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-11T12:00:00Z"));
+    resetRivenState();
+    const rollPending = vi.fn();
+    const rollConfirmed = vi.fn();
+    const choiceConfirmed = vi.fn();
+    setRivenCallbacks({
+      onRivenRollPending: rollPending,
+      onRivenRollConfirmed: rollConfirmed,
+      onRivenChoiceConfirmed: choiceConfirmed,
+    });
+
+    processRivenPatterns(openLine, "dbwin", true);
+    processRivenPatterns(localisedDialogLine, "dbwin", true);
+    processRivenPatterns(sendResultOk, "dbwin", true);
+    expect(rollPending).toHaveBeenCalledTimes(1);
+    expect(rollConfirmed).toHaveBeenCalledTimes(1);
+
+    resumeRivenSession();
+    vi.advanceTimersByTime(1_000);
+    processRivenPatterns(localisedDialogLine, "dbwin", true);
+    vi.advanceTimersByTime(1_000);
+    processRivenPatterns(sendResultOk, "dbwin", true);
+
+    expect(choiceConfirmed).toHaveBeenCalledTimes(1);
+    expect(rollPending).toHaveBeenCalledTimes(1);
   });
 });
 

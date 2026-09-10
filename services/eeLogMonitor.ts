@@ -16,6 +16,7 @@ import {
   processRivenPatterns,
   setRivenCallbacks,
   forceEndRivenSession,
+  resumeRivenSession,
   isRivenSessionActive,
   resetRivenState,
 } from "./rivenLogStateMachine";
@@ -166,7 +167,7 @@ let activeMissionTagCallback: ((tag: string) => void) | null = null;
 let loginCompleteCallback: (() => void) | null = null;
 let lastLoginCompleteAt = 0;
 
-export { RIVEN_PATTERNS, forceEndRivenSession };
+export { RIVEN_PATTERNS, forceEndRivenSession, resumeRivenSession };
 
 /** The game writes settings (interface scale included) to EE.cfg lazily; this
  *  line is the only signal that the file just changed. */

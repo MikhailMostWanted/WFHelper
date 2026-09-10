@@ -22,6 +22,7 @@ interface MainProcessContext {
   overlayThemeVars: OverlayThemeVars;
   overlayHotkeyRegistered: string | null;
   overlayInteractionHotkeyRegistered: string | null;
+  rivenRescanHotkeyRegistered: string | null;
   overlayInteractiveMode: boolean;
   overlayDismissedUntilMs: number;
   /** Relic era of the running fissure from EE.log ("omnia" = any era); null off-fissure. */
@@ -39,7 +40,10 @@ type PresenceKey =
   | "arbiSummaryWindow"
   | "currentInventoryPath"
   | "watcher";
-type QuotedKey = "overlayHotkeyRegistered" | "overlayInteractionHotkeyRegistered";
+type QuotedKey =
+  | "overlayHotkeyRegistered"
+  | "overlayInteractionHotkeyRegistered"
+  | "rivenRescanHotkeyRegistered";
 
 const log = withScope("ctx");
 const presenceKeys: ReadonlySet<ContextKey> = new Set<PresenceKey>([
@@ -56,6 +60,7 @@ const presenceKeys: ReadonlySet<ContextKey> = new Set<PresenceKey>([
 const quotedKeys: ReadonlySet<ContextKey> = new Set<QuotedKey>([
   "overlayHotkeyRegistered",
   "overlayInteractionHotkeyRegistered",
+  "rivenRescanHotkeyRegistered",
 ]);
 
 const state: MainProcessContext = {
@@ -73,6 +78,7 @@ const state: MainProcessContext = {
   overlayThemeVars: {},
   overlayHotkeyRegistered: null,
   overlayInteractionHotkeyRegistered: null,
+  rivenRescanHotkeyRegistered: null,
   overlayInteractiveMode: false,
   overlayDismissedUntilMs: 0,
   activeFissureTier: null,

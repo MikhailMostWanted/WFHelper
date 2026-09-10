@@ -386,6 +386,21 @@ export function isRivenSessionActive(): boolean {
   return _rivenSessionActive;
 }
 
+/** Re-arm over a rolling screen whose open marker is gone; a live session keeps its dialog state. */
+export function resumeRivenSession(): void {
+  const wasActive = _rivenSessionActive;
+  _rivenSessionActive = true;
+  _rivenSessionStartedAt = Date.now();
+  _rivenDioramaReady = true;
+  _rivenForceEndedAt = 0;
+  if (!wasActive) {
+    _rivenPendingDialog = null;
+    _rivenNextDialog = "cycle";
+    _rivenChatViewActive = false;
+  }
+  resetRivenIdleTimer();
+}
+
 export function forceEndRivenSession(): void {
   if (!_rivenSessionActive && !_rivenPendingDialog && !_rivenChatViewActive) return;
   _rivenSessionActive = false;
