@@ -305,6 +305,37 @@ describe("rivenData", () => {
       expect(rivenData.resolveRivenType("Kuva Sobek")).toContain("ShotgunRandomModRare");
     });
 
+    it("resolves shotguns DE only marks through their archetype", () => {
+      for (const weapon of [
+        "Drakgoon",
+        "Kuva Drakgoon",
+        "Convectrix",
+        "Phage",
+        "Bubonico",
+        "Coda Bubonico",
+        "Steflos",
+      ]) {
+        expect(rivenData.resolveRivenType(weapon)).toContain("ShotgunRandomModRare");
+      }
+      // Innate multishot is not the marker: these stay rifle rivens.
+      expect(rivenData.resolveRivenType("Quanta")).toContain("RifleRandomModRare");
+      expect(rivenData.resolveRivenType("Cernos Prime")).toContain("RifleRandomModRare");
+    });
+
+    it("grades a shotgun riven the rifle pool called impossible", () => {
+      const graded = gradeRiven("Kuva Drakgoon", [
+        { name: "Reload Speed", positive: true, value: 78.1 },
+        { name: "Multishot", positive: true, value: 181.6 },
+        { name: "Status Duration", positive: false, value: 52.3 },
+      ]);
+      expect(graded).not.toBeNull();
+      // A pool that cannot explain the card pins every float at exactly 0 or 1.
+      for (const stat of graded!.stats) {
+        expect(stat.rollFloat).toBeGreaterThan(0);
+        expect(stat.rollFloat).toBeLessThan(1);
+      }
+    });
+
     it("resolves Duviri melee to the ordinary melee riven", () => {
       // Both names collide with a Drifter twin, so this also pins that the melee
       // riven type survives whichever entry wins the name key.

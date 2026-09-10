@@ -24,6 +24,7 @@ interface WeaponInfo {
   productCategory: string;
   holsterCategory: string;
   compatibilityTags: string[];
+  shotgunFamily: boolean;
 }
 
 interface RivenModInfo {
@@ -190,6 +191,24 @@ function cleanLocTag(raw: string): string {
   return cleaned;
 }
 
+// DE states a weapon's mod class through the archetype it inherits from, not
+// through holsterCategory: Drakgoon, Convectrix and Phage holster as WIDE_RIFLE
+// and Bubonico as ARM_MOUNTED, yet all four take shotgun mods and shotgun rivens.
+function hasShotgunAncestor(
+  uniqueName: string,
+  weapons: Record<string, { parentName?: unknown }>,
+): boolean {
+  const seen = new Set<string>();
+  let current: string | undefined = uniqueName;
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    if (/\/Shotgun\//i.test(current)) return true;
+    const parent: unknown = weapons[current]?.parentName;
+    current = typeof parent === "string" ? parent : undefined;
+  }
+  return false;
+}
+
 function ensureBuilt(): void {
   if (_built) return;
   _built = true;
@@ -226,6 +245,7 @@ function ensureBuilt(): void {
           productCategory,
           holsterCategory: w.holsterCategory || "",
           compatibilityTags: Array.isArray(w.compatibilityTags) ? w.compatibilityTags : [],
+          shotgunFamily: hasShotgunAncestor(uniqueName, weapons),
         });
       }
       _weaponDisplayNames.set(nameLc, name);
@@ -314,11 +334,13 @@ export function resolveRivenType(weaponName: string): string | null {
 
   const cat = info.productCategory;
 
-  // Current data identifies some shotguns only by holsterCategory.
-  // Retain the compatibility-tag check for older exports.
+  // A LongGun is a shotgun by holsterCategory, by compatibility tag or by
+  // ancestry; the tag check stays for exports that carry neither of the others.
   if (
     cat === "LongGuns" &&
-    (info.holsterCategory === "SHOTGUN" || info.compatibilityTags.includes("SHOTGUN"))
+    (info.holsterCategory === "SHOTGUN" ||
+      info.compatibilityTags.includes("SHOTGUN") ||
+      info.shotgunFamily)
   ) {
     return SHOTGUN_RIVEN_KEY;
   }
