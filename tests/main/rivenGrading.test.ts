@@ -336,6 +336,15 @@ describe("rivenData", () => {
       }
     });
 
+    it("reads zaw strikes as melee though DE exports them as Pistols", () => {
+      expect(rivenData.isMeleeWeapon("Sepfahn")).toBe(true);
+      expect(rivenData.isMeleeWeapon("Plague Kripath")).toBe(true);
+      expect(rivenData.resolveRivenType("Sepfahn")).toContain("ModularMeleeRandomModRare");
+      // Kitgun chambers stay ranged.
+      expect(rivenData.isMeleeWeapon("Catchmoon")).toBe(false);
+      expect(rivenData.resolveRivenType("Catchmoon")).toContain("ModularPistolRandomModRare");
+    });
+
     it("resolves Duviri melee to the ordinary melee riven", () => {
       // Both names collide with a Drifter twin, so this also pins that the melee
       // riven type survives whichever entry wins the name key.

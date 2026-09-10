@@ -126,6 +126,10 @@ const ARCHGUN_RIVEN_KEY = "/Lotus/Upgrades/Mods/Randomized/LotusArchgunRandomMod
 const KITGUN_RIVEN_KEY = "/Lotus/Upgrades/Mods/Randomized/LotusModularPistolRandomModRare";
 const ZAW_RIVEN_KEY = "/Lotus/Upgrades/Mods/Randomized/LotusModularMeleeRandomModRare";
 
+// Every modular part exports as productCategory Pistols, so the path is the only discriminator.
+const MODULAR_MELEE_PATH = /ModularMelee/i;
+const MODULAR_PISTOL_PATH = /SUModularSecondary|InfKitGun/i;
+
 const RIVEN_MODS_BY_CATEGORY: Record<string, string> = {
   LongGuns: RIFLE_RIVEN_KEY,
   Pistols: PISTOL_RIVEN_KEY,
@@ -321,6 +325,7 @@ export function isMeleeWeapon(weaponName: string): boolean {
   ensureBuilt();
   const info = _weaponByNameLc.get(weaponName.toLowerCase());
   if (!info) return false;
+  if (MODULAR_MELEE_PATH.test(info.uniqueName)) return true;
   return MELEE_CATEGORIES.has(info.productCategory) || info.holsterCategory === "MELEE";
 }
 
@@ -341,13 +346,8 @@ export function resolveRivenType(weaponName: string): string | null {
     return SHOTGUN_RIVEN_KEY;
   }
 
-  // Check for modular weapons (Zaw / Kitgun)
-  if (cat === "Melee" && info.uniqueName.includes("PlayerMeleeWeapon")) {
-    return ZAW_RIVEN_KEY;
-  }
-  if (cat === "Pistols" && info.uniqueName.includes("LotusPistol")) {
-    return KITGUN_RIVEN_KEY;
-  }
+  if (MODULAR_MELEE_PATH.test(info.uniqueName)) return ZAW_RIVEN_KEY;
+  if (MODULAR_PISTOL_PATH.test(info.uniqueName)) return KITGUN_RIVEN_KEY;
 
   const byCategory = RIVEN_MODS_BY_CATEGORY[cat];
   if (byCategory) return byCategory;
