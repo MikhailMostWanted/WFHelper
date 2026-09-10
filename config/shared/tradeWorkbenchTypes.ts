@@ -1,11 +1,10 @@
 // Cross-runtime Trade Workbench contract: the renderer builds and previews a
 // selling plan, the main process journals every mutation and executes it.
 
-/** Hard per-run cap; a bigger queue executes as several confirmed runs. */
-export const WORKBENCH_MAX_ROWS_PER_RUN = 20;
+export const WORKBENCH_MAX_ROWS_PER_RUN = 100;
 /** Parse bound for hostile payloads, above the run cap on purpose so the
  *  validator (not the parser) is what reports an oversized plan. */
-const MAX_PARSED_ROWS = 100;
+const MAX_PARSED_ROWS = WORKBENCH_MAX_ROWS_PER_RUN + 10;
 const MAX_ID_LENGTH = 64;
 const MAX_NAME_LENGTH = 120;
 const MAX_SLUG_LENGTH = 120;

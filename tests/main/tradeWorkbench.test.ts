@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  WORKBENCH_MAX_ROWS_PER_RUN,
   isOrderLimitErrorMessage,
   parseWorkbenchPlan,
   parseWorkbenchSafetySnapshot,
@@ -138,8 +139,18 @@ describe("plan validation and parsing", () => {
   });
 
   it("rejects a plan over the per-run cap and rows missing from the snapshot", () => {
-    const big = makePlan(Array.from({ length: 21 }, (_, i) => planRow(`r${i}`)));
+    const atCap = makePlan(
+      Array.from({ length: WORKBENCH_MAX_ROWS_PER_RUN }, (_, i) => planRow(`r${i}`)),
+    );
+    expect(WORKBENCH_MAX_ROWS_PER_RUN).toBe(100);
+    expect(validateWorkbenchPlan(atCap, snapshotFor(atCap)).ok).toBe(true);
+
+    const big = makePlan(
+      Array.from({ length: WORKBENCH_MAX_ROWS_PER_RUN + 1 }, (_, i) => planRow(`r${i}`)),
+    );
     expect(validateWorkbenchPlan(big, snapshotFor(big)).planError).toBe("too-many-rows");
+    // The parse bound sits above the cap so the validator reports this, not the parser.
+    expect(parseWorkbenchPlan(big)).not.toBeNull();
 
     const plan = makePlan([planRow("a")]);
     const missing = validateWorkbenchPlan(plan, { capturedAt: 1, rows: {} });

@@ -16,18 +16,23 @@ import {
   mergeQueueRows,
   effectivePrice,
   eligibleSelectionKeys,
+  loadQueueMarketData,
   planTotals,
   relicSubtypeFor,
   resolveQueueSlug,
   rowNeedsOverride,
   rowSafetyKey,
   rowWarnings,
+  rowsNeedingMarketData,
   selectionKeyFor,
   setRowQuantity,
   unpricedSelectedRows,
   type WorkbenchQueueRow,
 } from "../../../../src/lib/tradeWorkbench/queueModel.js";
-import { parseWorkbenchPlan } from "../../../../config/shared/tradeWorkbenchTypes.js";
+import {
+  parseWorkbenchPlan,
+  WORKBENCH_MAX_ROWS_PER_RUN,
+} from "../../../../config/shared/tradeWorkbenchTypes.js";
 import type { PricingListing } from "../../../../src/lib/tradeWorkbench/pricingStrategies.js";
 import type { ItemDbEntry, ParsedItem } from "../../../../src/types/inventory.js";
 import type { WfmItemsLookup } from "../../../../src/types/ipc.js";
@@ -89,6 +94,19 @@ function sellBook(...prices: number[]): PricingListing[] {
     status: "ingame",
     userName: `seller${index}`,
   }));
+}
+
+function pricedRows(count: number): WorkbenchQueueRow[] {
+  const rows: WorkbenchQueueRow[] = [];
+  for (let i = 0; i < count; i++) {
+    const built = buildQueueRows(
+      [makeItem(`Item ${i}`)],
+      EMPTY_CTX,
+      lookupFor({ name: `Item ${i}`, slug: `item_${i}` }),
+    );
+    rows.push({ ...built[0], rowId: `r${i}`, selected: true, manualPrice: 5 });
+  }
+  return rows;
 }
 
 describe("workbench queue selection", () => {
@@ -252,19 +270,18 @@ describe("workbench queue selection", () => {
   });
 
   it("flags a selection larger than the per-run cap without truncating", () => {
-    const rows: WorkbenchQueueRow[] = [];
-    for (let i = 0; i < 21; i++) {
-      const built = buildQueueRows(
-        [makeItem(`Item ${i}`)],
-        EMPTY_CTX,
-        lookupFor({ name: `Item ${i}`, slug: `item_${i}` }),
-      );
-      rows.push({ ...built[0], rowId: `r${i}`, selected: true, manualPrice: 5 });
-    }
+    const rows = pricedRows(WORKBENCH_MAX_ROWS_PER_RUN + 1);
     const { plan, overCap } = buildPlanFromRows(rows, 1);
     expect(overCap).toBe(true);
-    expect(plan.rows).toHaveLength(21);
-    expect(planTotals(rows).rows).toBe(21);
+    expect(plan.rows).toHaveLength(WORKBENCH_MAX_ROWS_PER_RUN + 1);
+    expect(planTotals(rows).rows).toBe(WORKBENCH_MAX_ROWS_PER_RUN + 1);
+  });
+
+  it("accepts a selection of exactly the per-run cap", () => {
+    expect(WORKBENCH_MAX_ROWS_PER_RUN).toBe(100);
+    const { plan, overCap } = buildPlanFromRows(pricedRows(WORKBENCH_MAX_ROWS_PER_RUN), 1);
+    expect(overCap).toBe(false);
+    expect(plan.rows).toHaveLength(WORKBENCH_MAX_ROWS_PER_RUN);
   });
 
   it("gives two plans built in the same millisecond distinct ids", () => {
@@ -746,5 +763,92 @@ describe("selection safety context inputs", () => {
       pins: [],
     });
     expect(safeToList({ internalName: CHASSIS, amount: 3 }, mastered).reserved).toBe(0);
+  });
+});
+
+describe("workbench market loading", () => {
+  it("targets every selected row that has no order book, with no slice", () => {
+    const rows = pricedRows(134);
+    const targets = rowsNeedingMarketData([
+      { ...rows[0], sellBook: sellBook(10) },
+      { ...rows[1], selected: false },
+      ...rows.slice(2),
+    ]);
+    expect(targets).toHaveLength(132);
+    expect(targets.map((row) => row.rowId)).not.toContain("r0");
+    expect(targets.map((row) => row.rowId)).not.toContain("r1");
+  });
+
+  it("works through every target and paces the requests it sends", async () => {
+    const targets = pricedRows(134);
+    let clock = 0;
+    const waits: number[] = [];
+    const fetched: string[] = [];
+    const summary = await loadQueueMarketData(targets, {
+      now: () => clock,
+      sleep: async (ms) => {
+        waits.push(ms);
+        clock += ms;
+      },
+      fetchBook: async (row) => {
+        fetched.push(row.rowId);
+        clock += 50;
+        return { sell: sellBook(10), buy: null };
+      },
+      onRow: () => {},
+    });
+    expect(fetched).toHaveLength(134);
+    expect(summary).toEqual({ loaded: 134, failedRowIds: [], cancelled: false });
+    // 400ms between request starts, less the 50ms each fetch already took.
+    expect(waits).toEqual(Array.from({ length: 133 }, () => 350));
+  });
+
+  it("adds no gap when the request itself outlasted the interval", async () => {
+    let clock = 0;
+    const waits: number[] = [];
+    await loadQueueMarketData(pricedRows(3), {
+      now: () => clock,
+      sleep: async (ms) => {
+        waits.push(ms);
+        clock += ms;
+      },
+      fetchBook: async () => {
+        clock += 900;
+        return { sell: sellBook(10), buy: null };
+      },
+      onRow: () => {},
+    });
+    expect(waits).toEqual([]);
+  });
+
+  it("stops between rows once cancelled", async () => {
+    let cancelled = false;
+    const fetched: string[] = [];
+    const summary = await loadQueueMarketData(pricedRows(10), {
+      minIntervalMs: 0,
+      isCancelled: () => cancelled,
+      fetchBook: async (row) => {
+        fetched.push(row.rowId);
+        if (fetched.length === 3) cancelled = true;
+        return { sell: sellBook(10), buy: null };
+      },
+      onRow: () => {},
+    });
+    expect(fetched).toEqual(["r0", "r1", "r2"]);
+    expect(summary.cancelled).toBe(true);
+    expect(summary.loaded).toBe(3);
+  });
+
+  it("records rows whose fetch returned no book and still advances progress", async () => {
+    const progress: string[] = [];
+    const summary = await loadQueueMarketData(pricedRows(4), {
+      minIntervalMs: 0,
+      fetchBook: async (row) =>
+        row.rowId === "r1" || row.rowId === "r3" ? null : { sell: sellBook(10), buy: null },
+      onRow: (row) => progress.push(row.rowId),
+    });
+    expect(progress).toEqual(["r0", "r1", "r2", "r3"]);
+    expect(summary.failedRowIds).toEqual(["r1", "r3"]);
+    expect(summary.loaded).toBe(2);
   });
 });

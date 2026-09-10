@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   import WorkbenchQueueRow from "./WorkbenchQueueRow.svelte";
   import WorkbenchReview from "./WorkbenchReview.svelte";
@@ -36,10 +36,12 @@
     buildPlanFromRows,
     buildSelectedQueueRows,
     captureSafetySnapshot,
+    loadQueueMarketData,
     mergeQueueRows,
     planTotals,
     rowNeedsOverride,
     rowSafetyKey,
+    rowsNeedingMarketData,
     setRowQuantity,
     unpricedSelectedRows,
     type WorkbenchQueueRow as QueueRow,
@@ -113,6 +115,9 @@
     blocked: "workbench.rowStatus.blocked",
   };
 
+  // Rows named one by one in the confirm dialog; main truncates the message.
+  const CONFIRM_ROW_PREVIEW = 8;
+
   const FIELD_CLASS =
     "rounded-[var(--radius-md)] border border-[color:var(--ui-control-border)] " +
     "bg-[var(--ui-control-bg)] px-2 py-1.5 text-sm text-text-primary outline-none " +
@@ -131,6 +136,10 @@
   let ordersBusy = $state(false);
   let ownUserName = $state<string | null>(null);
   let marketBusy = $state(false);
+  let marketDone = $state(0);
+  let marketTotal = $state(0);
+  let marketFailedRowIds = $state<readonly string[]>([]);
+  let marketAbort = false;
   let reviewReport = $state<WorkbenchReviewReport | null>(null);
   let reviewBusy = $state(false);
   let preview = $state<WorkbenchPlanValidation | null>(null);
@@ -277,25 +286,46 @@
 
   async function loadMarketForSelected(): Promise<void> {
     if (marketBusy) return;
+    const targets = rowsNeedingMarketData(rows);
+    if (targets.length === 0) return;
     marketBusy = true;
+    marketAbort = false;
+    marketDone = 0;
+    marketTotal = targets.length;
+    marketFailedRowIds = [];
     try {
-      // Bounded per click; the order-book cache absorbs repeats.
-      const targets = rows.filter((row) => row.selected && !row.sellBook).slice(0, 30);
-      for (const target of targets) {
-        const result = await fetchItemOrderBookBySlug(target.slug, { rank: target.rank });
-        const sell = result.status === "ok" ? result.data.sell : null;
-        const buy = result.status === "ok" ? result.data.buy : null;
-        const current = rows.find((row) => row.rowId === target.rowId);
-        if (!current) continue;
-        let next = attachMarketData(current, sell, buy, myOrders);
-        next = applyStrategy(next, strategyConfig(), ownUserName, dampingRule);
-        replaceRow(next);
-        if (sell) markQueueMarketFetched();
-      }
+      const summary = await loadQueueMarketData(targets, {
+        isCancelled: () => marketAbort,
+        fetchBook: async (target) => {
+          const result = await fetchItemOrderBookBySlug(target.slug, {
+            rank: target.rank,
+            priority: "background",
+          });
+          return result.status === "ok" ? { sell: result.data.sell, buy: result.data.buy } : null;
+        },
+        onRow: (target, book) => {
+          marketDone += 1;
+          const current = rows.find((row) => row.rowId === target.rowId);
+          if (!current) return;
+          let next = attachMarketData(current, book?.sell ?? null, book?.buy ?? null, myOrders);
+          next = applyStrategy(next, strategyConfig(), ownUserName, dampingRule);
+          replaceRow(next);
+          if (book?.sell) markQueueMarketFetched();
+        },
+      });
+      marketFailedRowIds = summary.failedRowIds;
     } finally {
       marketBusy = false;
     }
   }
+
+  const marketFailedNames = $derived(
+    rows.filter((row) => marketFailedRowIds.includes(row.rowId)).map((row) => row.itemName),
+  );
+
+  onDestroy(() => {
+    marketAbort = true;
+  });
 
   function applyStrategyToSelected(): void {
     const config = strategyConfig();
@@ -387,13 +417,20 @@
           min: Math.min(...prices),
           max: Math.max(...prices),
         }),
-        ...plan.rows.map((row) =>
+        ...plan.rows.slice(0, CONFIRM_ROW_PREVIEW).map((row) =>
           t("workbench.execute.confirmRow", {
             item: row.itemName,
             units: row.quantity,
             price: row.platinum,
           }),
         ),
+        ...(plan.rows.length > CONFIRM_ROW_PREVIEW
+          ? [
+              t("workbench.execute.confirmMoreRows", {
+                count: plan.rows.length - CONFIRM_ROW_PREVIEW,
+              }),
+            ]
+          : []),
       ].join("\n"),
       t,
     );
@@ -493,13 +530,9 @@
     runFinishedAt != null ? new Date(runFinishedAt).toLocaleString($locale) : "",
   );
 
-  // Only a run this modal watched start needs the refresh below; one that
-  // finished earlier is already covered by the openQueue fetch.
   let watchedRunPlanId: string | null = null;
   let refreshedRunPlanId: string | null = null;
 
-  /** Rows still carry the pre-run order set, so a second press would plan a
-   *  create for an order the run just placed. */
   async function refreshOrdersAfterRun(): Promise<void> {
     if (!(await loadOwnOrders())) return;
     rows = attachExistingOrders(rows, myOrders);
@@ -622,6 +655,16 @@
         </div>
       {/if}
 
+      {#if marketFailedNames.length > 0}
+        <div
+          class="rounded-[var(--radius-md)] border border-warning/40 bg-warning/10 p-2.5 text-sm text-warning"
+          data-workbench-price-failed={marketFailedNames.length}
+        >
+          <div>{t("workbench.marketFailed", { count: marketFailedNames.length })}</div>
+          <div class="mt-1 max-h-16 overflow-y-auto text-xs">{marketFailedNames.join(", ")}</div>
+        </div>
+      {/if}
+
       {#if mainState && (reviewRequired || reviewReport)}
         <WorkbenchReview
           wbState={mainState}
@@ -651,6 +694,24 @@
         >
           {t(marketBusy ? "workbench.loadingMarket" : "workbench.loadMarket")}
         </button>
+        {#if marketTotal > 0}
+          <span
+            class="text-xs text-text-muted"
+            data-workbench-price-progress="{marketDone}/{marketTotal}"
+          >
+            {t("workbench.marketProgress", { done: marketDone, total: marketTotal })}
+          </span>
+        {/if}
+        {#if marketBusy}
+          <button
+            type="button"
+            class="btn-secondary btn-sm"
+            data-workbench-price-stop
+            onclick={() => (marketAbort = true)}
+          >
+            {t("workbench.stopLoadingMarket")}
+          </button>
+        {/if}
         <button type="button" class="btn-secondary" onclick={refreshSafety}>
           {t("workbench.refreshSafety")}
         </button>
@@ -794,8 +855,6 @@
         >
           <div class="mb-1 font-semibold">
             {#if runFinishedAt != null}
-              <!-- Undated, a run from hours ago reads as the current listings,
-                   so a finished block is stamped as history. -->
               <span class="text-text-muted">
                 {t("workbench.lastRunAt", { at: runFinishedLabel })} ·
               </span>
