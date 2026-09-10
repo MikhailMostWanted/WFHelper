@@ -347,7 +347,7 @@ export function correctScannedStats(
     }
 
     if (violation != null) {
-      log.warn(
+      log.info(
         `[RivenGrade] "${stat.name}" ${stat.positive ? "+" : "-"}${value} is out of ` +
           `range for "${weaponName}" (violation ${violation.toFixed(3)}) - kept as scanned`,
       );
