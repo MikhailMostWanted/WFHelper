@@ -3,16 +3,47 @@
   import { FEEDBACK_LIMITS, type FeedbackReport } from "../../config/shared/feedback.js";
   import { invoke } from "../lib/ipc.js";
   import { locale, tr, type MessageKey } from "../lib/i18n.js";
+  import { readStoredJson, writeStorage } from "../lib/persistence.js";
+  import { asRecord } from "../../config/shared/objectValidation.js";
   import { currentView } from "../stores/app.js";
   import { overlaySettings } from "../stores/overlaySettings.js";
   import ModalShell from "./ModalShell.svelte";
 
+  // The screenshot stays out of the draft: base64 pixels would blow the quota.
+  const DRAFT_KEY = "feedback-draft";
+
+  interface FeedbackDraft {
+    kind: FeedbackReport["kind"];
+    title: string;
+    description: string;
+    contact: string;
+    includeDiagnostics: boolean;
+  }
+
+  function normalizeDraft(parsed: unknown): FeedbackDraft {
+    const raw = asRecord(parsed) ?? {};
+    const text = (value: unknown, max: number): string =>
+      typeof value === "string" ? value.slice(0, max) : "";
+    return {
+      kind: raw.kind === "feature" ? "feature" : "bug",
+      title: text(raw.title, FEEDBACK_LIMITS.title),
+      description: text(raw.description, FEEDBACK_LIMITS.description),
+      contact: text(raw.contact, FEEDBACK_LIMITS.contact),
+      includeDiagnostics: raw.includeDiagnostics === true,
+    };
+  }
+
+  function emptyDraft(): FeedbackDraft {
+    return { kind: "bug", title: "", description: "", contact: "", includeDiagnostics: false };
+  }
+
   let { onClose }: { onClose: () => void } = $props();
-  let kind = $state<FeedbackReport["kind"]>("bug");
-  let title = $state("");
-  let description = $state("");
-  let contact = $state("");
-  let includeDiagnostics = $state(false);
+  const draft = readStoredJson(DRAFT_KEY, normalizeDraft, emptyDraft);
+  let kind = $state<FeedbackReport["kind"]>(draft.kind);
+  let title = $state(draft.title);
+  let description = $state(draft.description);
+  let contact = $state(draft.contact);
+  let includeDiagnostics = $state(draft.includeDiagnostics);
   let context = $state<Awaited<ReturnType<typeof loadContext>> | undefined>(undefined);
   let loading = $state(true);
   let sending = $state(false);
@@ -46,6 +77,12 @@
   async function loadContext() {
     return invoke("getFeedbackContext");
   }
+
+  $effect(() => {
+    const next: FeedbackDraft = { kind, title, description, contact, includeDiagnostics };
+    if (sent) return;
+    writeStorage(DRAFT_KEY, JSON.stringify(next));
+  });
 
   onMount(() => {
     let alive = true;
@@ -149,8 +186,10 @@
     };
     try {
       const result = await invoke("submitFeedback", report);
-      if (result?.ok) sent = true;
-      else if (result?.error === "unavailable") errorKey = "feedback.errorUnavailable";
+      if (result?.ok) {
+        sent = true;
+        writeStorage(DRAFT_KEY, "");
+      } else if (result?.error === "unavailable") errorKey = "feedback.errorUnavailable";
       else if (result?.error === "rate_limited") errorKey = "feedback.errorRateLimited";
       else if (result?.error === "invalid") errorKey = "feedback.errorInvalid";
       else errorKey = "feedback.errorFailed";
