@@ -55,11 +55,31 @@
   // Publish the width globally so the content area and any other consumer of
   // var(--sidebar-width) reflow with it. Under 800px responsive.css pins the icon
   // rail, so the inline value is dropped there rather than fighting its :root rule.
-  function applyWidthVar(px: number): void {
-    if (typeof document === "undefined") return;
+  function writeWidthVar(px: number): void {
     const root = document.documentElement.style;
     if (narrowRail?.matches) root.removeProperty("--sidebar-width");
     else root.setProperty("--sidebar-width", `${px}px`);
+  }
+
+  // One write per frame while the grip is held: each write relayouts the whole
+  // content area, which on the mastery tab is a four-figure card count.
+  let widthFrame: number | null = null;
+  let pendingWidth = 0;
+
+  function applyWidthVar(px: number): void {
+    if (typeof document === "undefined") return;
+    pendingWidth = px;
+    if (!resizing || typeof requestAnimationFrame !== "function") {
+      if (widthFrame !== null) cancelAnimationFrame(widthFrame);
+      widthFrame = null;
+      writeWidthVar(px);
+      return;
+    }
+    if (widthFrame !== null) return;
+    widthFrame = requestAnimationFrame(() => {
+      widthFrame = null;
+      writeWidthVar(pendingWidth);
+    });
   }
 
   $: applyWidthVar(effectiveWidth);
@@ -67,7 +87,10 @@
   onMount(() => {
     const onBreakpoint = (): void => applyWidthVar(effectiveWidth);
     narrowRail?.addEventListener("change", onBreakpoint);
-    return () => narrowRail?.removeEventListener("change", onBreakpoint);
+    return () => {
+      narrowRail?.removeEventListener("change", onBreakpoint);
+      if (widthFrame !== null) cancelAnimationFrame(widthFrame);
+    };
   });
 
   function startResize(e: PointerEvent): void {
