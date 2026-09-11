@@ -51,6 +51,7 @@
     readCachedQueueRows,
     writeCachedQueueRows,
   } from "../../lib/tradeWorkbench/queueCache.js";
+  import { STRATEGY_KEYS } from "../../lib/tradeWorkbench/strategyLabels.js";
   import { setWorkbenchState, workbenchState } from "../../lib/tradeWorkbench/workbenchState.js";
   import {
     WORKBENCH_MAX_ROWS_PER_RUN,
@@ -70,15 +71,6 @@
   const { onClose }: Props = $props();
 
   const t = $derived($tr);
-
-  const STRATEGY_KEYS: Record<WorkbenchStrategyId, MessageKey> = {
-    "match-cheapest": "workbench.strategy.match-cheapest",
-    "cheapest-minus-one": "workbench.strategy.cheapest-minus-one",
-    "percent-offset": "workbench.strategy.percent-offset",
-    "bounded-cheapest-average": "workbench.strategy.bounded-cheapest-average",
-    "target-margin": "workbench.strategy.target-margin",
-    manual: "workbench.strategy.manual",
-  };
 
   const PLAN_ERROR_KEYS: Record<NonNullable<WorkbenchPlanValidation["planError"]>, MessageKey> = {
     empty: "workbench.planError.empty",

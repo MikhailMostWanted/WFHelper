@@ -379,9 +379,13 @@ interface QueueMarketBook {
   buy: readonly PricingListing[] | null;
 }
 
-interface QueueMarketLoadOptions {
-  fetchBook: (row: WorkbenchQueueRow) => Promise<QueueMarketBook | null>;
-  onRow: (row: WorkbenchQueueRow, book: QueueMarketBook | null) => void;
+interface MarketLoadRow {
+  rowId: string;
+}
+
+interface QueueMarketLoadOptions<T extends MarketLoadRow> {
+  fetchBook: (row: T) => Promise<QueueMarketBook | null>;
+  onRow: (row: T, book: QueueMarketBook | null) => void;
   minIntervalMs?: number;
   isCancelled?: () => boolean;
   sleep?: (ms: number) => Promise<void>;
@@ -401,9 +405,9 @@ function defaultSleep(ms: number): Promise<void> {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-export async function loadQueueMarketData(
-  targets: readonly WorkbenchQueueRow[],
-  options: QueueMarketLoadOptions,
+export async function loadQueueMarketData<T extends MarketLoadRow>(
+  targets: readonly T[],
+  options: QueueMarketLoadOptions<T>,
 ): Promise<QueueMarketLoadSummary> {
   const interval = options.minIntervalMs ?? MARKET_LOAD_INTERVAL_MS;
   const now = options.now ?? Date.now;
