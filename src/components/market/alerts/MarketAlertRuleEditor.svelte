@@ -38,6 +38,9 @@
   } from "../../../types/ipc.js";
   import type { WfmSearchItem } from "../../../types/market.js";
 
+  /** How traders write a roll's shape: p is a buff, n the curse. */
+  type StatLayout = "" | "2p1n" | "3p1n" | "2p" | "3p";
+
   let {
     rule = null,
     binding = null,
@@ -89,6 +92,9 @@
   let negativeMode = $state<"any" | "required" | "forbidden">(
     riven?.hasNegative === true ? "required" : riven?.hasNegative === false ? "forbidden" : "any",
   );
+  let statLayout = $state<StatLayout>(layoutFromMatch(riven));
+  // Kept apart from statLayout, which cannot spell a buff count with no curse rule.
+  let positiveCount = $state<number | null>(riven?.positiveCount ?? null);
   let similarityPct = $state(
     riven?.minSimilarityPct !== undefined ? String(riven.minSimilarityPct) : "",
   );
@@ -147,20 +153,21 @@
       ?.wfmUrlName ?? null,
   );
 
-  // Saving refuses a rank outside its range, so pull the typed digits back in
-  // as they are typed rather than failing the save on a number no riven has.
+  function layoutFromMatch(saved: RivenAlertMatch | null): StatLayout {
+    if (saved?.positiveCount !== 2 && saved?.positiveCount !== 3) return "";
+    if (saved.hasNegative === true) return saved.positiveCount === 2 ? "2p1n" : "3p1n";
+    if (saved.hasNegative === false) return saved.positiveCount === 2 ? "2p" : "3p";
+    return "";
+  }
+
+  function applyStatLayout(): void {
+    positiveCount = statLayout ? (statLayout.startsWith("3") ? 3 : 2) : null;
+    if (!statLayout) return;
+    negativeMode = statLayout.endsWith("n") ? "required" : "forbidden";
+  }
+
   const MASTERY_RANK_BOUNDS = { min: 0, max: 16 };
   const MOD_RANK_BOUNDS = { min: 0, max: 8 };
-
-  // Takes unknown on purpose: a number input binds back as a number, and as null
-  // once the field is cleared, so a string signature here throws per keystroke.
-  function clampToBounds(raw: unknown, bounds: { min: number; max: number }): string {
-    const text = typeof raw === "string" ? raw.trim() : raw === null ? "" : String(raw);
-    if (text === "") return "";
-    const parsed = Number(text);
-    if (!Number.isFinite(parsed)) return "";
-    return String(Math.min(bounds.max, Math.max(bounds.min, Math.trunc(parsed))));
-  }
 
   function addStatBound(): void {
     const attribute = nextFreeBoundAttribute;
@@ -293,6 +300,7 @@
     if (excludeNegatives.length > 0) match.excludeNegatives = excludeNegatives;
     if (negativeMode === "required") match.hasNegative = true;
     if (negativeMode === "forbidden") match.hasNegative = false;
+    if (positiveCount !== null) match.positiveCount = positiveCount;
     if (includeBidOnly) match.includeBidOnly = true;
     const optional: Array<[keyof RivenAlertMatch, number | undefined]> = [
       ["minSimilarityPct", numOrUndef(similarityPct)],
@@ -562,10 +570,25 @@
       <div class="grid gap-3 md:grid-cols-2">
         <label class="flex flex-col gap-1 text-sm">
           <span class="text-text-secondary">{$tr("marketAlerts.negative")}</span>
-          <select class="shared-filter-select" bind:value={negativeMode}>
+          <select class="shared-filter-select" data-alert-negative-mode bind:value={negativeMode}>
             <option value="any">{$tr("filters.any")}</option>
             <option value="required">{$tr("marketAlerts.negativeRequired")}</option>
             <option value="forbidden">{$tr("marketAlerts.negativeForbidden")}</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-text-secondary">{$tr("marketAlerts.statLayout")}</span>
+          <select
+            class="shared-filter-select"
+            data-alert-stat-layout
+            bind:value={statLayout}
+            onchange={applyStatLayout}
+          >
+            <option value="">{$tr("filters.any")}</option>
+            <option value="2p1n">2p1n</option>
+            <option value="3p1n">3p1n</option>
+            <option value="2p">2p</option>
+            <option value="3p">3p</option>
           </select>
         </label>
       </div>
@@ -859,7 +882,7 @@
 
   <div class="mt-4 flex justify-end gap-2">
     <button class="btn-secondary" onclick={() => onClose(false)}>{$tr("common.cancel")}</button>
-    <button class="btn-primary" disabled={saving} onclick={() => void save()}>
+    <button class="btn-primary" data-alert-save disabled={saving} onclick={() => void save()}>
       {$tr("common.save")}
     </button>
   </div>

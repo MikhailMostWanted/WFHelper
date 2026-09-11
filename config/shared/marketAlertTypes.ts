@@ -62,6 +62,7 @@ export interface RivenAlertMatch {
   excludeAttributes: string[];
   /** true = the roll must carry a curse, false = must not, absent = either. */
   hasNegative?: boolean;
+  positiveCount?: number;
   /** Share of requirePositive the roll must carry, 0-100; absent means all. */
   minSimilarityPct?: number;
   /** Auctions with no buyout price. Off by default so a rule never quotes an
@@ -270,6 +271,7 @@ const RIVEN_MATCH_KEYS = [
   "excludeNegatives",
   "excludeAttributes",
   "hasNegative",
+  "positiveCount",
   "minSimilarityPct",
   "includeBidOnly",
   "statBounds",
@@ -392,6 +394,7 @@ function parseRivenMatch(value: unknown): MarketAlertParseResult<RivenAlertMatch
   }
 
   const numbers: Array<[keyof RivenAlertMatch, number, number, boolean]> = [
+    ["positiveCount", 2, 3, true],
     ["minSimilarityPct", 0, 100, true],
     ["minMasteryRank", 0, 16, true],
     ["maxMasteryRank", 0, 16, true],

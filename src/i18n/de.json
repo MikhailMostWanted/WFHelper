@@ -1968,6 +1968,7 @@
   "marketAlerts.negative": "Negativ",
   "marketAlerts.negativeRequired": "Erforderlich",
   "marketAlerts.negativeForbidden": "Keins erlaubt",
+  "marketAlerts.statLayout": "Statverteilung",
   "marketAlerts.requiredPositive": "Erforderliche positive Stats",
   "marketAlerts.excludedStats": "Ausgeschlossene Stats",
   "marketAlerts.excludedStatsHint": "Blockt den Stat auf beiden Seiten, positiv und negativ.",

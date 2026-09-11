@@ -2,10 +2,36 @@ import fs from "node:fs";
 
 import { test, expect } from "@playwright/test";
 
-import { launchElectronTestHarness } from "./electronTestHarness";
+import { launchElectronTestHarness, openView, selectOptionValues } from "./electronTestHarness";
+
+const SEED_RULE_ID = "seed-riven-rule";
+
+const SEEDED_RULES = {
+  schema: 1,
+  rules: [
+    {
+      id: SEED_RULE_ID,
+      name: "Seeded Boar",
+      kind: "riven",
+      enabled: false,
+      cooldownMinutes: 60,
+      riven: {
+        weaponUrlName: "boar",
+        requirePositive: ["multishot"],
+        excludeAttributes: [],
+        statBounds: [],
+        positiveCount: 2,
+      },
+    },
+  ],
+  bindings: { [SEED_RULE_ID]: { native: true } },
+  ownedCounts: {},
+};
 
 test("the riven alert editor offers stat layouts and clamps the rank fields", async () => {
-  const harness = await launchElectronTestHarness("wfh-alert-editor-");
+  const harness = await launchElectronTestHarness("wfh-alert-editor-", {
+    userDataFiles: { "market-alert-rules.json": SEEDED_RULES },
+  });
   const page = harness.page;
   const rendererErrors: string[] = [];
   page.on("pageerror", (err) => rendererErrors.push(String(err)));
@@ -14,29 +40,39 @@ test("the riven alert editor offers stat layouts and clamps the rank fields", as
   });
 
   try {
-    await page.locator('#sidebar [data-view="market"]').click();
-    await page.locator("#content button", { hasText: "Alerts" }).first().click();
-    await page.locator("button", { hasText: "New rule" }).first().click();
+    await openView(page, "market");
+    await page.locator('#content [data-tour-tab="alerts"]').first().click();
 
+    const cards = page.locator("[data-alert-card]");
+    await expect(cards).toHaveCount(1, { timeout: 30_000 });
+    const buffCountChip = page.locator('[data-alert-chip="positiveCount"]');
+    await expect(buffCountChip).toHaveCount(1);
+
+    await page.locator(`[data-alert-edit="${SEED_RULE_ID}"]`).click();
+    await expect(page.locator('[data-testid="alert-rule-editor"]')).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.locator("[data-alert-save]").click();
+    await expect(cards).toHaveCount(1);
+    await expect(buffCountChip).toHaveCount(1);
+
+    await page.locator(`[data-alert-duplicate="${SEED_RULE_ID}"]`).click();
+    await expect(cards).toHaveCount(2);
+    await expect(buffCountChip).toHaveCount(2);
+
+    await page.locator("[data-alert-new-rule]").click();
     const editor = page.locator('[data-testid="alert-rule-editor"]');
     await expect(editor).toBeVisible({ timeout: 30_000 });
 
     const layout = page.locator("[data-alert-stat-layout]");
     await expect(layout).toBeVisible();
-    expect(await layout.locator("option").allTextContents()).toEqual([
-      "Any",
-      "2p1n",
-      "3p1n",
-      "2p",
-      "3p",
-    ]);
+    // Values, not labels: the option text is translated.
+    expect(await selectOptionValues(layout)).toEqual(["", "2p1n", "3p1n", "2p", "3p"]);
 
-    // Picking a layout that names a curse implies the curse gate.
     await layout.selectOption("2p1n");
     expect(await layout.inputValue()).toBe("2p1n");
-    await expect(editor.locator("select").first()).toHaveValue("required");
+    await expect(editor.locator("[data-alert-negative-mode]")).toHaveValue("required");
 
-    // A rank no riven can reach must not reach the save, which refuses it.
     const rank = editor.locator('input[type="number"][max="8"]').first();
     await rank.fill("7908");
     await expect(rank).toHaveValue("8");

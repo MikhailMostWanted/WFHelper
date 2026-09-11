@@ -1985,6 +1985,7 @@
   "marketAlerts.negative": "Negative",
   "marketAlerts.negativeRequired": "Required",
   "marketAlerts.negativeForbidden": "None allowed",
+  "marketAlerts.statLayout": "Stat layout",
   "marketAlerts.requiredPositive": "Required positive stats",
   "marketAlerts.excludedStats": "Excluded stats",
   "marketAlerts.excludedStatsHint": "Blocks the stat on both sides, positive and negative.",

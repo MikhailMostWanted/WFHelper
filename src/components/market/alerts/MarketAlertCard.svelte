@@ -138,7 +138,7 @@
   {#if chips.length > 0}
     <div class="flex flex-wrap gap-1" data-alert-criteria>
       {#each chips as chip (chip.id)}
-        <span class={neutralChip} title={$tr(chip.titleKey)}>
+        <span class={neutralChip} title={$tr(chip.titleKey)} data-alert-chip={chip.id}>
           {#if chip.icon === "platinum"}
             <img src={PLATINUM_ICON_URL} alt="" width="11" height="11" />
           {:else if chip.icon === "endo"}
@@ -212,7 +212,8 @@
         disabled={testing || rule.kind === "baro"}
         onclick={() => onTest(rule)}>{$tr("marketAlerts.testFire")}</button
       >
-      <button class="btn-secondary btn-sm" onclick={() => onEdit(rule)}>{$tr("market.edit")}</button
+      <button class="btn-secondary btn-sm" data-alert-edit={rule.id} onclick={() => onEdit(rule)}
+        >{$tr("market.edit")}</button
       >
       <button
         class="btn-secondary btn-sm"

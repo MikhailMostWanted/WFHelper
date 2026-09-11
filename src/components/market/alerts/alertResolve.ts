@@ -197,6 +197,15 @@ export function criteriaChips(rule: MarketAlertRule): AlertChip[] {
         polarity: riven.polarity,
       });
     }
+    if (riven.positiveCount !== undefined) {
+      // Trade shorthand, English on every client, like the WTB/WTS chip.
+      chips.push({
+        id: "positiveCount",
+        titleKey: "marketAlerts.statLayout",
+        labelKey: "marketAlerts.statLayout",
+        text: `${riven.positiveCount}p`,
+      });
+    }
     if (riven.hasNegative !== undefined) {
       // "Required" alone says nothing about what is required, so the chip names
       // the criterion and carries the answer as its value.

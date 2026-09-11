@@ -300,6 +300,33 @@ describe("riven rule evaluation", () => {
     expect(mocks.dispatchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("matches only the buff count a 2p1n rule asks for", async () => {
+    mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "two-plus-one" }]));
+    saveOk(rivenRuleRaw({ riven: { positiveCount: 2, hasNegative: true } }));
+    initEngine();
+    await runMarketAlertTickForTest();
+    expect(mocks.dispatchMock).toHaveBeenCalledTimes(1);
+
+    mocks.dispatchMock.mockClear();
+    mocks.requestMock.mockResolvedValue(
+      auctionPayload([
+        {
+          id: "three-plus-one",
+          attributes: [
+            { url_name: "critical_chance", value: 120, positive: true },
+            { url_name: "critical_damage", value: 90, positive: true },
+            { url_name: "multishot", value: 60, positive: true },
+            { url_name: "zoom", value: -40, positive: false },
+          ],
+        },
+      ]),
+    );
+    saveOk(rivenRuleRaw({ riven: { positiveCount: 2, hasNegative: true } }));
+    initEngine();
+    await runMarketAlertTickForTest();
+    expect(mocks.dispatchMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a curse the rule excludes and keeps the same stat as a buff", async () => {
     mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "cursed" }]));
     saveOk(rivenRuleRaw({ riven: { excludeNegatives: ["zoom"] } }));

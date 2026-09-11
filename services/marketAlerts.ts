@@ -399,6 +399,7 @@ function matchRivenAuction(match: RivenAlertMatch, auction: AuctionView): boolea
   }
   if (match.hasNegative === true && negatives.size === 0) return false;
   if (match.hasNegative === false && negatives.size > 0) return false;
+  if (match.positiveCount !== undefined && positives.size !== match.positiveCount) return false;
 
   // A roll that does not carry the bounded stat cannot satisfy the bound.
   for (const bound of match.statBounds) {

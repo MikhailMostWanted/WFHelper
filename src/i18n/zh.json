@@ -1967,6 +1967,7 @@
   "marketAlerts.negative": "负属性",
   "marketAlerts.negativeRequired": "必须有",
   "marketAlerts.negativeForbidden": "不允许",
+  "marketAlerts.statLayout": "属性组合",
   "marketAlerts.requiredPositive": "必需的正属性",
   "marketAlerts.excludedStats": "排除的属性",
   "marketAlerts.excludedStatsHint": "正面和负面都排除该属性。",
