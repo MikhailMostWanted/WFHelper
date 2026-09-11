@@ -8,12 +8,14 @@ import fs from "node:fs";
 import { createJsonCache } from "./jsonCache";
 import { withScope } from "./logger";
 import { userDataPath } from "./userDataPath";
+import * as wfmCatalog from "./wfmCatalog";
 import * as wfmClient from "./wfmClient";
 import { rivenStatSearchParams } from "./wfmRivenSearch";
 import { getWfmSchedulerHealth } from "./wfmScheduler";
 import { dispatch } from "./notificationChannels";
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { titleCase } from "../config/shared/textNormalize";
+import { titleFromSlug } from "../config/shared/wfm";
 import {
   extractWfmOrderList,
   parseOrderPlatform,
@@ -526,7 +528,22 @@ function matchItemOrder(
   return true;
 }
 
-function itemHit(rule: MarketAlertRule, match: ItemAlertMatch, order: OrderView): MarketAlertHit {
+async function itemDisplayName(slug: string): Promise<string> {
+  try {
+    const entry = await wfmCatalog.lookupBySlug(slug);
+    if (entry?.item_name) return entry.item_name;
+  } catch (err) {
+    log.warn("[MarketAlerts] item name lookup failed:", normalizeErrorMessage(err));
+  }
+  return titleFromSlug(slug);
+}
+
+function itemHit(
+  rule: MarketAlertRule,
+  match: ItemAlertMatch,
+  order: OrderView,
+  itemName: string,
+): MarketAlertHit {
   const verb = order.side === "sell" ? "WTS" : "WTB";
   const hit: MarketAlertHit = {
     id: randomUUID(),
@@ -535,7 +552,7 @@ function itemHit(rule: MarketAlertRule, match: ItemAlertMatch, order: OrderView)
     at: new Date().toISOString(),
     kind: "item",
     title: `Item: ${rule.name}`,
-    detail: `${verb} ${match.itemUrlName} ${order.platinum}p x${order.quantity}`,
+    detail: `${verb} ${itemName} ${order.platinum}p x${order.quantity}`,
     url: `https://warframe.market/items/${match.itemUrlName}`,
     platinum: order.platinum,
   };
@@ -628,8 +645,9 @@ async function evaluateRule(rule: MarketAlertRule, skipDedup: boolean): Promise<
     const keyed = orders.map((o) => ({ key: seenKey(o.id, o.platinum), order: o }));
     const fresh = skipDedup ? null : takeUnseen(rule.id, keyed);
     const matched = fresh === null ? keyed : keyed.filter((k) => fresh.has(k.key));
+    const itemName = matched.length > 0 ? await itemDisplayName(match.itemUrlName) : "";
     return {
-      hits: matched.map((k) => itemHit(rule, match, k.order)),
+      hits: matched.map((k) => itemHit(rule, match, k.order, itemName)),
       keys: matched.map((k) => k.key),
       candidates: orders.length,
     };

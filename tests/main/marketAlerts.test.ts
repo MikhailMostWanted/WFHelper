@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
       deliverNative?.();
     },
   ),
+  catalogSlugMock: vi.fn(async (_slug: string) => null as { item_name: string } | null),
 }));
 
 vi.mock("electron", () => ({
@@ -36,6 +37,10 @@ vi.mock("../../services/wfmScheduler", () => ({
 
 vi.mock("../../services/notificationChannels", () => ({
   dispatch: mocks.dispatchMock,
+}));
+
+vi.mock("../../services/wfmCatalog", () => ({
+  lookupBySlug: mocks.catalogSlugMock,
 }));
 
 import {
@@ -688,6 +693,26 @@ describe("item rule evaluation", () => {
     expect(hits[0].detail).toContain("30p");
     expect(mocks.requestV2Mock.mock.calls[0][1]).toBe("/orders/item/nekros_prime_set");
     expect(mocks.requestMock).not.toHaveBeenCalled();
+  });
+
+  it("names the item the way warframe.market does", async () => {
+    mocks.catalogSlugMock.mockResolvedValue({ item_name: "Nekros Prime Set" });
+    mocks.requestV2Mock.mockResolvedValue(ordersPayload([{ id: "cheap", platinum: 30 }]));
+    saveOk(itemRuleRaw());
+    initEngine();
+    await runMarketAlertTickForTest();
+
+    expect(getMarketAlertHits()[0].detail).toBe("WTS Nekros Prime Set 30p x1");
+  });
+
+  it("un-slugs the name when the catalog has no entry", async () => {
+    mocks.catalogSlugMock.mockResolvedValue(null);
+    mocks.requestV2Mock.mockResolvedValue(ordersPayload([{ id: "cheap", platinum: 30 }]));
+    saveOk(itemRuleRaw({ item: { itemUrlName: "arcane_hot_shot" } }));
+    initEngine();
+    await runMarketAlertTickForTest();
+
+    expect(getMarketAlertHits()[0].detail).toBe("WTS Arcane Hot Shot 30p x1");
   });
 
   it("skips other-platform sellers and keeps pc and unlabelled ones", async () => {
