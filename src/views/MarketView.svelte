@@ -80,6 +80,7 @@
   import { isIpcError as hasError } from "../lib/ipcGuards.js";
   import InventoryOrderBookPanel from "../components/inventory/InventoryOrderBookPanel.svelte";
   import RivenDetailModal from "../modals/RivenDetailModal.svelte";
+  import RepriceOrdersModal from "../components/market/RepriceOrdersModal.svelte";
   import ThemedInput from "../components/ThemedInput.svelte";
   import { sharedFilters } from "../stores/filters.js";
   import {
@@ -275,6 +276,7 @@
   let contractsLoading = false;
   let contractsError = "";
   let selectedOrderItemKey: string | null = null;
+  let repriceOpen = false;
   let orderBookPanelOpen = false;
   let selectedContract: { contract: WfmContract; riven: DecodedRiven } | null = null;
   let ownedRivens: DecodedRiven[] = [];
@@ -705,6 +707,19 @@
     await fetchOrders({ clearSelection: true });
   }
 
+  /** Applies sent prices in place; a refetch would resort the list under the user. */
+  function onRepriced(updates: Array<{ id: string; platinum: number }>): void {
+    const byId = new Map(updates.map((entry) => [entry.id, entry.platinum]));
+    marketOrders.update((state) => ({
+      sell: state.sell.map((entry) =>
+        byId.has(entry.id) ? { ...entry, platinum: byId.get(entry.id) as number } : entry,
+      ),
+      buy: state.buy.map((entry) =>
+        byId.has(entry.id) ? { ...entry, platinum: byId.get(entry.id) as number } : entry,
+      ),
+    }));
+  }
+
   function selectAllVisible(): void {
     marketSelected.set(new Set(filteredOrderRows.map((order) => order.id)));
   }
@@ -766,6 +781,7 @@
   }
 
   $: isRivensTab = $marketViewState.typeTab === "rivens";
+  $: isSellOrdersTab = $marketViewState.typeTab === "sell";
   $: marketSectionScope = isRivensTab ? MARKET_RIVEN_SECTIONS : MARKET_ORDER_SECTIONS;
   // Mirrors the Inventory banner: a crashed or unreconciled run must stay visible
   // wherever the user is about to list something new.
@@ -803,6 +819,7 @@
     $marketFilters,
   );
   $: visibleOrderIds = new Set(filteredOrderRows.map((order) => order.id));
+  $: repriceTargets = activeOrders.filter((order) => $marketSelected.has(order.id));
   // Bulk actions hit the whole selection, so name the rows a filter is hiding.
   $: hiddenSelectedCount = [...$marketSelected].filter((id) => !visibleOrderIds.has(id)).length;
   $: filteredContractRows = applySharedFiltersAndSort(
@@ -1143,8 +1160,10 @@
                 })}{#if hiddenSelectedCount > 0}
                   {$tr("market.selectedHidden", { count: hiddenSelectedCount })}{/if}
               </span>
-              <button class="btn-sm btn-secondary" on:click={selectAllVisible}
-                >{$tr("common.selectAll")}</button
+              <button
+                class="btn-sm btn-secondary"
+                data-market-select-all
+                on:click={selectAllVisible}>{$tr("common.selectAll")}</button
               >
               {#if $marketSelected.size > 0}
                 <button class="btn-sm btn-secondary" on:click={() => bulkSetVisible(true)}
@@ -1153,6 +1172,13 @@
                 <button class="btn-sm btn-secondary" on:click={() => bulkSetVisible(false)}
                   >{$tr("market.setHidden")}</button
                 >
+                {#if isSellOrdersTab}
+                  <button
+                    class="btn-sm btn-secondary"
+                    data-market-reprice
+                    on:click={() => (repriceOpen = true)}>{$tr("market.repriceSelected")}</button
+                  >
+                {/if}
                 <button class="btn-sm btn-danger" on:click={bulkDelete}
                   >{$tr("common.deleteSelected")}</button
                 >
@@ -1269,6 +1295,14 @@
     </div>
   {/if}
 </section>
+
+{#if repriceOpen}
+  <RepriceOrdersModal
+    orders={repriceTargets}
+    onClose={() => (repriceOpen = false)}
+    onApplied={onRepriced}
+  />
+{/if}
 
 {#if selectedContract}
   <RivenDetailModal
