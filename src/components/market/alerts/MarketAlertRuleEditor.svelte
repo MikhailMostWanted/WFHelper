@@ -4,7 +4,7 @@
   import { parsedItems, wfmItems } from "../../../stores/data.js";
   import { savedSelections } from "../../../stores/inventorySelection.js";
   import { ownedCountForAlertItem } from "../../../lib/marketAlerts/ownedCount.js";
-  import { numOrUndef } from "../../../lib/numberInput.js";
+  import { inputText, numOrUndef } from "../../../lib/numberInput.js";
   import { getAlertSellLink, setAlertSellLink } from "./alertBulkSell.js";
   import { statLabel } from "./alertResolve.js";
   import ThemedInput from "../../ThemedInput.svelte";
@@ -146,6 +146,21 @@
     statOptions.find((option) => !statBounds.some((row) => row.attribute === option.wfmUrlName))
       ?.wfmUrlName ?? null,
   );
+
+  // Saving refuses a rank outside its range, so pull the typed digits back in
+  // as they are typed rather than failing the save on a number no riven has.
+  const MASTERY_RANK_BOUNDS = { min: 0, max: 16 };
+  const MOD_RANK_BOUNDS = { min: 0, max: 8 };
+
+  // Takes unknown on purpose: a number input binds back as a number, and as null
+  // once the field is cleared, so a string signature here throws per keystroke.
+  function clampToBounds(raw: unknown, bounds: { min: number; max: number }): string {
+    const text = typeof raw === "string" ? raw.trim() : raw === null ? "" : String(raw);
+    if (text === "") return "";
+    const parsed = Number(text);
+    if (!Number.isFinite(parsed)) return "";
+    return String(Math.min(bounds.max, Math.max(bounds.min, Math.trunc(parsed))));
+  }
 
   function addStatBound(): void {
     const attribute = nextFreeBoundAttribute;
@@ -419,12 +434,33 @@
   </div>
 {/snippet}
 
-{#snippet rangePair(labelKey: MessageKey, lo: { v: string }, hi: { v: string })}
+{#snippet rangePair(
+  labelKey: MessageKey,
+  lo: { v: string },
+  hi: { v: string },
+  bounds?: { min: number; max: number },
+)}
   <div class="flex flex-col gap-1 text-sm">
     <span class="text-text-secondary">{$tr(labelKey)}</span>
     <div class="flex gap-1">
-      <ThemedInput bind:value={lo.v} placeholder={$tr("common.min")} className="w-full" />
-      <ThemedInput bind:value={hi.v} placeholder={$tr("common.max")} className="w-full" />
+      <ThemedInput
+        bind:value={lo.v}
+        type={bounds ? "number" : "text"}
+        min={bounds?.min ?? null}
+        max={bounds?.max ?? null}
+        clampToRange={!!bounds}
+        placeholder={$tr("common.min")}
+        className="w-full"
+      />
+      <ThemedInput
+        bind:value={hi.v}
+        type={bounds ? "number" : "text"}
+        min={bounds?.min ?? null}
+        max={bounds?.max ?? null}
+        clampToRange={!!bounds}
+        placeholder={$tr("common.max")}
+        className="w-full"
+      />
     </div>
   </div>
 {/snippet}
@@ -656,7 +692,7 @@
               return minMastery;
             },
             set v(next: string) {
-              minMastery = next;
+              minMastery = inputText(next);
             },
           },
           {
@@ -664,9 +700,10 @@
               return maxMastery;
             },
             set v(next: string) {
-              maxMastery = next;
+              maxMastery = inputText(next);
             },
           },
+          MASTERY_RANK_BOUNDS,
         )}
         {@render rangePair(
           "common.rank",
@@ -675,7 +712,7 @@
               return minModRank;
             },
             set v(next: string) {
-              minModRank = next;
+              minModRank = inputText(next);
             },
           },
           {
@@ -683,9 +720,10 @@
               return maxModRank;
             },
             set v(next: string) {
-              maxModRank = next;
+              maxModRank = inputText(next);
             },
           },
+          MOD_RANK_BOUNDS,
         )}
         {@render rangePair(
           "common.platinum",

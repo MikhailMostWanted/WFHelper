@@ -15,6 +15,20 @@
   export let el: HTMLInputElement | null = null;
   /** Marks this input as the view's Ctrl+F search target. */
   export let searchFocusTarget = false;
+  /** Clamps to min/max by writing el; a bound value alone leaves the typed digits on screen. */
+  export let clampToRange = false;
+
+  function clampTyped(): void {
+    if (!clampToRange || !el || min === null || max === null) return;
+    const typed = el.value;
+    if (typed === "") return;
+    const parsed = Number(typed);
+    if (!Number.isFinite(parsed)) return;
+    const clamped = Math.min(Number(max), Math.max(Number(min), Math.trunc(parsed)));
+    if (String(clamped) === typed) return;
+    el.value = String(clamped);
+    value = String(clamped);
+  }
 </script>
 
 <input
@@ -37,6 +51,9 @@
          disabled:cursor-not-allowed disabled:opacity-50
          [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none
          [&::-webkit-outer-spin-button]:appearance-none {className}"
-  on:input={() => onInput?.()}
+  on:input={() => {
+    clampTyped();
+    onInput?.();
+  }}
   on:focus={() => onFocus?.()}
 />
