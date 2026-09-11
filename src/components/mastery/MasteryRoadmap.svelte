@@ -201,7 +201,12 @@
           <span
             class="flex h-16 w-16 items-center justify-center overflow-hidden rounded-[var(--radius-md)] bg-surface-card"
           >
-            <ItemImage src={item.imageUrl} alt={itemLabel(item)} auditKey={item.name} />
+            <ItemImage
+              src={item.imageUrl}
+              alt={itemLabel(item)}
+              auditKey={item.name}
+              cls="max-h-full max-w-full object-contain"
+            />
           </span>
           <span class="min-w-0">
             <strong class="block truncate font-display text-base text-text-primary"
