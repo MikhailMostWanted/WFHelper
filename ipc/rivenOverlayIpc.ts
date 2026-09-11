@@ -210,9 +210,10 @@ function forEachRivenWindow(fn: (win: InstanceType<typeof BrowserWindow>) => voi
 // Alt-tab hides the panels until the game refocuses. The status poll is too
 // permissive on linux to drive that, so X11 is asked directly; unknowable
 // (no libX11, native-wayland game) reads as focused = never hide.
-function unfocusHideFocused(pollFocused: boolean): boolean {
+function unfocusHideFocused(pollFocused: boolean, foreground: boolean | null = null): boolean {
   if (process.platform === "win32") return pollFocused;
   if (process.platform !== "linux") return true;
+  if (foreground !== null) return foreground;
   return warframeStatus.isWarframeWindowFocusedLinux() !== false;
 }
 
@@ -240,9 +241,9 @@ function probeRivenZOrder(keepRaised: boolean): void {
   log.info(`[ZOrder] riven ${line}`);
 }
 
-function syncRivenWindowZOrder(warframeFocused: boolean): void {
+function syncRivenWindowZOrder(warframeFocused: boolean, foreground: boolean | null = null): void {
   if (process.platform === "win32" || process.platform === "linux") {
-    const focusedForHide = unfocusHideFocused(warframeFocused);
+    const focusedForHide = unfocusHideFocused(warframeFocused, foreground);
     if (_rivenHiddenByUnfocus) {
       if (!focusedForHide) return;
       clearUnfocusHide("Warframe refocused");

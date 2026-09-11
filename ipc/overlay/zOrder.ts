@@ -26,7 +26,7 @@ export function canRaiseOverlayWindows(platform: NodeJS.Platform = process.platf
 
 interface ZOrderSubscriber {
   isActive: () => boolean;
-  sync: (warframeFocused: boolean) => void;
+  sync: (warframeFocused: boolean, foreground?: boolean | null) => void;
 }
 
 const subscribers = new Set<ZOrderSubscriber>();
@@ -146,7 +146,7 @@ export function syncOverlayWindowZOrder(
   applyOverlayZOrder(win, warframeFocused, platform);
 }
 
-async function poll(): Promise<void> {
+async function poll(force = false, foreground: boolean | null = null): Promise<void> {
   if (polling) return;
   const active = [...subscribers].filter((subscriber) => subscriber.isActive());
   if (active.length === 0) return;
@@ -155,7 +155,12 @@ async function poll(): Promise<void> {
   try {
     // Only isFocused is read here, and resolving the game geometry costs an X
     // tree walk on linux, so this poll asks for the bounds-free status.
-    const status = await warframeStatus.getStatus({ needBounds: false });
+    // force skips the status cache, whose TTL is the 2s interval this poll beats.
+    const status = await warframeStatus.getStatus({
+      needBounds: false,
+      force,
+      keepProcessSample: true,
+    });
     // Named on change only: flipping every poll with WFHelper in the foreground
     // means the overlay is stealing focus, not that the user alt-tabbed away.
     if (lastFocused !== status.isFocused) {
@@ -164,7 +169,7 @@ async function poll(): Promise<void> {
         `[ZOrder] warframe focused=${status.isFocused} foreground="${status.focusedProcessName ?? "?"}"`,
       );
     }
-    for (const subscriber of active) subscriber.sync(status.isFocused);
+    for (const subscriber of active) subscriber.sync(status.isFocused, foreground);
   } catch {
     // status polling is best effort
   } finally {
@@ -172,9 +177,35 @@ async function poll(): Promise<void> {
   }
 }
 
+const FOCUS_WATCH_MS = 250;
+// Every linux foreground read opens its own X display connection, so it trails the tick.
+const LINUX_FOCUS_READ_MS = 1000;
+let focusWatch: ReturnType<typeof setInterval> | null = null;
+let lastForeground: boolean | null = null;
+let lastForegroundAt = 0;
+
+export function foregroundReadDue(platform: NodeJS.Platform, sinceMs: number): boolean {
+  return platform !== "linux" || sinceMs >= LINUX_FOCUS_READ_MS;
+}
+
+async function watchForeground(platform: NodeJS.Platform = process.platform): Promise<void> {
+  if (polling) return;
+  if (![...subscribers].some((subscriber) => subscriber.isActive())) return;
+  const now = Date.now();
+  if (!foregroundReadDue(platform, now - lastForegroundAt)) return;
+  lastForegroundAt = now;
+
+  const foreground = warframeStatus.isWarframeForegroundNow();
+  if (foreground === null) return;
+  const changed = lastForeground !== null && lastForeground !== foreground;
+  lastForeground = foreground;
+  if (changed) await poll(true, foreground);
+}
+
 function ensureInterval(): void {
   if (interval) return;
   interval = setInterval(() => void poll(), 2000);
+  focusWatch = setInterval(() => void watchForeground(), FOCUS_WATCH_MS);
 }
 
 export function registerZOrderSubscriber(subscriber: ZOrderSubscriber): void {
@@ -184,7 +215,11 @@ export function registerZOrderSubscriber(subscriber: ZOrderSubscriber): void {
 
 app.once("before-quit", () => {
   if (interval) clearInterval(interval);
+  if (focusWatch) clearInterval(focusWatch);
   interval = null;
+  focusWatch = null;
+  lastForeground = null;
+  lastForegroundAt = 0;
   subscribers.clear();
   lastFocused = null;
   loggedLinuxRaise = false;

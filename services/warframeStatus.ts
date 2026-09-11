@@ -257,6 +257,26 @@ async function getForegroundWindowInfo(): Promise<{
   }
 }
 
+/** No process scan, no bounds and no cache, so it can be asked often. Null = unknowable. */
+export function isWarframeForegroundNow(): boolean | null {
+  if (process.platform === "linux") return isWarframeWindowFocusedLinux();
+  if (process.platform !== "win32") return null;
+  try {
+    if (!ensureWin32()) return null;
+    const win32 = _win32!;
+    const windowHandle = win32.GetForegroundWindow();
+    if (!windowHandle) return null;
+    foregroundPidBuffer.fill(0);
+    win32.GetWindowThreadProcessId(windowHandle, foregroundPidBuffer);
+    const pid = foregroundPidBuffer.readUInt32LE(0);
+    if (pid <= 0) return null;
+    return isWarframeProcessName(getProcessName(pid));
+  } catch (err) {
+    log.warn("[WarframeStatus] foreground focus check failed:", normalizeErrorMessage(err));
+    return null;
+  }
+}
+
 /** Whether the OS foreground window belongs to this process (win32 only, else
  * null). Electron's getFocusedWindow can wedge on a stale window after a
  * focused overlay is made unfocusable; the foreground pid is the authority. */
@@ -431,11 +451,14 @@ async function collectStatusLinux(needBounds: boolean): Promise<WarframeStatus> 
   };
 }
 
-async function collectStatus(needBounds: boolean, force: boolean): Promise<WarframeStatus> {
+async function collectStatus(
+  needBounds: boolean,
+  forceProcessScan: boolean,
+): Promise<WarframeStatus> {
   if (process.platform === "linux") return collectStatusLinux(needBounds);
 
   const [processRunning, foregroundWindow] = await Promise.all([
-    getWarframeProcessState(force) === true,
+    getWarframeProcessState(forceProcessScan) === true,
     getForegroundWindowInfo(),
   ]);
 
@@ -456,10 +479,12 @@ async function collectStatus(needBounds: boolean, force: boolean): Promise<Warfr
   };
 }
 
+/** `keepProcessSample` leaves the process scan on its own TTL even under `force`. */
 export async function getStatus(
-  options: { force?: boolean; needBounds?: boolean } = {},
+  options: { force?: boolean; needBounds?: boolean; keepProcessSample?: boolean } = {},
 ): Promise<WarframeStatus> {
   const force = !!options.force;
+  const forceProcessScan = force && options.keepProcessSample !== true;
   // Bounds-free results are cached too, so a caller that needs geometry must
   // not be served one; it collects again instead of inheriting a null. Only
   // linux can skip the probe, so elsewhere every result is bounds-complete.
@@ -475,7 +500,7 @@ export async function getStatus(
   const joinable = inFlightWithBounds ?? (needBounds ? null : inFlightWithoutBounds);
   if (joinable) return joinable;
 
-  const collected = collectStatus(needBounds, force).catch((err) => {
+  const collected = collectStatus(needBounds, forceProcessScan).catch((err) => {
     log.warn("[WarframeStatus] status collection failed:", normalizeErrorMessage(err));
     return {
       isOpen: false,

@@ -8,6 +8,7 @@ vi.mock("../../services/warframeStatus", () => ({
   getStatus: vi.fn(),
   isWindowTopmost: vi.fn(() => null),
   isWarframeOrWindowForeground: vi.fn(() => false),
+  isWarframeForegroundNow: vi.fn(() => null),
 }));
 // hoisted: vi.mock factories run before top-level consts are initialised.
 const { logInfo } = vi.hoisted(() => ({ logInfo: vi.fn() }));
@@ -25,6 +26,8 @@ vi.mock("../../services/logger", () => ({
 import {
   applyOverlayZOrder,
   canRaiseOverlayWindows,
+  foregroundReadDue,
+  registerZOrderSubscriber,
   syncOverlayWindowZOrder,
 } from "../../ipc/overlay/zOrder";
 import * as warframeStatus from "../../services/warframeStatus";
@@ -463,5 +466,52 @@ describe("syncOverlayWindowZOrder", () => {
     sync(controller, win, true, "win32");
 
     expect(win.moveTop).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("foreground read rate", () => {
+  it("reads every tick on win32 and once a second on linux", () => {
+    expect(foregroundReadDue("win32", 0)).toBe(true);
+    expect(foregroundReadDue("darwin", 0)).toBe(true);
+    expect(foregroundReadDue("linux", 250)).toBe(false);
+    expect(foregroundReadDue("linux", 750)).toBe(false);
+    expect(foregroundReadDue("linux", 1000)).toBe(true);
+  });
+});
+
+// Last in the file: registering a subscriber starts intervals nothing stops again.
+describe("alt-tab response", () => {
+  it("syncs on the flip and hands the subscriber its own foreground read", async () => {
+    vi.useFakeTimers();
+    const sync = vi.fn();
+    vi.mocked(warframeStatus.getStatus).mockResolvedValue({
+      isOpen: true,
+      isFocused: false,
+      processRunning: true,
+      focusedProcessName: "explorer",
+      focusedWindowBounds: null,
+      focusedDisplayId: null,
+      checkedAt: 0,
+    } as never);
+    const foreground = vi.mocked(warframeStatus.isWarframeForegroundNow);
+    foreground.mockReturnValue(true);
+
+    registerZOrderSubscriber({ isActive: () => true, sync });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sync).not.toHaveBeenCalled();
+
+    foreground.mockReturnValue(false);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(sync).toHaveBeenCalledWith(false, false);
+    expect(warframeStatus.getStatus).toHaveBeenCalledWith({
+      needBounds: false,
+      force: true,
+      keepProcessSample: true,
+    });
+
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 });
