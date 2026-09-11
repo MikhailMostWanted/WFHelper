@@ -475,7 +475,12 @@
   /* Darkens fill and empty track alike, so one pill style works at any percent. */
   .material-bar__value {
     border-radius: var(--radius-sm);
-    padding: 0 0.25rem;
+    /* Rajdhani fills the text-xs line box to the pixel, so the percent sat flush
+       against its pill's top edge while the Barlow count sat a pixel inside its
+       own. Page zoom is fractional on a 1440p or 4K display and the rounding has
+       to land somewhere, so the box owns slack instead of inheriting none. */
+    padding: 0.125rem 0.25rem;
+    line-height: 1.25;
     background: color-mix(in oklab, var(--bg-deep) 55%, transparent);
   }
 
