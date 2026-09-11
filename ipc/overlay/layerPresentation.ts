@@ -9,6 +9,7 @@ import {
   type LayerPointerEvent,
   type LayerSurface,
 } from "../../services/layerShell";
+import { withScope } from "../../services/logger";
 import { getWarframeWindowBoundsLinux } from "../../services/warframeStatus";
 import { resolveGameOutput } from "../../services/waylandCompositor";
 
@@ -92,6 +93,8 @@ interface LayerPresentationOptions {
 
 const DEFAULT_FRAME_RATE = 30;
 
+const outputLog = withScope("layerOutput");
+
 /** Which monitor holds the game, by matching its window against the compositor's
  *  logical layout. XWayland reports geometry in that same space, so this works on
  *  any compositor, unlike the ipc lookup that only niri, sway and Hyprland answer. */
@@ -109,12 +112,21 @@ async function outputFromGameBounds(): Promise<string | null> {
   return hit?.name ?? null;
 }
 
-/** The compositor knows best, so it is asked first. Only niri, sway and Hyprland
- *  answer; every other one falls through to matching the game's window rect. */
+let loggedOutputSource: string | null = null;
+
+function noteOutputSource(source: string, output: string | null): string | null {
+  if (loggedOutputSource !== source) {
+    loggedOutputSource = source;
+    outputLog.info(`[LayerOutput] game monitor from ${source}: ${output ?? "unknown"}`);
+  }
+  return output;
+}
+
+/** Measured rect first: the ipc lookup takes the first window titled /warframe/i. */
 async function resolveOutputForGame(): Promise<string | null> {
-  const fromCompositor = await resolveGameOutput();
-  if (fromCompositor) return fromCompositor;
-  return outputFromGameBounds();
+  const fromBounds = await outputFromGameBounds();
+  if (fromBounds) return noteOutputSource("the game window rect", fromBounds);
+  return noteOutputSource("compositor ipc", await resolveGameOutput());
 }
 
 export function createLayerPresentation(options: LayerPresentationOptions) {

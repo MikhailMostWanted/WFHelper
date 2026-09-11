@@ -682,10 +682,28 @@ describe("choosing the monitor the game is on", () => {
     expect(await chosenOutput()).toBe("DP-3");
   });
 
-  it("takes the compositor's answer over the geometry match", async () => {
+  it("takes the measured rect over the compositor's answer", async () => {
     twoMonitors();
     deps.compositorOutput = "DP-2";
     deps.gameBounds = { x: 0, y: 0, width: 3440, height: 1440 };
+
+    expect(await chosenOutput()).toBe("DP-3");
+  });
+
+  it("asks the compositor when no output carries a position", async () => {
+    deps.rects = [
+      { name: "DP-3", x: 0, y: 0, width: 3440, height: 1440, scale: 1, placed: false },
+      { name: "DP-2", x: 0, y: 0, width: 1920, height: 1080, scale: 1, placed: false },
+    ];
+    deps.compositorOutput = "DP-2";
+    deps.gameBounds = { x: 0, y: 0, width: 3440, height: 1440 };
+
+    expect(await chosenOutput()).toBe("DP-2");
+  });
+
+  it("asks the compositor when the game window cannot be measured", async () => {
+    twoMonitors();
+    deps.compositorOutput = "DP-2";
 
     expect(await chosenOutput()).toBe("DP-2");
   });
