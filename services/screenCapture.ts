@@ -192,19 +192,25 @@ async function cropToLinuxGameWindow(img: NativeImage): Promise<NativeImage | nu
   return img.crop({ x, y, width, height });
 }
 
+interface GameContentCrop {
+  image: NativeImage;
+  /** X named the window, so the frame is already the client area and needs no bar search. */
+  isGameWindow: boolean;
+}
+
 // X first, bar-detection only when X cannot answer (no libX11, no xwininfo).
-async function cropToGameContent(img: NativeImage): Promise<NativeImage> {
+async function cropToGameContent(img: NativeImage): Promise<GameContentCrop> {
   if (process.platform === "linux") {
     try {
       const cropped = await cropToLinuxGameWindow(img);
-      if (cropped) return cropped;
+      if (cropped) return { image: cropped, isGameWindow: true };
       // Said out loud: a silent fallback reads exactly like a clean pass in a log.
       noteLinuxCrop("no Warframe window rect from X - falling back to bar detection");
     } catch (err) {
       log.warn("[ScreenCapture] window-rect crop skipped:", normalizeErrorMessage(err));
     }
   }
-  return trimToGameContent(img);
+  return { image: trimToGameContent(img), isGameWindow: false };
 }
 
 async function captureDesktopCapturer(
@@ -226,9 +232,10 @@ async function captureDesktopCapturer(
     });
     const source = sources.find((s) => s.display_id === String(target.id)) || sources[0];
     if (!source || source.thumbnail.isEmpty()) return null;
+    const content = await cropToGameContent(source.thumbnail);
     return {
-      image: await cropToGameContent(source.thumbnail),
-      sourceType: "screen",
+      image: content.image,
+      sourceType: content.isGameWindow ? "window" : "screen",
       sourceName: source.name || "desktopCapturer",
       sourceId: source.id,
       sourceDisplayId: source.display_id || String(target.id),
@@ -244,9 +251,10 @@ async function captureLinuxStream(): Promise<CaptureResult | null> {
   try {
     const frame = await captureLinuxStreamFrame();
     if (!frame) return null;
+    const content = await cropToGameContent(frame);
     return {
-      image: await cropToGameContent(frame),
-      sourceType: "screen",
+      image: content.image,
+      sourceType: content.isGameWindow ? "window" : "screen",
       sourceName: "getDisplayMedia stream",
       sourceId: "linux-stream",
       sourceDisplayId: "",

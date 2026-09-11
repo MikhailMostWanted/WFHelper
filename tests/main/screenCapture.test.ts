@@ -157,6 +157,7 @@ describe("captureScreenFast on linux (persistent stream)", () => {
     const result = await captureScreenFast(null);
 
     expect(result!.image.getSize()).toEqual({ width: 480, height: 270 });
+    expect(result!.sourceType).toBe("window");
   });
 
   it("crops a windowed game to its window rect through the display scale", async () => {
@@ -174,6 +175,52 @@ describe("captureScreenFast on linux (persistent stream)", () => {
     const result = await captureScreenFast(null);
 
     expect(result!.image.getSize()).toEqual({ width: 400, height: 250 });
+    expect(result!.sourceType).toBe("window");
+  });
+
+  it("keeps riven crops on the full frame once X has resolved the window", async () => {
+    setPlatform("linux");
+    const darkBordered = makeFakeNativeImage(1000, 650, (x, y) =>
+      x < 200 || x >= 800 || y < 130 || y >= 520 ? BLACK : BRIGHT,
+    );
+    mocks.captureLinuxStreamFrame.mockResolvedValue(darkBordered);
+    mocks.getWarframeWindowBoundsLinux.mockResolvedValue({
+      x: 0,
+      y: 0,
+      width: 1000,
+      height: 650,
+    });
+
+    const result = await captureScreenFast(null);
+    const { cardCrop } = cropRivenStatImage(
+      result!.image,
+      RIVEN_SCAN_CROPS.singleCard,
+      result!.sourceType,
+    );
+
+    expect(result!.sourceType).toBe("window");
+    // 0.56 of the whole 1000px frame, not 0.56 of the 600px lit region.
+    expect(cardCrop.getSize().width).toBeGreaterThan(500);
+  });
+
+  it("still trims bars for riven crops when X cannot name the window", async () => {
+    setPlatform("linux");
+    mocks.captureLinuxStreamFrame.mockResolvedValue(
+      makeFakeNativeImage(1000, 650, (x, y) =>
+        x < 200 || x >= 800 || y < 130 || y >= 520 ? BLACK : BRIGHT,
+      ),
+    );
+    mocks.getWarframeWindowBoundsLinux.mockResolvedValue(null);
+
+    const result = await captureScreenFast(null);
+    const { cardCrop } = cropRivenStatImage(
+      result!.image,
+      RIVEN_SCAN_CROPS.singleCard,
+      result!.sourceType,
+    );
+
+    expect(result!.sourceType).toBe("screen");
+    expect(cardCrop.getSize().width).toBeLessThan(400);
   });
 
   it("returns null without re-prompting when the stream is unavailable", async () => {
