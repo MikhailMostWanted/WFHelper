@@ -62,10 +62,14 @@ function compactUnit(value: number): string {
   return value.toFixed(1).replace(/\.0$/, "");
 }
 
+// One decimal of thousands rounds to the nearest 100: 8% off a four-digit count,
+// under 1% from five digits up.
+const COMPACT_FROM = 10_000;
+
 export function formatNumber(num: number, locale?: string): string {
   // 999,950+ would render as "1000.0K" - bump to the next unit instead.
   if (num >= 999_950) return `${compactUnit(num / 1e6)}M`;
-  if (num >= 1e3) return `${compactUnit(num / 1e3)}K`;
+  if (num >= COMPACT_FROM) return `${compactUnit(num / 1e3)}K`;
   return num.toLocaleString(locale);
 }
 

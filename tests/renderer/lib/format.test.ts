@@ -39,12 +39,18 @@ describe("format helpers", () => {
 
   it("formats compact numeric values", () => {
     expect(formatNumber(950)).toBe("950");
-    expect(formatNumber(1_500)).toBe("1.5K");
+    expect(formatNumber(12_500)).toBe("12.5K");
     expect(formatNumber(2_200_000)).toBe("2.2M");
   });
 
+  it("spells out a four-digit count instead of rounding it to the hundred", () => {
+    expect(formatNumber(1_234, "en-US")).toBe("1,234");
+    expect(formatNumber(1_000, "en-US")).toBe("1,000");
+    expect(formatNumber(9_999, "en-US")).toBe("9,999");
+  });
+
   it("handles unit thresholds without 1000.0K or trailing .0", () => {
-    expect(formatNumber(1_000)).toBe("1K");
+    expect(formatNumber(10_000)).toBe("10K");
     expect(formatNumber(999_949)).toBe("999.9K");
     expect(formatNumber(999_950)).toBe("1M");
     expect(formatNumber(1_000_000)).toBe("1M");
