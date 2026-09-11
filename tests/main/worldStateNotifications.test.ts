@@ -507,7 +507,11 @@ describe("windows toast audio and lifetime", () => {
     registerWithQuitHook();
     worldStateIpc.sendDesktopNotificationRaw("WFHelper", "Test notification", "app");
 
-    expect(toastXml()).toContain('<audio src="ms-winsoundevent:Notification.Default"/>');
+    // incomingCall defaults to looping, which plays a ringtone over this sound.
+    expect(toastXml()).toContain(
+      '<audio src="ms-winsoundevent:Notification.Default" loop="false"/>',
+    );
+    expect(toastXml()).toContain('scenario="incomingCall"');
     expect(soundSends).toEqual([]);
   });
 

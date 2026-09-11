@@ -261,7 +261,8 @@ let _lastSoundAt = 0;
 // the volume mixer, so its slider applies; the system sound is billed to System
 // Sounds, so that slider applies instead. Neither one obeys both.
 const TOAST_SILENT_AUDIO = '<audio silent="true"/>';
-const TOAST_SYSTEM_AUDIO = '<audio src="ms-winsoundevent:Notification.Default"/>';
+// loop="false" is required: the incomingCall scenario below defaults to looping.
+const TOAST_SYSTEM_AUDIO = '<audio src="ms-winsoundevent:Notification.Default" loop="false"/>';
 
 function notificationSoundUsesSystem(): boolean {
   return process.platform === "win32" && ctx.overlaySettings.notificationSoundUsesSystem === true;
