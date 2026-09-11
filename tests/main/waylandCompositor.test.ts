@@ -4,6 +4,8 @@ import {
   detectCompositor,
   hyprGameOutputName,
   hyprGameWorkspace,
+  hyprWorkspaceOnOutput,
+  hyprTargetWorkspace,
   hyprMoveCommand,
   niriGameOutput,
   niriMoveRequests,
@@ -170,6 +172,32 @@ describe("hyprland", () => {
 
   it("is null when the monitor reports no active workspace", () => {
     expect(hyprGameWorkspace(clients, [{ id: 0, activeWorkspace: null }])).toBeNull();
+  });
+
+  it("turns a named output into the workspace live on it", () => {
+    const named = [
+      { id: 0, name: "DP-3", activeWorkspace: { id: 3 } },
+      { id: 1, name: "DP-2", activeWorkspace: { id: 5 } },
+    ];
+
+    expect(hyprWorkspaceOnOutput(named, "DP-3")).toBe(3);
+    expect(hyprWorkspaceOnOutput(named, "DP-2")).toBe(5);
+    expect(hyprWorkspaceOnOutput(named, "HDMI-A-1")).toBeNull();
+    expect(
+      hyprWorkspaceOnOutput([{ id: 0, name: "DP-3", activeWorkspace: null }], "DP-3"),
+    ).toBeNull();
+  });
+
+  it("falls back to the game's monitor for an output hyprland does not report", () => {
+    const named = [
+      { id: 0, name: "DP-3", activeWorkspace: { id: 3 } },
+      { id: 1, name: "DP-2", activeWorkspace: { id: 5 } },
+    ];
+
+    expect(hyprTargetWorkspace(clients, named, "DP-2")).toBe(5);
+    expect(hyprTargetWorkspace(clients, named, "HDMI-A-1")).toBe(3);
+    expect(hyprTargetWorkspace(clients, named, null)).toBe(3);
+    expect(hyprTargetWorkspace([clients[0]], named, "HDMI-A-1")).toBeNull();
   });
 
   // A layer surface is pinned by output name, not by workspace, so the same

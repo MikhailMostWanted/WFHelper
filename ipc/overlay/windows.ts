@@ -13,7 +13,11 @@ import {
   setClickThrough,
 } from "./clickThrough";
 import { createKeepMappedMode } from "./keepMapped";
-import { createLayerPresentation, type LayerGeometry } from "./layerPresentation";
+import {
+  createLayerPresentation,
+  resolveOutputForGame,
+  type LayerGeometry,
+} from "./layerPresentation";
 import { probeLayerShell } from "../../services/layerShell";
 import { placeWindowOnGameOutput } from "../../services/waylandCompositor";
 import type {
@@ -103,7 +107,7 @@ type OverlayWindowsControllerOptions = {
   platform?: NodeJS.Platform;
   isNativeWayland?: () => boolean;
   isTilingCompositor?: () => boolean;
-  placeOnGameOutput?: (title: string) => Promise<boolean>;
+  placeOnGameOutput?: (title: string, output: string | null) => Promise<boolean>;
   /** Returns null to keep the ordinary window; the default answers null unless
    *  the compositor offers layer-shell. */
   createPresentation?: (
@@ -559,11 +563,12 @@ export function createOverlayWindowsController(options: OverlayWindowsController
    *  on a socket, and a compositor that says no leaves the window as it was. */
   async function placeOverlayOnGameOutput(): Promise<void> {
     if (platform !== "linux" || !windowTitle || !isNativeWayland()) return;
+    const target = await resolveOutputForGame();
     for (const delay of PLACEMENT_ATTEMPT_DELAYS_MS) {
       await new Promise((resolve) => setTimeout(resolve, delay));
       const overlayWindow = readOverlayWindow();
       if (!overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible()) return;
-      if (await placeOnGameOutput(windowTitle)) return;
+      if (await placeOnGameOutput(windowTitle, target)) return;
     }
   }
 

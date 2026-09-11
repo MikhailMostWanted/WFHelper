@@ -38,6 +38,7 @@ interface HyprClient {
 
 interface HyprMonitor {
   id?: unknown;
+  name?: unknown;
   activeWorkspace?: { id?: unknown } | null;
 }
 
@@ -135,12 +136,16 @@ async function niriOutputName(socketPath: string): Promise<string | null> {
   return niriGameOutput(windows as NiriWindow[], workspaces as NiriWorkspace[]);
 }
 
-async function placeNiri(socketPath: string, title: string): Promise<boolean> {
+async function placeNiri(
+  socketPath: string,
+  title: string,
+  target: string | null,
+): Promise<boolean> {
   const windows = niriOk(await niriRequest(socketPath, "Windows"), "Windows");
   const workspaces = niriOk(await niriRequest(socketPath, "Workspaces"), "Workspaces");
   if (!Array.isArray(windows) || !Array.isArray(workspaces)) return false;
 
-  const output = niriGameOutput(windows as NiriWindow[], workspaces as NiriWorkspace[]);
+  const output = target ?? niriGameOutput(windows as NiriWindow[], workspaces as NiriWorkspace[]);
   const id = niriWindowIdByTitle(windows as NiriWindow[], title);
   if (!output || id === null) return false;
 
@@ -222,9 +227,13 @@ async function swayOutputName(socketPath: string): Promise<string | null> {
   return swayGameOutput(tree);
 }
 
-async function placeSway(socketPath: string, title: string): Promise<boolean> {
-  const tree = (await swayRequest(socketPath, SWAY_GET_TREE, "")) as SwayNode | null;
-  const output = swayGameOutput(tree);
+async function placeSway(
+  socketPath: string,
+  title: string,
+  target: string | null,
+): Promise<boolean> {
+  const output =
+    target ?? swayGameOutput((await swayRequest(socketPath, SWAY_GET_TREE, "")) as SwayNode | null);
   if (!output) return false;
   const reply = await swayRequest(socketPath, SWAY_RUN_COMMAND, swayMoveCommand(title, output));
   return Array.isArray(reply) && reply.every((entry) => (entry as { success?: unknown })?.success);
@@ -254,15 +263,34 @@ export function hyprGameOutputName(clients: HyprClient[], monitors: HyprMonitor[
   return typeof name === "string" && name ? name : null;
 }
 
+export function hyprWorkspaceOnOutput(monitors: HyprMonitor[], name: string): number | null {
+  const workspace = monitors.find((entry) => entry.name === name)?.activeWorkspace?.id;
+  return typeof workspace === "number" ? workspace : null;
+}
+
+/** Falls back to the game client's own monitor when hyprland does not report `target`. */
+export function hyprTargetWorkspace(
+  clients: HyprClient[],
+  monitors: HyprMonitor[],
+  target: string | null,
+): number | null {
+  const named = target === null ? null : hyprWorkspaceOnOutput(monitors, target);
+  return named ?? hyprGameWorkspace(clients, monitors);
+}
+
 export function hyprMoveCommand(title: string, workspace: number): string {
   return `dispatch movetoworkspacesilent ${workspace},title:^(${title})$`;
 }
 
-async function placeHyprland(socketPath: string, title: string): Promise<boolean> {
+async function placeHyprland(
+  socketPath: string,
+  title: string,
+  target: string | null,
+): Promise<boolean> {
   const clients = JSON.parse(await hyprRequest(socketPath, "j/clients")) as HyprClient[];
   const monitors = JSON.parse(await hyprRequest(socketPath, "j/monitors")) as HyprMonitor[];
   if (!Array.isArray(clients) || !Array.isArray(monitors)) return false;
-  const workspace = hyprGameWorkspace(clients, monitors);
+  const workspace = hyprTargetWorkspace(clients, monitors, target);
   if (workspace === null) return false;
   const reply = await hyprRequest(socketPath, hyprMoveCommand(title, workspace));
   return reply.trim().toLowerCase().startsWith("ok");
@@ -299,6 +327,7 @@ let loggedKind: CompositorKind | null = null;
  *  overlay exactly where it would have been, so every failure is only logged. */
 export async function placeWindowOnGameOutput(
   title: string,
+  target: string | null = null,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<boolean> {
   const compositor = detectCompositor(env);
@@ -308,9 +337,9 @@ export async function placeWindowOnGameOutput(
     log.info(`[Compositor] placing overlays via ${compositor.kind} ipc`);
   }
   try {
-    if (compositor.kind === "niri") return await placeNiri(compositor.socketPath, title);
-    if (compositor.kind === "sway") return await placeSway(compositor.socketPath, title);
-    return await placeHyprland(compositor.socketPath, title);
+    if (compositor.kind === "niri") return await placeNiri(compositor.socketPath, title, target);
+    if (compositor.kind === "sway") return await placeSway(compositor.socketPath, title, target);
+    return await placeHyprland(compositor.socketPath, title, target);
   } catch (err) {
     log.warn(`[Compositor] ${compositor.kind} placement failed:`, (err as Error)?.message);
     return false;

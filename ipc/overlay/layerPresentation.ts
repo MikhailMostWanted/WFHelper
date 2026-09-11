@@ -123,7 +123,7 @@ function noteOutputSource(source: string, output: string | null): string | null 
 }
 
 /** Measured rect first: the ipc lookup takes the first window titled /warframe/i. */
-async function resolveOutputForGame(): Promise<string | null> {
+export async function resolveOutputForGame(): Promise<string | null> {
   const fromBounds = await outputFromGameBounds();
   if (fromBounds) return noteOutputSource("the game window rect", fromBounds);
   return noteOutputSource("compositor ipc", await resolveGameOutput());

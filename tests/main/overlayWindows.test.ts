@@ -290,7 +290,7 @@ function createPresentationProbe(options: {
   neverClickThrough?: boolean;
   tiling?: boolean;
   windowTitle?: string;
-  placeOnGameOutput?: (title: string) => Promise<boolean>;
+  placeOnGameOutput?: (title: string, output: string | null) => Promise<boolean>;
   createPresentation?: (options: unknown) => unknown;
   windowStateKey?: OverlayWindowKey;
   persistBoundsWhenPassive?: boolean;
@@ -1761,7 +1761,7 @@ describe("layer-shell presentation", () => {
 describe("compositor placement", () => {
   async function probeWithPlacer(
     nativeWayland: boolean,
-    placeOnGameOutput: (title: string) => Promise<boolean>,
+    placeOnGameOutput: (title: string, output: string | null) => Promise<boolean>,
     platform: typeof process.platform = "linux",
   ) {
     const probe = createPresentationProbe({
@@ -1783,7 +1783,7 @@ describe("compositor placement", () => {
 
     await probeWithPlacer(true, place);
 
-    expect(place).toHaveBeenCalledWith("WFHelper Relic Rewards");
+    expect(place).toHaveBeenCalledWith("WFHelper Relic Rewards", null);
     // A compositor that placed the window is not asked a second time.
     expect(place).toHaveBeenCalledTimes(1);
   });
