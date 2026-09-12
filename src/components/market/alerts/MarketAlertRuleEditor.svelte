@@ -505,6 +505,7 @@
           <input
             class="rounded-[var(--radius-md)] border border-[color:var(--ui-control-border)] bg-[var(--ui-control-bg)] px-2.5 py-2 text-sm text-text-primary outline-none"
             list="market-alert-weapon-names"
+            data-search-focus
             maxlength={MARKET_ALERT_MAX_NAME_CHARS * 2}
             bind:value={weaponInput}
             oninput={() => (weaponDirty = true)}
@@ -533,6 +534,7 @@
             <ThemedInput
               bind:value={itemQuery}
               placeholder={$tr("common.searchPlaceholder")}
+              searchFocusTarget
               onInput={() => void searchItems()}
             />
             {#if itemResults.length > 0}
