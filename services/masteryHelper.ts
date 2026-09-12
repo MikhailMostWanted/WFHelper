@@ -788,6 +788,12 @@ interface MasterableItem {
   keywords: string[];
   debugReason: string;
   components: ComponentEntry[];
+  /** DE offers this item's blueprint in the in-game Market for credits. */
+  marketBuyable?: true;
+  /** Market credit price of that blueprint; absent when DE lists none. */
+  marketCredits?: number;
+  /** The blueprint is a clan dojo research project. */
+  dojoResearch?: true;
 }
 
 const SUIT_MASTERY_CATEGORIES = new Set(["Warframes", "Companions", "Necramech"]);
@@ -911,6 +917,9 @@ export function getAllMasterableItems(): MasterableItem[] {
       debugReason: `show:${masterableSource}; cat:${display.source}; dbCat:${item.category || "?"}; product:${item.productCategory || "?"}; type:${item.type || "?"}`,
       // Components from wfcd (blueprints, barrels, etc.)
       components: item.components || [],
+      ...(item.marketBuyable ? { marketBuyable: true as const } : {}),
+      ...(typeof item.marketCredits === "number" ? { marketCredits: item.marketCredits } : {}),
+      ...(item.dojoResearch ? { dojoResearch: true as const } : {}),
     });
   }
 

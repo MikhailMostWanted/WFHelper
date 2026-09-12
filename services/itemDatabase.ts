@@ -197,6 +197,12 @@ interface ItemEntry {
   drops?: DropEntry[];
   isBuildComponent?: boolean;
   componentOf?: string;
+  /** DE offers this item's blueprint in the in-game Market. */
+  marketBuyable?: true;
+  /** Market credit price of that blueprint; absent when DE lists none. */
+  marketCredits?: number;
+  /** The blueprint is a clan dojo research project. */
+  dojoResearch?: true;
 }
 
 let itemsByUniqueName: Record<string, ItemEntry> = {};
@@ -209,6 +215,10 @@ let recipesByResultType: Record<string, RecipeData> = {};
 let resultTypeByBlueprint: Record<string, string> = {};
 /** Blueprints DE marks consumeOnUse=false: the copy survives its own build. */
 let reusableBlueprints = new Set<string>();
+/** resultType -> Market credit price, null when DE offers the blueprint at no listed price. */
+let marketCreditsByResultType: Record<string, number | null> = {};
+/** resultTypes whose blueprint is a clan dojo research project. */
+let dojoResearchResultTypes = new Set<string>();
 
 function loadDict(): Record<string, string> {
   const attempts: string[] = [];
@@ -717,6 +727,8 @@ interface PepRecipeItem {
   buildTime?: number;
   num?: number;
   consumeOnUse?: boolean;
+  creditsCost?: number;
+  excludeFromMarket?: boolean;
   ingredients?: { ItemType: string; ItemCount: number }[];
 }
 
@@ -729,11 +741,23 @@ function buildRecipeIndex(): void {
     recipesByResultType = {};
     resultTypeByBlueprint = {};
     reusableBlueprints = new Set();
+    marketCreditsByResultType = {};
+    dojoResearchResultTypes = new Set();
     let count = 0;
     for (const [recipeKey, item] of Object.entries(exportData) as [string, PepRecipeItem][]) {
       if (!item.resultType || !Array.isArray(item.ingredients)) continue;
       resultTypeByBlueprint[recipeKey] = item.resultType;
       if (item.consumeOnUse === false) reusableBlueprints.add(recipeKey);
+      if (item.excludeFromMarket !== true) {
+        const credits =
+          typeof item.creditsCost === "number" && Number.isFinite(item.creditsCost)
+            ? item.creditsCost
+            : null;
+        // Several recipes can build one item, so a listed price beats a missing one.
+        if (marketCreditsByResultType[item.resultType] == null) {
+          marketCreditsByResultType[item.resultType] = credits;
+        }
+      }
       recipesByResultType[item.resultType] = {
         buildPrice: item.buildPrice || 0,
         buildTime: item.buildTime || 0,
@@ -748,10 +772,43 @@ function buildRecipeIndex(): void {
       };
       count++;
     }
-    log.info(`[ItemDB] Recipe index: ${count} recipes by resultType`);
+
+    // Dojo research is keyed by the recipe uniqueName, so it joins to an item
+    // only through that recipe's resultType.
+    const research = (pep.ExportDojoRecipes as { research?: Record<string, unknown> } | undefined)
+      ?.research;
+    for (const researchKey of Object.keys(research || {})) {
+      const resultType = resultTypeByBlueprint[researchKey];
+      if (resultType) dojoResearchResultTypes.add(resultType);
+    }
+
+    log.info(
+      `[ItemDB] Recipe index: ${count} recipes by resultType, ${Object.keys(marketCreditsByResultType).length} market blueprints, ${dojoResearchResultTypes.size} dojo research results`,
+    );
   } catch {
     log.warn("[ItemDB] Could not build recipe index");
   }
+}
+
+// Market and dojo facts live on the recipe, not the item, and the wfcd pass can
+// replace a whole entry, so stamp them once every loader has run.
+function applyAcquisitionSources(): void {
+  let market = 0;
+  let dojo = 0;
+  for (const [resultType, credits] of Object.entries(marketCreditsByResultType)) {
+    const entry = itemsByUniqueName[resultType];
+    if (!entry) continue;
+    entry.marketBuyable = true;
+    if (credits != null) entry.marketCredits = credits;
+    market++;
+  }
+  for (const resultType of dojoResearchResultTypes) {
+    const entry = itemsByUniqueName[resultType];
+    if (!entry) continue;
+    entry.dojoResearch = true;
+    dojo++;
+  }
+  log.info(`[ItemDB] Acquisition: ${market} market blueprints, ${dojo} dojo research items`);
 }
 
 // Recipe aliases inherit their crafted item's mappings.
@@ -834,6 +891,8 @@ export function buildDatabase(): void {
   recipesByResultType = {};
   resultTypeByBlueprint = {};
   reusableBlueprints = new Set();
+  marketCreditsByResultType = {};
+  dojoResearchResultTypes = new Set();
 
   const pepCount = loadPublicExportPlus();
   buildRecipeIndex();
@@ -842,6 +901,7 @@ export function buildDatabase(): void {
   applyMechPartTradability();
   linkBlueprintsToResults();
   inheritBlueprintDisplayFromResults();
+  applyAcquisitionSources();
   resolveAllImages();
 
   log.info(`[ItemDB] Total: ${Object.keys(itemsByUniqueName).length} items`);

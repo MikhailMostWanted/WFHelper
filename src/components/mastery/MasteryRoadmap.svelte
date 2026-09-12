@@ -32,6 +32,7 @@
     building: $tr("mastery.roadmap.accessBuilding"),
     buildable: $tr("common.canBuild"),
     foundryParts: $tr("mastery.roadmap.accessFoundryParts"),
+    marketBlueprint: $tr("mastery.roadmap.accessMarket"),
     relics: $tr("mastery.roadmap.accessRelics"),
     platinum: $tr("mastery.roadmap.accessPlatinum"),
   };
@@ -198,6 +199,13 @@
   {:else}
     <div class="grid gap-2 min-[900px]:grid-cols-2">
       {#each visible as item (`${item.uniqueName || item.internalName}-${item.access}`)}
+        <!-- Only the Market state carries a price, so its label cannot live in ACCESS_LABELS. -->
+        {@const accessLabel =
+          item.access === "marketBlueprint" && item.marketCredits != null
+            ? $tr("mastery.roadmap.accessMarketCredits", {
+                credits: item.marketCredits.toLocaleString($locale),
+              })
+            : ACCESS_LABELS[item.access]}
         <button
           type="button"
           class="grid min-w-0 grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--ui-panel-border)] bg-[var(--ui-panel-bg)] p-2.5 text-left text-inherit transition-[border-color,background-color] hover:border-accent-dim hover:bg-bg-hover"
@@ -234,6 +242,14 @@
                     : null}>{$tr("rivens.mr", { level: item.masteryReq })}</span
                 >
               {/if}
+              {#if item.dojoResearch}
+                <span
+                  class="shrink-0 rounded border border-info/40 bg-info/10 px-1.5 py-px font-display text-[0.6rem] font-bold uppercase tracking-[0.03em] text-info"
+                  data-roadmap-dojo="true"
+                  title={$tr("mastery.roadmap.dojoResearchTitle")}
+                  >{$tr("mastery.roadmap.dojoResearchTag")}</span
+                >
+              {/if}
             </span>
             {#if item.access === "relics"}
               <span
@@ -261,7 +277,7 @@
               <span class="block text-xs text-text-secondary">
                 {$tr("mastery.roadmap.categoryAccessLine", {
                   category: item.category,
-                  access: ACCESS_LABELS[item.access],
+                  access: accessLabel,
                 })}
               </span>
               <span class="mt-1 block text-xs text-text-muted">

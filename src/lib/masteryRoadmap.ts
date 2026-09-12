@@ -9,7 +9,8 @@ type MasteryRoadmapAccess =
   | "claimable"
   | "building"
   | "buildable"
-  | "foundryParts";
+  | "foundryParts"
+  | "marketBlueprint";
 
 interface MissingMasteryComponent {
   component: ComponentInfo;
@@ -86,6 +87,9 @@ const ACCESS_PRIORITY: Record<MasteryRoadmapAccess, number> = {
   building: 3,
   buildable: 4,
   foundryParts: 5,
+  // A Market blueprint is one credit purchase away, but the parts it needs are
+  // still missing, so it ranks below everything the foundry can already finish.
+  marketBlueprint: 6,
 };
 
 // Parts in the foundry are neither owned nor missing, so relics and platinum both
@@ -97,6 +101,17 @@ function partsWaitingInFoundry(item: MasteryRoadmapSourceItem): boolean {
   return missingMasteryComponents(item.components).length === 0;
 }
 
+// Only worth calling easy when the blueprint is the last thing missing. A
+// warframe whose chassis is still unfarmed stays in the relic and platinum
+// lists, where its parts are actually priced, instead of reading as one credit
+// purchase away.
+function marketBlueprintFinishesIt(item: MasteryRoadmapSourceItem): boolean {
+  if (!item.marketBuyable) return false;
+  const missing = missingMasteryComponents(item.components);
+  if (missing.length === 0) return false;
+  return missing.every((entry) => /\bblueprint$/i.test(entry.component.name.trim()));
+}
+
 function easyAccess(item: MasteryRoadmapSourceItem): MasteryRoadmapAccess | null {
   // A max-rank ungilded amp reads "level it" otherwise, which is what the player just did.
   if (item.needsGilding) return "gild";
@@ -105,6 +120,7 @@ function easyAccess(item: MasteryRoadmapSourceItem): MasteryRoadmapAccess | null
   if (item.foundryState === "building") return "building";
   if (item.foundryState === "buildable") return "buildable";
   if (partsWaitingInFoundry(item)) return "foundryParts";
+  if (marketBlueprintFinishesIt(item)) return "marketBlueprint";
   return null;
 }
 

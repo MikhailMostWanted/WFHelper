@@ -134,6 +134,120 @@ describe("buildMasteryRoadmap", () => {
     expect(roadmap.easy).toEqual([]);
   });
 
+  it("offers a Market blueprint after everything the Foundry can already finish", () => {
+    const roadmap = buildMasteryRoadmap([
+      item({
+        name: "Mag",
+        marketBuyable: true,
+        marketCredits: 25_000,
+        components: [{ name: "Blueprint", itemCount: 1, ownedCount: 0 }],
+      }),
+      item({ name: "Claimable", foundryState: "claimable" }),
+      item({
+        name: "Nekros",
+        components: [{ name: "Neuroptics", itemCount: 1, ownedCount: 0, building: true }],
+      }),
+    ]);
+
+    expect(roadmap.easy.map((entry) => [entry.name, entry.access])).toEqual([
+      ["Claimable", "claimable"],
+      ["Nekros", "foundryParts"],
+      ["Mag", "marketBlueprint"],
+    ]);
+    expect(roadmap.easy[2].marketCredits).toBe(25_000);
+  });
+
+  it("leaves a Market item alone while a part other than the blueprint is missing", () => {
+    const roadmap = buildMasteryRoadmap([
+      item({
+        name: "Mag",
+        marketBuyable: true,
+        marketCredits: 25_000,
+        components: [
+          { name: "Blueprint", itemCount: 1, ownedCount: 0 },
+          { name: "Chassis", itemCount: 1, ownedCount: 0 },
+        ],
+      }),
+    ]);
+
+    expect(roadmap.easy).toEqual([]);
+  });
+
+  it("keeps a Market blueprint with no listed price", () => {
+    const roadmap = buildMasteryRoadmap([
+      item({
+        name: "Unpriced",
+        marketBuyable: true,
+        components: [{ name: "Blueprint", itemCount: 1, ownedCount: 0 }],
+      }),
+    ]);
+
+    expect(roadmap.easy.map((entry) => entry.access)).toEqual(["marketBlueprint"]);
+    expect(roadmap.easy[0].marketCredits).toBeUndefined();
+  });
+
+  it("prefers an owned item over its Market blueprint", () => {
+    const roadmap = buildMasteryRoadmap([
+      item({ name: "Ash", status: "progress", owned: true, marketBuyable: true, marketCredits: 1 }),
+    ]);
+
+    expect(roadmap.easy.map((entry) => entry.access)).toEqual(["owned"]);
+  });
+
+  it("skips a mastered item that is still sold in the Market", () => {
+    const roadmap = buildMasteryRoadmap([
+      item({ name: "Mastered", status: "mastered", marketBuyable: true, marketCredits: 15_000 }),
+    ]);
+
+    expect(roadmap.easy).toEqual([]);
+    expect(roadmap.relics).toEqual([]);
+    expect(roadmap.platinum).toEqual([]);
+  });
+
+  it("carries the dojo research tag into every tab", () => {
+    const { db, owned } = relicInventory([reward("Kompressa Part", "/Part", 100)], 1);
+    const roadmap = buildMasteryRoadmap(
+      [
+        item({
+          name: "Kompressa",
+          dojoResearch: true,
+          platinum: 20,
+          estimatedCost: 20,
+          components: [{ name: "Part", uniqueName: "/Part" }],
+        }),
+        item({ name: "Dera", dojoResearch: true, status: "progress", owned: true }),
+      ],
+      db,
+      owned,
+    );
+
+    expect(roadmap.easy[0].dojoResearch).toBe(true);
+    expect(roadmap.relics[0].dojoResearch).toBe(true);
+    expect(roadmap.platinum[0].dojoResearch).toBe(true);
+  });
+
+  it("gives a Market blueprint that is also dojo research one access state and the tag", () => {
+    const roadmap = buildMasteryRoadmap([
+      item({
+        name: "Both",
+        marketBuyable: true,
+        marketCredits: 30_000,
+        dojoResearch: true,
+        components: [{ name: "Blueprint", itemCount: 1, ownedCount: 0 }],
+      }),
+    ]);
+
+    expect(roadmap.easy).toHaveLength(1);
+    expect(roadmap.easy[0].access).toBe("marketBlueprint");
+    expect(roadmap.easy[0].dojoResearch).toBe(true);
+  });
+
+  it("leaves an item DE does not sell out of the Market state", () => {
+    const roadmap = buildMasteryRoadmap([item({ name: "Dread", dojoResearch: true })]);
+
+    expect(roadmap.easy).toEqual([]);
+  });
+
   it("carries the mastery requirement into every tab", () => {
     const { db, owned } = relicInventory([reward("Kompressa Part", "/Part", 100)], 1);
     const roadmap = buildMasteryRoadmap(
