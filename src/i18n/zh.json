@@ -1138,6 +1138,7 @@
   "overlay.trade.repNotFound": "在 warframe.market 上找不到 {partner}",
   "overlay.trade.repOffer": "按 {hotkey} 为 {partner} +1 好评",
   "overlay.trade.repSent": "已向 {partner} 发送 +1 好评",
+  "overlay.trade.repUnconfirmed": "无法在 warframe.market 上确认 {partner}",
   "overlay.trade.tradeFinished": "交易完成",
   "overlay.trade.unknownItem": "未知物品",
   "overlay.window.trade": "交易通知",

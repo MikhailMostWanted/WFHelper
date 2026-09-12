@@ -6,7 +6,12 @@ import { WfmApiError } from "./wfmTypes";
 
 const log = withScope("wfmReviews");
 
-export type SendRepResult = "sent" | "already-exists" | "user-not-found" | "failed";
+export type SendRepResult =
+  | "sent"
+  | "already-exists"
+  | "user-not-found"
+  | "profile-unresolved"
+  | "failed";
 
 const REVIEW_REDIRECT = /^https:\/\/api\.warframe\.market\/v1\/profile\/([^/?#]+)\/review\/?$/;
 const REDIRECT_STATUSES = new Set([301, 302, 307, 308]);
@@ -31,11 +36,20 @@ export async function sendPlusRep(username: string): Promise<SendRepResult> {
   const name = String(username || "").trim();
   if (!name) return "failed";
 
+  // A review is outward-facing, so an unconfirmed name is never written to: the
+  // names WFM reshapes are exactly the ones that collide with another user.
+  const resolution = await probeProfileSlug(name);
+  if (resolution.kind === "not-found") {
+    log.info(`[Rep] no WFM profile named ${name}`);
+    return "user-not-found";
+  }
+  if (resolution.kind === "unresolved") {
+    log.warn(`[Rep] could not confirm the WFM profile for ${name}; nothing sent`);
+    return "profile-unresolved";
+  }
+
   try {
-    // No minted slug means the name is already one, or there is no such profile,
-    // which the POST reports as a 404 of its own.
-    const slug = (await probeProfileSlug(name)) ?? name;
-    const path = `/profile/${encodeURIComponent(slug)}/review`;
+    const path = `/profile/${encodeURIComponent(resolution.slug)}/review`;
     const body = { json: { review_type: 1, text: "" } };
     try {
       await request("POST", path, body);

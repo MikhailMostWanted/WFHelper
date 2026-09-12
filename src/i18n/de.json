@@ -1424,6 +1424,7 @@
   "overlay.trade.repNotFound": "{partner} nicht auf warframe.market gefunden",
   "overlay.trade.repOffer": "{hotkey} drücken für +1 Rep an {partner}",
   "overlay.trade.repSent": "+1 Rep an {partner} gesendet",
+  "overlay.trade.repUnconfirmed": "{partner} konnte auf warframe.market nicht bestätigt werden",
   "overlay.trade.tradeFinished": "Handel abgeschlossen",
   "overlay.trade.unknownItem": "Unbekanntes Item",
   "overlay.window.trade": "Handelsbenachrichtigung",

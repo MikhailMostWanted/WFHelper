@@ -1149,6 +1149,7 @@
   "overlay.trade.repNotFound": "{partner} not found on warframe.market",
   "overlay.trade.repOffer": "Press {hotkey} to +1 rep {partner}",
   "overlay.trade.repSent": "+1 rep sent to {partner}",
+  "overlay.trade.repUnconfirmed": "Could not confirm {partner} on warframe.market",
   "overlay.trade.tradeFinished": "Trade Finished",
   "overlay.trade.unknownItem": "Unknown Item",
   "overlay.window.trade": "Trade Notification",

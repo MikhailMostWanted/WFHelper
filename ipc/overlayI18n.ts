@@ -100,6 +100,7 @@ const OVERLAY_MESSAGE_KEYS = [
   "overlay.trade.repNotFound",
   "overlay.trade.repOffer",
   "overlay.trade.repSent",
+  "overlay.trade.repUnconfirmed",
   "overlay.trade.tradeFinished",
   "overlay.trade.unknownItem",
   "overlay.window.trade",

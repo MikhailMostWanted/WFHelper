@@ -15,6 +15,7 @@
     sent: { key: "overlay.trade.repSent", cls: "ok" },
     "already-exists": { key: "overlay.trade.repAlready", cls: "ok" },
     "user-not-found": { key: "overlay.trade.repNotFound", cls: "err" },
+    "profile-unresolved": { key: "overlay.trade.repUnconfirmed", cls: "err" },
     failed: { key: "overlay.trade.repFailed", cls: "err" },
   };
 
