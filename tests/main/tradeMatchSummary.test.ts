@@ -81,14 +81,40 @@ describe("resolveRepOffer", () => {
     expect(resolveRepOffer(contract, "closed", enabled)?.partner).toBe("Buyer");
   });
 
-  it("never offers rep for purchases", () => {
+  it("offers rep for a purchase that closed a buy order", () => {
     const purchase = { ...match("Serration", 20), type: "purchase" as const };
-    expect(resolveRepOffer(purchase, "closed", enabled)).toBeNull();
+    expect(resolveRepOffer(purchase, "closed", enabled)).toEqual({
+      partner: "Buyer",
+      hotkey: "F9",
+    });
+    expect(resolveRepOffer(purchase, "close-failed", enabled)).not.toBeNull();
+  });
+
+  // Buying on warframe.market means whispering somebody else's sell order, which
+  // closes no listing of ours, so the common case arrives with no order id.
+  it("offers rep for a purchase that matched no order once the orders were checked", () => {
+    const purchase = { ...match("Serration", 20), type: "purchase" as const, orderId: "" };
+    expect(resolveRepOffer(purchase, "no-match", enabled)).toEqual({
+      partner: "Buyer",
+      hotkey: "F9",
+    });
+  });
+
+  it("refuses an unmatched purchase that warframe.market never saw", () => {
+    const purchase = { ...match("Serration", 20), type: "purchase" as const, orderId: "" };
+    // "detected" is auto-close off or signed out: no orders were ever consulted.
+    expect(resolveRepOffer(purchase, "detected", enabled)).toBeNull();
+    // A trade moving no platinum is a gift or a barter, not a market purchase.
+    expect(resolveRepOffer({ ...purchase, platinum: 0 }, "no-match", enabled)).toBeNull();
+    // Barter carries neither an order nor a side to credit.
+    const barter = { ...purchase, type: "trade" as const };
+    expect(resolveRepOffer(barter, "no-match", enabled)).toBeNull();
   });
 
   it("never offers rep for sales that matched no WFM listing", () => {
     const unmatched = { ...match("Ash Prime Chassis", 45), orderId: "" };
     expect(resolveRepOffer(unmatched, "no-match", enabled)).toBeNull();
+    expect(resolveRepOffer(unmatched, "detected", enabled)).toBeNull();
     expect(resolveRepOffer(match("Ash Prime Chassis", 45), "no-match", enabled)).toBeNull();
     expect(resolveRepOffer(match("Ash Prime Chassis", 45), "detected", enabled)).toBeNull();
   });

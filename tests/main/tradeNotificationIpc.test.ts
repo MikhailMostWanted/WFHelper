@@ -173,6 +173,12 @@ function sale(partner: string): TradeMatchPayload {
   };
 }
 
+// Buying through warframe.market means whispering somebody else's sell order,
+// which closes no listing of ours, so the toast arrives with no order id.
+function purchase(partner: string): TradeMatchPayload {
+  return { ...sale(partner), orderId: "", type: "purchase" };
+}
+
 async function setup(overrides: Record<string, unknown> = {}) {
   vi.resetModules();
   h.windows.length = 0;
@@ -453,6 +459,61 @@ describe("trade notification reputation lifecycle", () => {
     expect(win.sent.at(-1)).toMatchObject({
       channel: "trade-notification-show",
       payload: { rep: { partner: "Buyer", hotkey: "F9" } },
+    });
+  });
+
+  it("arms and sends rep for a purchase that closed no listing of ours", async () => {
+    const { notifications } = await setup();
+    h.sendPlusRep.mockResolvedValueOnce("sent");
+
+    notifications.showTradeNotification(purchase("Seller"), "no-match");
+    const win = h.windows[0];
+    win.finishLoad();
+
+    expect(win.sent.at(-1)).toMatchObject({
+      channel: "trade-notification-show",
+      payload: { match: { type: "purchase" }, rep: { partner: "Seller", hotkey: "F9" } },
+    });
+
+    h.hotkeys.get("F9")?.();
+    await flushPromises();
+
+    expect(h.sendPlusRep).toHaveBeenCalledWith("Seller");
+    expect(win.sent.at(-1)).toMatchObject({
+      channel: "trade-notification-rep-result",
+      payload: { result: "sent", partner: "Seller" },
+    });
+  });
+
+  // Auto-close off or signed out: nothing ever asked warframe.market about this
+  // trade, so there is no reason to believe it happened there.
+  it("leaves a purchase unarmed when the orders were never checked", async () => {
+    const { notifications } = await setup();
+
+    notifications.showTradeNotification(purchase("Seller"), "detected");
+    const win = h.windows[0];
+    win.finishLoad();
+
+    expect(win.sent.at(-1)).toMatchObject({
+      channel: "trade-notification-show",
+      payload: { rep: null },
+    });
+    expect(h.hotkeys.size).toBe(0);
+  });
+
+  it("publishes a refusal the profile lookup could not confirm", async () => {
+    const { notifications } = await setup();
+    h.sendPlusRep.mockResolvedValueOnce("profile-unresolved");
+
+    notifications.showTradeNotification(purchase("Seller"), "no-match");
+    const win = h.windows[0];
+    win.finishLoad();
+    h.hotkeys.get("F9")?.();
+    await flushPromises();
+
+    expect(win.sent.at(-1)).toMatchObject({
+      channel: "trade-notification-rep-result",
+      payload: { result: "profile-unresolved", partner: "Seller" },
     });
   });
 
