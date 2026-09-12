@@ -8,7 +8,9 @@ import { applyUpdateState } from "../stores/updates.js";
 import { watchBaroWishlistArrivals } from "../stores/baro.js";
 import { configureRelicRuntimeCacheFingerprint, warmupPrimeRewardPriceCache } from "./relic.js";
 import { exportRankedHotset, importRankedHotset } from "./wfm/rankedHotset.js";
+import { refreshWfmPresence } from "./wfm/presence.js";
 import { tryLoadSnapshot } from "./wfm/snapshotLoader.js";
+import { marketSession } from "../stores/market.js";
 import { log } from "./log.js";
 import { derived, get } from "svelte/store";
 import { writable } from "svelte/store";
@@ -150,6 +152,22 @@ export function initStartup(options: StartupOptions = {}): StartupHandle {
       }
     })();
 
+    // The titlebar status pill is visible on every tab, so the session and the
+    // presence it reads cannot wait for the Market tab to be opened.
+    const wfmSessionTask = (async () => {
+      try {
+        const stageStart = Date.now();
+        const session = await invoke("wfmGetSession");
+        if (disposed) return;
+        marketSession.set(session);
+        profileStage("wfm-session:load", stageStart);
+        if (!session.loggedIn) return;
+        await refreshWfmPresence();
+      } catch (e) {
+        log.warn("[Startup] wfmGetSession failed:", e);
+      }
+    })();
+
     const updateStateTask = (async () => {
       try {
         const stageStart = Date.now();
@@ -167,6 +185,7 @@ export function initStartup(options: StartupOptions = {}): StartupHandle {
       itemDbTask,
       inventoryTask,
       wfmItemsTask,
+      wfmSessionTask,
       updateStateTask,
     ]);
     if (disposed) return;

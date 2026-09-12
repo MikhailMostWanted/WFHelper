@@ -6,6 +6,7 @@
   import { locale, tr, type MessageKey } from "../lib/i18n.js";
   import { useInterval } from "../lib/timers.js";
   import { APP_LOGO_URL } from "../lib/assetUrls.js";
+  import WfmStatusPill from "./market/WfmStatusPill.svelte";
   import { themeSettings } from "../stores/theme.js";
   import { DEFAULT_APP_NAME } from "../config/themeDefaults.js";
   import type { HelperStatus } from "../types/ipc.js";
@@ -135,6 +136,11 @@
         >{helperStatusText}</span
       >
     </span>
+  </div>
+  <!-- ml-auto keeps the pill against the window controls: with three children
+       justify-between would centre it instead. -->
+  <div class="app-region-no-drag ml-auto flex items-center pr-2">
+    <WfmStatusPill />
   </div>
   <div class="app-region-no-drag flex">
     <button

@@ -101,6 +101,14 @@ export function clearMarketAccountState(): void {
   marketOrders.set({ sell: [], buy: [] });
   marketContracts.set({ contracts: [], page: 1, totalPages: null, hasMore: false });
   marketSelected.set(new Set());
+  // Presence belongs to the account that just went away. Keeping it would show
+  // the previous user's status in the titlebar pill after the next sign-in.
+  setMarketViewState({
+    status: null,
+    statusExpiresAt: null,
+    statusAutoActive: false,
+    statusAwayActive: false,
+  });
   resetMarketFetchTimes();
 }
 

@@ -76,6 +76,7 @@
   import MarketAlertsView from "../components/market/alerts/MarketAlertsView.svelte";
   import MarketContractRow from "../components/market/MarketContractRow.svelte";
   import MarketOrderRow from "../components/market/MarketOrderRow.svelte";
+  import WfmPresenceBar from "../components/market/WfmPresenceBar.svelte";
   import { attributeKeyword, contractInventoryMatch } from "../lib/marketContract.js";
   import { isIpcError as hasError } from "../lib/ipcGuards.js";
   import InventoryOrderBookPanel from "../components/inventory/InventoryOrderBookPanel.svelte";
@@ -85,7 +86,6 @@
   import { sharedFilters } from "../stores/filters.js";
   import {
     applyOverlaySettingsResponse,
-    overlaySettings,
     overlaySettingsLoaded,
   } from "../stores/overlaySettings.js";
   import { applySharedFiltersAndSort } from "../lib/filters.js";
@@ -101,6 +101,7 @@
     invalidateRivenContractsRefresh,
   } from "../lib/marketContractsSync.js";
   import { invalidateMarketOrdersRefresh, refreshMarketOrders } from "../lib/marketOrdersSync.js";
+  import { refreshWfmPresence } from "../lib/wfm/presence.js";
   import { bulkSellOpen } from "../stores/inventorySelection.js";
   import { workbenchState } from "../lib/tradeWorkbench/workbenchState.js";
   import { addToast } from "../stores/toasts.js";
@@ -108,11 +109,7 @@
   import { startupPriceCacheReady } from "../lib/startupLoader.js";
   import { marketDensity } from "../stores/uiDensity.js";
   import { getInventoryHydrationController } from "../stores/inventoryHydration.js";
-  import {
-    WFM_STATUS_HOLD_MINUTES,
-    normalizeWfmAwayIdleMinutes,
-    titleFromSlug,
-  } from "../../config/shared/wfm.js";
+  import { titleFromSlug } from "../../config/shared/wfm.js";
   import { tr, type MessageKey } from "../lib/i18n.js";
   import type {
     MarketTab,
@@ -120,7 +117,6 @@
     WfmContract,
     WfmContractAttribute,
     WfmOrder,
-    WfmStatus,
   } from "../types/market.js";
   import type { DecodedRiven, WfmItemsLookup } from "../types/ipc.js";
   import type { SharedSortKey } from "../types/filters.js";
@@ -135,13 +131,6 @@
 
   /** Only a lost write reservation is worth sending the same request again. */
   type ContractsFetchOutcome = "published" | "lostWrite" | "ended";
-
-  let statusOptions: Array<[WfmStatus, string]>;
-  $: statusOptions = [
-    ["online", $tr("common.online")],
-    ["ingame", $tr("common.inGame")],
-    ["invisible", $tr("common.invisible")],
-  ];
 
   let orderTypeTabs: Array<{ key: MarketTab; label: string }>;
   $: orderTypeTabs = [
@@ -287,68 +276,9 @@
 
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let unsubscribeWfmNotification: (() => void) | null = null;
-  let holdTicker: ReturnType<typeof setInterval> | null = null;
-  let holdNow = Date.now();
-
-  $: autoIngameEnabled = $overlaySettings.wfmAutoIngameEnabled === true;
-  $: statusHoldMinutes = $overlaySettings.wfmStatusHoldMinutes ?? 0;
-  $: awayIdleEnabled = $overlaySettings.wfmAwayIdleEnabled === true;
-  $: awayIdleMinutes = normalizeWfmAwayIdleMinutes($overlaySettings.wfmAwayIdleMinutes);
-  $: awayClosedEnabled = $overlaySettings.wfmAwayWhenClosedEnabled === true;
-  $: holdRemaining = formatHoldRemaining($marketViewState.statusExpiresAt, holdNow);
-  $: holdIdle = !$marketViewState.status || $marketViewState.status === "invisible";
   // The sentence stays one key so a translator can move the link; omitting the
   // param leaves "{link}" in place as the split point.
   $: steamHintParts = $tr("market.signInSteamHint").split("{link}");
-  $: holdLabels = WFM_STATUS_HOLD_MINUTES.map((minutes) => {
-    if (!minutes) return $tr("market.holdAlways");
-    return minutes < 60 ? `${minutes}m` : `${minutes / 60}h`;
-  });
-  // Only tick while there is a deadline to count down; a hold of "Always" would
-  // otherwise re-run this view's reactive statements once a second for nothing.
-  $: syncHoldTicker($marketViewState.statusExpiresAt !== null);
-
-  function syncHoldTicker(needed: boolean): void {
-    if (needed === !!holdTicker) return;
-    if (!needed) {
-      if (holdTicker) clearInterval(holdTicker);
-      holdTicker = null;
-      return;
-    }
-    holdNow = Date.now();
-    holdTicker = setInterval(() => (holdNow = Date.now()), 1000);
-  }
-
-  function formatHoldRemaining(expiresAt: number | null, now: number): string {
-    if (!expiresAt) return "";
-    const totalSeconds = Math.max(0, Math.round((expiresAt - now) / 1000));
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    if (hours) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
-    return minutes ? `${minutes}m` : `${totalSeconds}s`;
-  }
-
-  async function saveOverlayPatch(patch: Record<string, unknown>): Promise<void> {
-    try {
-      const saved = await invoke("setOverlaySettings", patch);
-      if (saved) applyOverlaySettingsResponse(saved);
-    } catch (error) {
-      console.error("[Market] saving presence settings failed:", error);
-    }
-  }
-
-  const saveAutoIngame = (enabled: boolean) => saveOverlayPatch({ wfmAutoIngameEnabled: enabled });
-  const saveHoldMinutes = (minutes: number) => saveOverlayPatch({ wfmStatusHoldMinutes: minutes });
-  const saveAwayIdle = (enabled: boolean) => saveOverlayPatch({ wfmAwayIdleEnabled: enabled });
-  const saveAwayClosed = (enabled: boolean) =>
-    saveOverlayPatch({ wfmAwayWhenClosedEnabled: enabled });
-
-  // An emptied number input binds to null, which would clamp up to the floor.
-  function saveAwayIdleMinutes(value: string): void {
-    const minutes = normalizeWfmAwayIdleMinutes(value, awayIdleMinutes);
-    void saveOverlayPatch({ wfmAwayIdleMinutes: minutes });
-  }
-
   onMount(async () => {
     hydration.resume();
     unsubscribeWfmNotification = on("wfm:notification", (notification) => {
@@ -375,7 +305,6 @@
     unsubscribeWfmNotification?.();
     window.removeEventListener("focus", backgroundRefresh);
     if (pollTimer) clearInterval(pollTimer);
-    syncHoldTicker(false);
   });
 
   function backgroundRefresh(): void {
@@ -416,20 +345,10 @@
       await fetchOrders();
     }
 
+    // Startup seeds this for the titlebar pill; a pop-out or a mid-session
+    // sign-in still reaches the tab with an empty status.
     if (!$marketViewState.status) {
-      try {
-        // Main owns presence: it seeds from the public profile (`/v2/me` omits
-        // status) and knows how long the current status is still held.
-        const presence = await invoke("wfmPresenceState");
-        setMarketViewState({
-          status: presence.status,
-          statusExpiresAt: presence.expiresAt,
-          statusAutoActive: presence.autoActive,
-          statusAwayActive: presence.awayActive,
-        });
-      } catch (error) {
-        console.warn("[Market] presence state failed:", error);
-      }
+      await refreshWfmPresence();
     }
 
     if ($marketViewState.typeTab === "rivens") {
@@ -452,6 +371,9 @@
       } else {
         marketSession.set(result);
         password = "";
+        // Signing out cleared the previous account's presence, and the pill is
+        // on every tab now, so refill it here instead of on the next tab visit.
+        await refreshWfmPresence();
         await fetchOrders({ clearSelection: true });
         if ($marketViewState.typeTab === "rivens") {
           await fetchContracts();
@@ -657,17 +579,6 @@
       if (needsContracts()) {
         void fetchContracts();
       }
-    }
-  }
-
-  async function setStatus(status: WfmStatus): Promise<void> {
-    if (status === $marketViewState.status) return;
-    try {
-      await tradeInvoke("wfmSetStatus", status);
-      // Main broadcasts the authoritative state (hold expiry) right after.
-      setMarketViewState({ status, statusAutoActive: false, statusAwayActive: false });
-    } catch (error) {
-      console.error("[Market] setStatus failed:", error);
     }
   }
 
@@ -1018,93 +929,7 @@
         </div>
       </div>
 
-      <div class="mb-2.5 flex flex-wrap items-center gap-1.5">
-        {#each statusOptions as [statusKey, label]}
-          <button
-            class="rounded-md border border-border bg-bg-surface px-2 py-1 font-display text-xs font-semibold text-text-secondary transition-all duration-[0.14s] hover:border-text-secondary hover:text-text-primary"
-            class:statusOnlineActive={statusKey === "online" &&
-              $marketViewState.status === statusKey}
-            class:statusIngameActive={statusKey === "ingame" &&
-              $marketViewState.status === statusKey}
-            class:statusInvisibleActive={statusKey === "invisible" &&
-              $marketViewState.status === statusKey}
-            on:click={() => setStatus(statusKey)}>{label}</button
-          >
-        {/each}
-
-        <span class="mx-1 h-4 w-px bg-surface-hover"></span>
-
-        <button
-          class="presence-chip"
-          class:presenceChipActive={autoIngameEnabled}
-          title={$tr("market.autoIngameTitle")}
-          on:click={() => saveAutoIngame(!autoIngameEnabled)}
-        >
-          {$tr("market.autoInGame")}{autoIngameEnabled
-            ? $tr("market.stateOn")
-            : $tr("market.stateOff")}
-        </button>
-
-        <button
-          class="presence-chip"
-          class:presenceChipActive={awayIdleEnabled}
-          title={$tr("market.awayIdleTitle")}
-          on:click={() => saveAwayIdle(!awayIdleEnabled)}
-        >
-          {$tr("market.awayIdle", { minutes: awayIdleMinutes })}{awayIdleEnabled
-            ? $tr("market.stateOn")
-            : $tr("market.stateOff")}
-        </button>
-        <input
-          class="presence-minutes"
-          type="number"
-          min="1"
-          max="60"
-          value={awayIdleMinutes}
-          disabled={!awayIdleEnabled}
-          title={$tr("market.awayIdleTitle")}
-          aria-label={$tr("market.awayIdle", { minutes: awayIdleMinutes })}
-          on:change={(event) => saveAwayIdleMinutes(event.currentTarget.value)}
-        />
-
-        <button
-          class="presence-chip"
-          class:presenceChipActive={awayClosedEnabled}
-          title={$tr("market.awayClosedTitle")}
-          on:click={() => saveAwayClosed(!awayClosedEnabled)}
-        >
-          {$tr("market.awayClosed")}{awayClosedEnabled
-            ? $tr("market.stateOn")
-            : $tr("market.stateOff")}
-        </button>
-
-        <!-- Warframe.market disables the same control while invisible: an already
-             hidden status has nothing left to expire. -->
-        <div class="flex flex-wrap items-center gap-1.5" class:presenceHoldIdle={holdIdle}>
-          <span class="ml-1 font-display text-xs text-text-muted"
-            >{$tr("market.keepStatusFor")}</span
-          >
-          {#each WFM_STATUS_HOLD_MINUTES as minutes, index}
-            <button
-              class="presence-chip"
-              class:presenceChipActive={statusHoldMinutes === minutes && !holdIdle}
-              disabled={holdIdle}
-              on:click={() => saveHoldMinutes(minutes)}>{holdLabels[index]}</button
-            >
-          {/each}
-        </div>
-
-        {#if holdRemaining}
-          <span class="font-display text-xs text-text-secondary"
-            >{$tr("market.holdLeft", { time: holdRemaining })}</span
-          >
-        {/if}
-        {#if $marketViewState.statusAutoActive}
-          <span class="font-display text-xs text-text-muted">{$tr("market.followingGame")}</span>
-        {:else if $marketViewState.statusAwayActive}
-          <span class="font-display text-xs text-text-muted">{$tr("market.presenceAway")}</span>
-        {/if}
-      </div>
+      <div class="mb-2.5"><WfmPresenceBar /></div>
 
       <div class="mb-2.5 flex items-end border-b border-border-subtle">
         <HeaderTabs
@@ -1312,65 +1137,3 @@
     onclose={() => (selectedContract = null)}
   />
 {/if}
-
-<style>
-  .statusOnlineActive {
-    border-color: var(--success-dim);
-    background: var(--success-bg);
-    color: var(--success);
-  }
-  .statusIngameActive {
-    border-color: var(--info-dim);
-    background: var(--info-bg);
-    color: var(--info);
-  }
-  .statusInvisibleActive {
-    border-color: var(--border-subtle);
-    background: var(--surface-hover);
-    color: var(--text-primary);
-  }
-  .presence-chip {
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--bg-surface);
-    padding: 0.15rem 0.6rem;
-    font-family: var(--font-display);
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    transition: all 0.14s;
-  }
-  .presence-chip:hover {
-    border-color: var(--text-secondary);
-    color: var(--text-primary);
-  }
-  .presenceChipActive {
-    border-color: var(--info-dim);
-    background: var(--info-bg);
-    color: var(--info);
-  }
-  .presenceHoldIdle {
-    opacity: 0.4;
-  }
-  .presence-chip:disabled {
-    cursor: default;
-  }
-  .presence-chip:disabled:hover {
-    border-color: var(--border);
-    color: var(--text-muted);
-  }
-  .presence-minutes {
-    width: 3.2rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--bg-surface);
-    padding: 0.15rem 0.5rem;
-    font-family: var(--font-display);
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-  .presence-minutes:disabled {
-    opacity: 0.4;
-  }
-</style>
