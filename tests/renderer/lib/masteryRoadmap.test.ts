@@ -134,6 +134,28 @@ describe("buildMasteryRoadmap", () => {
     expect(roadmap.easy).toEqual([]);
   });
 
+  it("carries the mastery requirement into every tab", () => {
+    const { db, owned } = relicInventory([reward("Kompressa Part", "/Part", 100)], 1);
+    const roadmap = buildMasteryRoadmap(
+      [
+        item({
+          name: "Kompressa",
+          masteryReq: 13,
+          platinum: 20,
+          estimatedCost: 20,
+          components: [{ name: "Part", uniqueName: "/Part" }],
+        }),
+        item({ name: "Owned", masteryReq: 5, status: "progress", owned: true }),
+      ],
+      db,
+      owned,
+    );
+
+    expect(roadmap.easy[0].masteryReq).toBe(5);
+    expect(roadmap.relics[0].masteryReq).toBe(13);
+    expect(roadmap.platinum[0].masteryReq).toBe(13);
+  });
+
   it("ranks purchases by remaining XP per platinum", () => {
     const roadmap = buildMasteryRoadmap([
       item({ name: "Efficient", platinum: 10, estimatedCost: 10, masteryXpRemaining: 3_000 }),

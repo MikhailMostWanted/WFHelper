@@ -615,6 +615,7 @@
   "mastery.projection.readyInFoundry": "锻造中已备 {xp} 经验",
   "mastery.roadmap.accessBuilding": "锻造制造中",
   "mastery.roadmap.accessFoundryParts": "部件在锻造厂：领取后建造",
+  "mastery.roadmap.mrLockedTitle": "需要段位 {rank}，你当前为段位 {current}",
   "mastery.roadmap.easyDesc": "已拥有或可在锻造制造的物品：{count}",
   "mastery.roadmap.easyDescWithRank": "已拥有或可在锻造制造的物品：{count}，潜在段位 {rank}",
   "mastery.roadmap.xpPerPlat": "{xp} 经验/白金",

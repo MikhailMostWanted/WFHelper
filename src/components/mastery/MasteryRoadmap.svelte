@@ -90,6 +90,10 @@
     return `${((value ?? 0) * 100).toFixed(2).replace(/\.00$/, "")}%`;
   }
 
+  function isRankLocked(item: MasteryRoadmapRecommendation, rank: number | null): boolean {
+    return rank !== null && item.masteryReq > rank;
+  }
+
   function ownedPartTypes(item: MasteryRoadmapRecommendation): number {
     return item.components.filter(
       (component) =>
@@ -210,9 +214,27 @@
             />
           </span>
           <span class="min-w-0">
-            <strong class="block truncate font-display text-base text-text-primary"
-              >{itemLabel(item)}</strong
-            >
+            <span class="flex min-w-0 items-center gap-1.5">
+              <strong class="min-w-0 truncate font-display text-base text-text-primary"
+                >{itemLabel(item)}</strong
+              >
+              {#if item.masteryReq > 0}
+                {@const locked = isRankLocked(item, currentRank)}
+                <span
+                  class="shrink-0 rounded border px-1.5 py-px font-display text-[0.6rem] font-bold uppercase tracking-[0.03em] {locked
+                    ? 'border-warning/40 bg-warning/10 text-warning'
+                    : 'border-border-subtle text-text-muted'}"
+                  data-roadmap-mr={item.masteryReq}
+                  data-roadmap-mr-locked={locked ? "true" : null}
+                  title={locked
+                    ? $tr("mastery.roadmap.mrLockedTitle", {
+                        rank: item.masteryReq,
+                        current: currentRank ?? 0,
+                      })
+                    : null}>{$tr("rivens.mr", { level: item.masteryReq })}</span
+                >
+              {/if}
+            </span>
             {#if item.access === "relics"}
               <span
                 class="block text-xs font-semibold text-success"

@@ -874,6 +874,7 @@
   "mastery.projection.readyInFoundry": "{xp} XP in der Schmiede bereit",
   "mastery.roadmap.accessBuilding": "Im Bau in der Schmiede",
   "mastery.roadmap.accessFoundryParts": "Teile in der Schmiede: abholen, dann bauen",
+  "mastery.roadmap.mrLockedTitle": "Benötigt MR {rank}, du bist MR {current}",
   "mastery.roadmap.easyDesc": "Items im Besitz oder über die Schmiede verfügbar: {count}",
   "mastery.roadmap.easyDescWithRank": "Items im Besitz oder über die Schmiede verfügbar: {count}, möglicher MR {rank}",
   "mastery.roadmap.xpPerPlat": "{xp} XP/p",
