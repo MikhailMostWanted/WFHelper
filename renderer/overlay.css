@@ -116,6 +116,8 @@ body {
   border-radius: 50%;
   /* steps(): ~9 repaints/s - the window is software-rendered over the game. */
   animation: spin 0.85s steps(8) infinite;
+  /* A narrow panel squashed the ring into an ellipse without this. */
+  flex-shrink: 0;
 }
 
 @keyframes spin {
