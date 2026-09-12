@@ -93,4 +93,20 @@ describe("template expressions keep their state dependency textual", () => {
       expect(deps).toContain("state");
     }
   });
+
+  it("MarketBrowseView tracks the item database and the translator", () => {
+    const generated = compileComponent("src/components/market/MarketBrowseView.svelte");
+
+    const labelSites = trackedDependenciesFor(generated, "catalogLabel");
+    expect(labelSites.length).toBeGreaterThan(0);
+    for (const deps of labelSites) {
+      expect(deps).toContain("$itemDb");
+    }
+
+    const whisperSites = trackedDependenciesFor(generated, "buildWhisper");
+    expect(whisperSites.length).toBeGreaterThan(0);
+    for (const deps of whisperSites) {
+      expect(deps).toContain("$translate");
+    }
+  });
 });

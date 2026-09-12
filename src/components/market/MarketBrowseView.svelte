@@ -327,8 +327,13 @@
 
   // The catalog is English because warframe.market is. Only the label follows the
   // game language; every slug, order and chat line still goes out in English.
-  function catalogLabel(entry: { name: string; gameRef?: string | null }): string {
-    return itemLabel(entry.gameRef ? ($itemDb[entry.gameRef] ?? entry) : entry);
+  // `db` is a parameter so call sites name it; a template call is untracked, so
+  // reading $itemDb here would keep the pre-refresh name after item-db-updated.
+  function catalogLabel(
+    entry: { name: string; gameRef?: string | null },
+    db: typeof $itemDb,
+  ): string {
+    return itemLabel(entry.gameRef ? (db[entry.gameRef] ?? entry) : entry);
   }
   $: owned = computeOwned(selected, $parsedItems);
 
@@ -427,20 +432,22 @@
     }, FEEDBACK_TTL_MS);
   }
 
-  function buildWhisper(entry: OrderBookEntry): string {
+  // The translator is a parameter because $translate read inside a function is not
+  // a dependency of the template call that renders this as a tooltip.
+  function buildWhisper(entry: OrderBookEntry, t: Translator): string {
     if (!selected) return "";
     const quantitySuffix = entry.quantity > 1 ? ` x${entry.quantity}` : "";
     const rankSuffix = ranked && entry.rank != null ? ` (Rank ${entry.rank})` : "";
     const variantSuffix = subtype === "atragraph" ? " (Atragraph)" : "";
     const itemText = `${selected.name}${variantSuffix}${rankSuffix}${quantitySuffix}`;
     if (side === "sell") {
-      return $translate("common.whisperBuy", {
+      return t("common.whisperBuy", {
         user: entry.userName,
         item: itemText,
         platinum: entry.platinum,
       });
     }
-    return $translate("common.whisperSell", {
+    return t("common.whisperSell", {
       user: entry.userName,
       item: itemText,
       platinum: entry.platinum,
@@ -460,7 +467,7 @@
   }
 
   async function copyWhisper(entry: OrderBookEntry, key: string): Promise<void> {
-    const message = buildWhisper(entry);
+    const message = buildWhisper(entry, $translate);
     if (!message) return;
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
@@ -609,12 +616,12 @@
                   fallbackSrc={suggestion.gameRef
                     ? ($itemDb[suggestion.gameRef]?.imageUrl ?? null)
                     : null}
-                  alt={catalogLabel(suggestion)}
+                  alt={catalogLabel(suggestion, $itemDb)}
                   cls="max-h-full max-w-full"
                 />
               </span>
               <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-                >{catalogLabel(suggestion)}</span
+                >{catalogLabel(suggestion, $itemDb)}</span
               >
             </button>
           {/each}
@@ -685,7 +692,7 @@
         <ItemImage
           src={selected.thumb}
           fallbackSrc={selected.gameRef ? ($itemDb[selected.gameRef]?.imageUrl ?? null) : null}
-          alt={catalogLabel(selected)}
+          alt={catalogLabel(selected, $itemDb)}
           cls="max-h-[72px] max-w-[72px]"
         />
       </div>
@@ -693,7 +700,7 @@
         <h3
           class="m-0 font-display text-2xl font-bold uppercase tracking-[0.04em] text-text-primary"
         >
-          {catalogLabel(selected)}
+          {catalogLabel(selected, $itemDb)}
         </h3>
         <div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-text-secondary">
           <span class={owned.total > 0 ? "font-semibold text-success" : ""}
@@ -961,7 +968,7 @@
                       class="{copiedKey === rowKey
                         ? 'btn-success'
                         : 'btn-secondary'} btn-sm min-w-[104px]"
-                      title={buildWhisper(entry)}
+                      title={buildWhisper(entry, $translate)}
                       on:click={() => void copyWhisper(entry, rowKey)}
                       >{copiedKey === rowKey
                         ? $translate("common.copied")
