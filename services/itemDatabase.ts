@@ -9,6 +9,7 @@ import { fallbackNameFromUniqueName, sanitizeDisplayName } from "../config/share
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { normalizeDucats } from "../config/shared/numeric";
 import { normalizeWfmSlug } from "../config/shared/wfm";
+import { WIKI_ITEM_ART } from "../config/shared/wikiItemArt";
 import { WIKI_MOD_ART, WIKI_MOD_ART_BY_NAME } from "../config/shared/wikiModArt";
 import { isLocalizingNames, localizeName } from "./gameLocale";
 import * as publicExportSource from "./publicExportSource";
@@ -60,6 +61,10 @@ function buildWfcdImageUrl(imageName: string | null | undefined): string | null 
 // know. Mirror-only, so the manifest builder never takes it for an upstream URL.
 function wikiCardArtUrl(uniqueName: string, category: string, displayName: string): string | null {
   if (process.env.WFHELPER_ICON_MIRROR_DISABLED === "1") return null;
+  // Per-item overrides are keyed by uniqueName and win over everything, so an
+  // item DE draws badly is fixed without widening the category gate below.
+  const item = WIKI_ITEM_ART[uniqueName];
+  if (item) return `${ICON_MIRROR_BASE_URL}/item-art/${encodeURIComponent(item)}.webp`;
   if (category !== "Mod" && category !== "Arcane") return null;
   // The wiki's internal names have drifted from DE's for railjack mods and
   // stances, so the display name is the only join left for those.

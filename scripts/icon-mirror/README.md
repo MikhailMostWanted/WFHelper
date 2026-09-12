@@ -53,6 +53,29 @@ The app loads them from:
 https://assets.wfhelper.com/arbi-minimaps/<file>.webp
 ```
 
+## Per-item art overrides
+
+DE's own texture wins for almost everything, but a few items ship art that does
+not survive a thumbnail. The tauforged Emerald, Topaz and Violet archon shards
+are near-transparent glow plates, about 860 opaque pixels against the 7,900 of
+the Amar, Boreal and Nira ones, so at the 42px resource card they read as a
+colourless smudge.
+
+`config/shared/wikiItemArt.ts` maps those uniqueNames to a wiki file stem. It is
+hand-kept, unlike the generated `wikiModArt.ts`. Add the file names to
+`wiki-item-art.json` as well, or the mirror never fetches them:
+
+```bash
+pnpm run icons:download:item-art
+pnpm run icons:deploy
+```
+
+The app loads them from:
+
+```text
+https://assets.wfhelper.com/item-art/<stem>.webp
+```
+
 If upstream sources have missing icons, `icons:download` writes them to
 `.icon-mirror/download-failures.json`. Real 404s are expected when an upstream
 package references image names that no longer exist. Deploying the successfully
