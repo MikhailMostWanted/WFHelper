@@ -1,0 +1,96 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+
+import { compile } from "svelte/compiler";
+import ts from "typescript";
+import { describe, expect, it } from "vitest";
+
+// Svelte wraps a call inside a template expression in untrack, so only the
+// bindings spelled out in the expression are its dependencies. A helper that
+// reads component state internally renders once and never repaints; these
+// components shipped that bug, and the fix passes the state in as an argument.
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+
+function compileComponent(relativePath: string): string {
+  const source = readFileSync(resolve(ROOT, relativePath), "utf8");
+  // Keep lang="ts" on the tag so TS in the markup still parses; only the script
+  // body needs the types stripped before the Svelte compiler sees it.
+  const plain = source.replace(
+    /(<script[^>]*lang="ts"[^>]*>)([\s\S]*?)(<\/script>)/g,
+    (_match, open: string, body: string, close: string) => {
+      const js = ts.transpileModule(body, {
+        compilerOptions: {
+          target: ts.ScriptTarget.ESNext,
+          module: ts.ModuleKind.ESNext,
+          // without this the transpiler drops imports the markup alone uses
+          verbatimModuleSyntax: true,
+        },
+      }).outputText;
+      return `${open}\n${js}${close}`;
+    },
+  );
+  return compile(plain, { generate: "client", filename: relativePath, dev: false }).js.code;
+}
+
+// The generated shape is `(dep, dep, $.untrack(() => call(...)))`, so the tracked
+// dependencies of a call are the identifiers in its sequence apart from the thunk.
+function trackedDependenciesFor(generated: string, callee: string): string[][] {
+  const sf = ts.createSourceFile("out.js", generated, ts.ScriptTarget.Latest, true);
+  const found: string[][] = [];
+
+  const containsCallTo = (node: ts.Node, name: string): boolean => {
+    let hit = false;
+    const walk = (n: ts.Node): void => {
+      if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === name) {
+        hit = true;
+      }
+      ts.forEachChild(n, walk);
+    };
+    walk(node);
+    return hit;
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === "untrack" &&
+      containsCallTo(node, callee)
+    ) {
+      const parent = node.parent;
+      const deps: string[] = [];
+      if (
+        parent &&
+        ts.isBinaryExpression(parent) &&
+        parent.operatorToken.kind === ts.SyntaxKind.CommaToken
+      ) {
+        const collect = (n: ts.Node): void => {
+          if (n === node) return;
+          if (ts.isIdentifier(n)) deps.push(n.text);
+          ts.forEachChild(n, collect);
+        };
+        collect(parent);
+      }
+      found.push(deps);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return found;
+}
+
+describe("template expressions keep their state dependency textual", () => {
+  it("MarketMetricStrip tracks the metric state next to each value", () => {
+    const generated = compileComponent("src/components/MarketMetricStrip.svelte");
+    const sites = trackedDependenciesFor(generated, "valueLabel");
+
+    // platinum, ducats and ratio
+    expect(sites).toHaveLength(3);
+    for (const deps of sites) {
+      // without this the placeholder stays "..." when a lookup ends with no data
+      expect(deps).toContain("state");
+    }
+  });
+});

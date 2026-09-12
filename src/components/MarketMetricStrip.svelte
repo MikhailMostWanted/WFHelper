@@ -22,9 +22,12 @@
     return value !== null && value !== undefined && value !== "";
   }
 
-  function valueLabel(value: MetricValue): string {
+  // `state` is a parameter, not read off the component: Svelte untracks a call in
+  // a template expression, so reading it here would leave the placeholder stuck on
+  // "..." when a lookup finishes with no data and only `state` changes.
+  function valueLabel(value: MetricValue, metricState: MetricState): string {
     if (hasValue(value)) return String(value);
-    return state === "loading" ? "..." : "-";
+    return metricState === "loading" ? "..." : "-";
   }
 
   function toneClass(value: MetricValue, tone: "plat" | "ducat"): string {
@@ -51,7 +54,7 @@
     title={$tr("common.platinum")}
   >
     <img src={PLAT_ICON} alt="" class="{iconSizeClass} object-contain shrink-0" />
-    {valueLabel(platinum)}
+    {valueLabel(platinum, state)}
   </span>
 
   {#if showDucats}
@@ -63,7 +66,7 @@
       title={$tr("common.ducats")}
     >
       <img src={DUCAT_ICON} alt="" class="{iconSizeClass} object-contain shrink-0" />
-      {valueLabel(ducats)}
+      {valueLabel(ducats, state)}
     </span>
 
     <span
@@ -76,7 +79,7 @@
       <img src={DUCAT_ICON} alt="" class="{iconSizeClass} object-contain shrink-0" />
       <span aria-hidden="true" class="text-text-muted text-[0.8em]">/</span>
       <img src={PLAT_ICON} alt="" class="{iconSizeClass} object-contain shrink-0 mr-1" />
-      {valueLabel(ratio)}
+      {valueLabel(ratio, state)}
     </span>
   {/if}
 </div>
