@@ -56,7 +56,10 @@
   import { startTour } from "../stores/tour.js";
   import { currentView } from "../stores/app.js";
   import type { InventorySource, OverlaySettings, OverlayWindowKey } from "../types/ipc.js";
-  import { ROUTABLE_NOTIFICATION_SOURCES } from "../../config/shared/notifications.js";
+  import {
+    DEFAULT_SOURCE_CHANNELS,
+    ROUTABLE_NOTIFICATION_SOURCES,
+  } from "../../config/shared/notifications.js";
   import type {
     NotificationChannelState,
     NotificationSource,
@@ -321,7 +324,7 @@
   }
 
   function channelToggles(source: NotificationSource): SourceChannelToggles {
-    return channelState?.sources[source] ?? { native: true, webhook: false };
+    return channelState?.sources[source] ?? DEFAULT_SOURCE_CHANNELS[source];
   }
 
   async function saveWebhook(channel: WebhookChannel): Promise<void> {
@@ -740,7 +743,11 @@
               <p class="m-0 mt-2 text-xs text-text-muted">{$tr("settings.channelRoutingDesc")}</p>
 
               {#each SOURCE_ROWS as row (row.source)}
-                {@const toggles = channelToggles(row.source)}
+                <!-- channelState is read here instead of through channelToggles because
+                     Svelte untracks a call in a template expression: the async load would
+                     never repaint these boxes, so a remounted view sat on the default. -->
+                {@const toggles =
+                  channelState?.sources[row.source] ?? DEFAULT_SOURCE_CHANNELS[row.source]}
                 <SettingsRow
                   label={$tr(row.labelKey)}
                   dataSetting={`notify-source-${row.source}`}

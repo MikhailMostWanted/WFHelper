@@ -288,4 +288,22 @@ test.describe("Settings rows degrade without colliding", () => {
 
     await setFontScale(page, null);
   });
+
+  // The boxes used to be painted from a default that the async channel load
+  // never repainted, so leaving settings and coming back dropped the webhook
+  // tick while main kept routing notifications to it.
+  test("notification channel boxes survive leaving settings", async () => {
+    await openSettings(page, 1100);
+    const boxes = () =>
+      page.locator('[data-setting="notify-source-worldState"] input[type="checkbox"]');
+    await expect(boxes().first()).toBeVisible();
+    await boxes().nth(1).check();
+    await expect(boxes().nth(1)).toBeChecked();
+
+    await openView(page, "inventory");
+    await openView(page, "settings");
+
+    await expect(boxes().nth(1)).toBeChecked();
+    await expect(boxes().first()).toBeChecked();
+  });
 });
