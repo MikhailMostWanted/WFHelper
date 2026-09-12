@@ -31,6 +31,7 @@
     claimable: $tr("mastery.roadmap.accessClaimable"),
     building: $tr("mastery.roadmap.accessBuilding"),
     buildable: $tr("common.canBuild"),
+    foundryParts: $tr("mastery.roadmap.accessFoundryParts"),
     relics: $tr("mastery.roadmap.accessRelics"),
     platinum: $tr("mastery.roadmap.accessPlatinum"),
   };

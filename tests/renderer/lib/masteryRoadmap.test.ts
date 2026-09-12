@@ -87,6 +87,53 @@ describe("buildMasteryRoadmap", () => {
     ]);
   });
 
+  it("recommends claiming an item whose remaining parts all sit in the Foundry", () => {
+    const roadmap = buildMasteryRoadmap([
+      item({
+        name: "Nekros",
+        estimatedCost: 30,
+        components: [
+          { name: "Blueprint", itemCount: 1, ownedCount: 1, owned: true },
+          { name: "Neuroptics", itemCount: 1, ownedCount: 0, building: true },
+          { name: "Chassis", itemCount: 1, ownedCount: 0, building: true },
+          { name: "Systems", itemCount: 1, ownedCount: 0, building: true },
+          { name: "Orokin Cell", itemCount: 3, ownedCount: 3 },
+        ],
+      }),
+    ]);
+
+    expect(roadmap.easy.map((entry) => [entry.name, entry.access])).toEqual([
+      ["Nekros", "foundryParts"],
+    ]);
+    expect(roadmap.platinum).toEqual([]);
+  });
+
+  it("keeps an item with a short build resource out of the Foundry recommendation", () => {
+    const roadmap = buildMasteryRoadmap([
+      item({
+        name: "Nekros",
+        components: [
+          { name: "Neuroptics", itemCount: 1, ownedCount: 0, building: true },
+          { name: "Orokin Cell", itemCount: 3, ownedCount: 1 },
+        ],
+      }),
+    ]);
+
+    expect(roadmap.easy).toEqual([]);
+  });
+
+  it("still skips a mastered item whose parts sit in the Foundry", () => {
+    const roadmap = buildMasteryRoadmap([
+      item({
+        name: "Mastered",
+        status: "mastered",
+        components: [{ name: "Neuroptics", itemCount: 1, ownedCount: 0, building: true }],
+      }),
+    ]);
+
+    expect(roadmap.easy).toEqual([]);
+  });
+
   it("ranks purchases by remaining XP per platinum", () => {
     const roadmap = buildMasteryRoadmap([
       item({ name: "Efficient", platinum: 10, estimatedCost: 10, masteryXpRemaining: 3_000 }),

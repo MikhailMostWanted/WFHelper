@@ -616,6 +616,7 @@
   "mastery.projection.foundryRaises": "Foundry raises potential to MR {rank} (+{xp} XP)",
   "mastery.projection.readyInFoundry": "{xp} XP ready in Foundry",
   "mastery.roadmap.accessBuilding": "Building in Foundry",
+  "mastery.roadmap.accessFoundryParts": "Parts in Foundry: claim, then build",
   "mastery.roadmap.easyDesc": "Items owned or available through Foundry: {count}",
   "mastery.roadmap.easyDescWithRank": "Items owned or available through Foundry: {count}, potential MR {rank}",
   "mastery.roadmap.xpPerPlat": "{xp} XP/p",

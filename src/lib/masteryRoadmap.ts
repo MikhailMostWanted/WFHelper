@@ -3,7 +3,13 @@ import type { ComponentInfo, ParsedItem } from "../types/inventory.js";
 import type { FoundryState } from "../types/filters.js";
 import type { OwnedCounts, RelicDatabase, RelicQuality, RelicReward } from "../types/relics.js";
 
-type MasteryRoadmapAccess = "owned" | "gild" | "claimable" | "building" | "buildable";
+type MasteryRoadmapAccess =
+  | "owned"
+  | "gild"
+  | "claimable"
+  | "building"
+  | "buildable"
+  | "foundryParts";
 
 interface MissingMasteryComponent {
   component: ComponentInfo;
@@ -79,7 +85,17 @@ const ACCESS_PRIORITY: Record<MasteryRoadmapAccess, number> = {
   claimable: 2,
   building: 3,
   buildable: 4,
+  foundryParts: 5,
 };
+
+// Parts in the foundry are neither owned nor missing, so relics and platinum both
+// read the set as complete and drop the item. The foundry copy only covers one
+// required unit, which keeps a short build resource missing.
+function partsWaitingInFoundry(item: MasteryRoadmapSourceItem): boolean {
+  if (item.components.length === 0) return false;
+  if (!item.components.some((component) => component.building === true)) return false;
+  return missingMasteryComponents(item.components).length === 0;
+}
 
 function easyAccess(item: MasteryRoadmapSourceItem): MasteryRoadmapAccess | null {
   // A max-rank ungilded amp reads "level it" otherwise, which is what the player just did.
@@ -88,6 +104,7 @@ function easyAccess(item: MasteryRoadmapSourceItem): MasteryRoadmapAccess | null
   if (item.foundryState === "claimable") return "claimable";
   if (item.foundryState === "building") return "building";
   if (item.foundryState === "buildable") return "buildable";
+  if (partsWaitingInFoundry(item)) return "foundryParts";
   return null;
 }
 
