@@ -50,6 +50,7 @@ export const MARKET_ALERTS_LIST = "market-alerts:list";
 export const MARKET_ALERTS_SAVE = "market-alerts:save";
 export const MARKET_ALERTS_DELETE = "market-alerts:delete";
 export const MARKET_ALERTS_SET_ENABLED = "market-alerts:set-enabled";
+export const MARKET_ALERTS_CLEAR_COOLDOWN = "market-alerts:clear-cooldown";
 export const MARKET_ALERTS_HITS = "market-alerts:hits";
 export const MARKET_ALERTS_CLEAR_HITS = "market-alerts:clear-hits";
 export const MARKET_ALERTS_STATUS = "market-alerts:status";

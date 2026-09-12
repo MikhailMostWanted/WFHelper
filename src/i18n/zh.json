@@ -2043,6 +2043,8 @@
   "marketAlerts.section.watch": "监控对象",
   "marketAlerts.section.delivery": "通知方式",
   "marketAlerts.cooldownShort": "冷却 {minutes} 分钟",
+  "marketAlerts.clearCooldown": "解除冷却",
+  "marketAlerts.cooldownLeft": "剩余 {minutes} 分钟",
   "marketAlerts.lastHitAt": "上次命中 {time}",
   "marketAlerts.sellSelection": "批量出售选择",
   "marketAlerts.sellSelectionItem": "仅此物品",

@@ -16,13 +16,13 @@
     MarketAlertHit,
     MarketAlertRule,
   } from "../../../../config/shared/marketAlertTypes.js";
-  import type { RivenStatOption } from "../../../types/ipc.js";
+  import type { MarketAlertStatusPayload, RivenStatOption } from "../../../types/ipc.js";
 
   let rules = $state<MarketAlertRule[]>([]);
   let bindings = $state<Record<string, MarketAlertBinding>>({});
   let selectedIds = $state<string[]>([]);
   let hits = $state<MarketAlertHit[]>([]);
-  let status = $state<MarketAlertEngineStatus | null>(null);
+  let status = $state<MarketAlertStatusPayload | null>(null);
   let statOptions = $state<RivenStatOption[]>([]);
   let editorOpen = $state(false);
   let editingRule = $state<MarketAlertRule | null>(null);
@@ -89,6 +89,15 @@
   const itemRuleById = $derived(
     new Map(rules.filter((rule) => rule.kind === "item").map((rule) => [rule.id, rule])),
   );
+  // A fresh status object lands on every poll, so the time left is stamped here
+  // rather than in the card, where an unchanged end stamp would freeze it.
+  const cooldownLeftByRuleId = $derived(
+    new Map<string, number>(
+      Object.entries(status?.cooldowns ?? {}).map(
+        ([id, until]) => [id, Math.max(0, until - Date.now())] as const,
+      ),
+    ),
+  );
   const lastHitByRuleId = $derived(
     hits.reduce((map, hit) => {
       if (!map.has(hit.ruleId)) map.set(hit.ruleId, hit.at);
@@ -98,6 +107,11 @@
 
   async function toggleRule(rule: MarketAlertRule): Promise<void> {
     await invoke("marketAlertsSetEnabled", rule.id, !rule.enabled);
+    await refresh();
+  }
+
+  async function clearCooldown(rule: MarketAlertRule): Promise<void> {
+    await invoke("marketAlertsClearCooldown", rule.id);
     await refresh();
   }
 
@@ -343,6 +357,8 @@
       rule={editingRule}
       binding={editingRule ? (bindings[editingRule.id] ?? null) : null}
       {statOptions}
+      cooldownLeftMs={editingRule ? (cooldownLeftByRuleId.get(editingRule.id) ?? 0) : 0}
+      onClearCooldown={(rule) => void clearCooldown(rule)}
       onClose={(saved) => void onEditorClose(saved)}
     />
   {:else if cards.length === 0}
@@ -358,10 +374,12 @@
           lastHitAt={lastHitByRuleId.has(card.rule.id)
             ? formatTime(lastHitByRuleId.get(card.rule.id) ?? "")
             : null}
+          cooldownLeftMs={cooldownLeftByRuleId.get(card.rule.id) ?? 0}
           testing={testFiring === card.rule.id}
           selected={selectedIds.includes(card.rule.id)}
           onSelect={selectRule}
           onToggle={(rule) => void toggleRule(rule)}
+          onClearCooldown={(rule) => void clearCooldown(rule)}
           onEdit={editRule}
           onDuplicate={(rule) => void duplicateRule(rule)}
           onDelete={(rule) => void deleteRule(rule)}

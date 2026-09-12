@@ -45,13 +45,20 @@
     rule = null,
     binding = null,
     statOptions = [],
+    cooldownLeftMs = 0,
+    onClearCooldown,
     onClose,
   }: {
     rule?: MarketAlertRule | null;
     binding?: MarketAlertBinding | null;
     statOptions?: RivenStatOption[];
+    /** Live remaining quiet time, so the button below can say what it clears. */
+    cooldownLeftMs?: number;
+    onClearCooldown?: (rule: MarketAlertRule) => void;
     onClose: (saved: boolean) => void;
   } = $props();
+
+  const cooldownLeftMinutes = $derived(Math.ceil(cooldownLeftMs / 60_000));
 
   // The editor seeds from its props exactly once; the parent remounts it per
   // rule, so the initial value is the only one that can ever arrive.
@@ -853,6 +860,25 @@
             max: MARKET_ALERT_MAX_COOLDOWN_MINUTES,
           })}
         </span>
+        <!-- The rule card carries the same button, but a muted rule is usually
+             reopened here, so the quiet time can be ended without going back. -->
+        {#if initialRule && onClearCooldown}
+          <span class="flex items-center gap-2">
+            <button
+              type="button"
+              class="btn-secondary btn-sm"
+              disabled={cooldownLeftMs <= 0}
+              data-alert-editor-clear-cooldown
+              onclick={() => onClearCooldown(initialRule)}
+              >{$tr("marketAlerts.clearCooldown")}</button
+            >
+            {#if cooldownLeftMs > 0}
+              <span class="text-xs text-text-muted" data-alert-editor-cooldown-left
+                >{$tr("marketAlerts.cooldownLeft", { minutes: cooldownLeftMinutes })}</span
+              >
+            {/if}
+          </span>
+        {/if}
       </label>
       {#if kind === "item"}
         <label class="flex flex-col gap-1 text-sm">

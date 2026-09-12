@@ -44,9 +44,11 @@ vi.mock("../../services/wfmCatalog", () => ({
 }));
 
 import {
+  clearMarketAlertCooldown,
   clearMarketAlertHits,
   deleteMarketAlertRule,
   exportMarketAlertRules,
+  getMarketAlertCooldowns,
   getMarketAlertEngineStatus,
   getMarketAlertHits,
   importMarketAlertRules,
@@ -615,6 +617,53 @@ describe("cooldown and dedup", () => {
     expect(mocks.requestMock).toHaveBeenCalledTimes(2);
     expect(mocks.dispatchMock).toHaveBeenCalledTimes(1);
     expect(getMarketAlertHits()).toHaveLength(1);
+  });
+
+  it("reports the running cooldown and clears it on demand", async () => {
+    vi.useFakeTimers();
+    mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "first" }]));
+    saveOk(rivenRuleRaw());
+    initEngine();
+    await runMarketAlertTickForTest();
+    expect(mocks.requestMock).toHaveBeenCalledTimes(1);
+    expect(getMarketAlertCooldowns()["rule-riven"]).toBeGreaterThan(Date.now());
+
+    // Past the eval spacing, inside the 60 minute cooldown: still no request.
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await runMarketAlertTickForTest();
+    expect(mocks.requestMock).toHaveBeenCalledTimes(1);
+
+    expect(clearMarketAlertCooldown("rule-riven")).toBe(true);
+    expect(getMarketAlertCooldowns()["rule-riven"]).toBeUndefined();
+    // A new listing, because the first one is in the seen file for good.
+    mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "second" }]));
+    await runMarketAlertTickForTest();
+    expect(mocks.requestMock).toHaveBeenCalledTimes(2);
+    expect(mocks.dispatchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses to clear the cooldown of a rule it does not have", () => {
+    saveOk(rivenRuleRaw());
+    expect(clearMarketAlertCooldown("no-such-rule")).toBe(false);
+  });
+
+  it("clears the cooldown when a rule is switched back on", async () => {
+    vi.useFakeTimers();
+    mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "first" }]));
+    saveOk(rivenRuleRaw());
+    initEngine();
+    await runMarketAlertTickForTest();
+    expect(mocks.requestMock).toHaveBeenCalledTimes(1);
+
+    // The reported workaround: off, then on, to get the rule checking again.
+    setMarketAlertRuleEnabled("rule-riven", false);
+    setMarketAlertRuleEnabled("rule-riven", true);
+    expect(getMarketAlertCooldowns()["rule-riven"]).toBeUndefined();
+
+    mocks.requestMock.mockResolvedValue(auctionPayload([{ id: "second" }]));
+    await runMarketAlertTickForTest();
+    expect(mocks.requestMock).toHaveBeenCalledTimes(2);
+    expect(mocks.dispatchMock).toHaveBeenCalledTimes(2);
   });
 
   it("re-evaluates a rule edited during its cooldown", async () => {

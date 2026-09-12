@@ -135,6 +135,9 @@ export interface PreloadAPI {
     id: IpcInvokeMap["marketAlertsSetEnabled"]["args"][0],
     enabled: IpcInvokeMap["marketAlertsSetEnabled"]["args"][1],
   ) => Promise<IpcInvokeMap["marketAlertsSetEnabled"]["return"]>;
+  marketAlertsClearCooldown: (
+    id: IpcInvokeMap["marketAlertsClearCooldown"]["args"][0],
+  ) => Promise<IpcInvokeMap["marketAlertsClearCooldown"]["return"]>;
   marketAlertsGetHits: () => Promise<IpcInvokeMap["marketAlertsGetHits"]["return"]>;
   marketAlertsClearHits: () => Promise<IpcInvokeMap["marketAlertsClearHits"]["return"]>;
   marketAlertsStatus: () => Promise<IpcInvokeMap["marketAlertsStatus"]["return"]>;

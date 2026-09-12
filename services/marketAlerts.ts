@@ -736,6 +736,13 @@ async function runRule(rule: MarketAlertRule): Promise<void> {
   }
 }
 
+/** Drops the quiet window and the eval spacing so the rule runs on the next
+ *  tick. The failure count stays: it paces a broken rule, not a fired one. */
+function clearRuleCooldown(id: string): void {
+  _cooldownUntil.delete(id);
+  _nextEvalAt.delete(id);
+}
+
 function isDue(rule: MarketAlertRule, now: number): boolean {
   if (!rule.enabled) return false;
   if (rule.kind === "baro") return false;
@@ -854,9 +861,31 @@ export function setMarketAlertRuleEnabled(id: string, enabled: boolean): boolean
   if (!rule) return false;
   rule.enabled = enabled;
   persistState();
+  // Switching a rule back on is a deliberate "watch this again", so it must not
+  // sit out the rest of a cooldown collected before it went quiet.
+  if (enabled) clearRuleCooldown(id);
   // A rule switched off will not evaluate again, so its error cannot clear itself.
-  if (!enabled) clearLastErrorForRule(id);
+  else clearLastErrorForRule(id);
   return true;
+}
+
+/** Ends the quiet window a fire started, so the rule may fire again now. */
+export function clearMarketAlertCooldown(id: string): boolean {
+  if (!state().rules.some((r) => r.id === id)) return false;
+  clearRuleCooldown(id);
+  return true;
+}
+
+/** Rule id to cooldown end, epoch ms. Rules whose window has passed are left
+ *  out, so the renderer never counts down a cooldown that is already over. */
+export function getMarketAlertCooldowns(): Record<string, number> {
+  const now = Date.now();
+  const out: Record<string, number> = {};
+  for (const rule of state().rules) {
+    const until = _cooldownUntil.get(rule.id) ?? 0;
+    if (until > now) out[rule.id] = until;
+  }
+  return out;
 }
 
 export function getMarketAlertHits(): MarketAlertHit[] {

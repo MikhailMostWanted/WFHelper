@@ -48,10 +48,27 @@ test("the riven alert editor offers stat layouts and clamps the rank fields", as
     const buffCountChip = page.locator('[data-alert-chip="positiveCount"]');
     await expect(buffCountChip).toHaveCount(1);
 
+    // The card carries a cooldown control separate from the enable toggle. A
+    // seeded rule has never fired, so there is nothing to clear.
+    const clearCooldown = page.locator(`[data-alert-clear-cooldown="${SEED_RULE_ID}"]`);
+    await expect(clearCooldown).toBeVisible();
+    await expect(clearCooldown).toBeDisabled();
+    await expect(page.locator(`[data-alert-cooldown-left="${SEED_RULE_ID}"]`)).toHaveCount(0);
+    expect(await clearCooldown.innerText()).not.toContain("marketAlerts.");
+    await page.screenshot({ path: test.info().outputPath("alert-card.png") });
+
     await page.locator(`[data-alert-edit="${SEED_RULE_ID}"]`).click();
     await expect(page.locator('[data-testid="alert-rule-editor"]')).toBeVisible({
       timeout: 30_000,
     });
+    // The same control the card carries, so a muted rule reopened here can end
+    // its quiet time without going back to the list.
+    const editorClearCooldown = page.locator("[data-alert-editor-clear-cooldown]");
+    await editorClearCooldown.scrollIntoViewIfNeeded();
+    await expect(editorClearCooldown).toBeVisible();
+    await expect(editorClearCooldown).toBeDisabled();
+    expect(await editorClearCooldown.innerText()).not.toContain("marketAlerts.");
+    await page.screenshot({ path: test.info().outputPath("alert-editor-cooldown.png") });
     await page.locator("[data-alert-save]").click();
     await expect(cards).toHaveCount(1);
     await expect(buffCountChip).toHaveCount(1);

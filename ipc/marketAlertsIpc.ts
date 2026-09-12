@@ -11,6 +11,7 @@ import { isRivenWeaponSlug } from "../services/wfmRivenItems";
 import * as wfmSession from "../services/wfmSession";
 import {
   MARKET_ALERTS_CHANGED,
+  MARKET_ALERTS_CLEAR_COOLDOWN,
   MARKET_ALERTS_CLEAR_HITS,
   MARKET_ALERTS_DELETE,
   MARKET_ALERTS_EXPORT,
@@ -135,6 +136,15 @@ function register(): void {
     },
   );
 
+  handleAuthorized(
+    MARKET_ALERTS_CLEAR_COOLDOWN,
+    assertMainRendererSender,
+    (_event, id: unknown) => {
+      const ruleId = toNonEmptyString(id, 64);
+      return { ok: !!ruleId && marketAlerts.clearMarketAlertCooldown(ruleId) };
+    },
+  );
+
   handleAuthorized(MARKET_ALERTS_HITS, assertMainRendererSender, () =>
     marketAlerts.getMarketAlertHits(),
   );
@@ -144,9 +154,12 @@ function register(): void {
     return { ok: true };
   });
 
-  handleAuthorized(MARKET_ALERTS_STATUS, assertMainRendererSender, () =>
-    marketAlerts.getMarketAlertEngineStatus(),
-  );
+  // The cooldowns ride the status poll the renderer already runs, so a card can
+  // count one down without a second round trip.
+  handleAuthorized(MARKET_ALERTS_STATUS, assertMainRendererSender, () => ({
+    ...marketAlerts.getMarketAlertEngineStatus(),
+    cooldowns: marketAlerts.getMarketAlertCooldowns(),
+  }));
 
   handleAuthorized(
     MARKET_ALERTS_TEST_FIRE,

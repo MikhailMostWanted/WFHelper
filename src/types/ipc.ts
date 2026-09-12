@@ -199,6 +199,13 @@ import type {
   OverlayDescriptor,
 } from "../../config/shared/overlayLayout.js";
 
+/** The engine status plus the live per-rule cooldowns. Main composes the two so
+ *  the cooldowns ride the poll the alerts view already runs. */
+export interface MarketAlertStatusPayload extends MarketAlertEngineStatus {
+  /** Rule id to cooldown end, epoch ms; a rule not in cooldown is absent. */
+  cooldowns: Record<string, number>;
+}
+
 export interface IpcInvokeMap {
   getPersonalProfile: {
     args: [refresh?: boolean];
@@ -471,6 +478,10 @@ export interface IpcInvokeMap {
     args: [id: string, enabled: boolean];
     return: { ok: boolean };
   };
+  marketAlertsClearCooldown: {
+    args: [id: string];
+    return: { ok: boolean };
+  };
   marketAlertsGetHits: {
     args: [];
     return: MarketAlertHit[];
@@ -481,7 +492,7 @@ export interface IpcInvokeMap {
   };
   marketAlertsStatus: {
     args: [];
-    return: MarketAlertEngineStatus;
+    return: MarketAlertStatusPayload;
   };
   marketAlertsTestFire: {
     args: [id: string];
