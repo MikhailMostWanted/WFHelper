@@ -20,6 +20,7 @@
   import { setRootOf } from "../../lib/inventory/fullSets.js";
   import { confirmWithDialog, invoke, tradeInvoke } from "../../lib/ipc.js";
   import { locale, tr, type MessageKey } from "../../lib/i18n.js";
+  import { numOrUndef } from "../../lib/numberInput.js";
   import { fetchItemOrderBookBySlug } from "../../lib/wfm/orderBook.js";
   import {
     DEFAULT_DAMPING_RULE,
@@ -36,6 +37,7 @@
     buildPlanFromRows,
     buildSelectedQueueRows,
     captureSafetySnapshot,
+    filterQueueRows,
     loadQueueMarketData,
     mergeQueueRows,
     planTotals,
@@ -43,7 +45,9 @@
     rowSafetyKey,
     rowsNeedingMarketData,
     setRowQuantity,
+    unpricedHiddenCount,
     unpricedSelectedRows,
+    type QueueListedFilter,
     type WorkbenchQueueRow as QueueRow,
   } from "../../lib/tradeWorkbench/queueModel.js";
   import {
@@ -110,6 +114,10 @@
   // Rows named one by one in the confirm dialog; main truncates the message.
   const CONFIRM_ROW_PREVIEW = 8;
 
+  // Display cap only. Bulk selection deliberately ignores it and acts on every
+  // filtered row, so a long queue is not silently half-ticked.
+  const QUEUE_DISPLAY_CAP = 100;
+
   const FIELD_CLASS =
     "rounded-[var(--radius-md)] border border-[color:var(--ui-control-border)] " +
     "bg-[var(--ui-control-bg)] px-2 py-1.5 text-sm text-text-primary outline-none " +
@@ -121,6 +129,9 @@
 
   let rows = $state<QueueRow[]>([]);
   let filter = $state("");
+  let minPlat = $state<number | null>(null);
+  let maxPlat = $state<number | null>(null);
+  let listedFilter = $state<QueueListedFilter>("all");
   let myOrders = $state<WfmOrder[]>([]);
   /** False until a fetch of our own orders succeeded; every row would otherwise
    *  be planned as a create and duplicate whatever is already listed. */
@@ -160,14 +171,15 @@
     maxDropPlat: dampMaxPlat,
   });
 
-  const visibleRows = $derived(
-    rows
-      .filter((row) => {
-        if (!filter.trim()) return true;
-        return row.itemName.toLowerCase().includes(filter.trim().toLowerCase());
-      })
-      .slice(0, 100),
-  );
+  const queueFilter = $derived({
+    text: filter,
+    plat: { min: numOrUndef(minPlat) ?? null, max: numOrUndef(maxPlat) ?? null },
+    listed: listedFilter,
+  });
+  const filteredRows = $derived(filterQueueRows(rows, queueFilter));
+  const visibleRows = $derived(filteredRows.slice(0, QUEUE_DISPLAY_CAP));
+  const noPriceHidden = $derived(unpricedHiddenCount(rows, queueFilter));
+  const selectedCount = $derived(rows.filter((row) => row.selected).length);
 
   const totals = $derived(planTotals(rows));
   const previewFailures = $derived(
@@ -336,6 +348,19 @@
 
   function toggleSelect(row: QueueRow): void {
     replaceRow({ ...row, selected: !row.selected });
+  }
+
+  /** Bulk ticks cover every filtered row, not the capped slice on screen, so the
+   *  count on the button is what actually changes. */
+  function selectFiltered(next: (row: QueueRow) => boolean): void {
+    const ids = new Set(filteredRows.map((row) => row.rowId));
+    rows = rows.map((row) => (ids.has(row.rowId) ? { ...row, selected: next(row) } : row));
+  }
+
+  /** Clears the whole queue, filters included: a row hidden right now would
+   *  otherwise stay ticked and still be listed. */
+  function clearSelection(): void {
+    rows = rows.map((row) => (row.selected ? { ...row, selected: false } : row));
   }
 
   function changeQuantity(row: QueueRow, quantity: number): void {
@@ -685,6 +710,72 @@
           data-workbench-filter
           bind:value={filter}
         />
+        <input
+          class="{FIELD_CLASS} w-24 text-right"
+          type="number"
+          min="0"
+          placeholder={t("workbench.filter.minPlat")}
+          aria-label={t("workbench.filter.minPlat")}
+          data-workbench-min-plat
+          bind:value={minPlat}
+        />
+        <input
+          class="{FIELD_CLASS} w-24 text-right"
+          type="number"
+          min="0"
+          placeholder={t("workbench.filter.maxPlat")}
+          aria-label={t("workbench.filter.maxPlat")}
+          data-workbench-max-plat
+          bind:value={maxPlat}
+        />
+        <select
+          class="{FIELD_CLASS} w-44"
+          aria-label={t("workbench.filter.listedLabel")}
+          data-workbench-listed
+          bind:value={listedFilter}
+        >
+          <option value="all">{t("workbench.filter.listedAll")}</option>
+          <option value="unlisted">{t("workbench.filter.listedUnlisted")}</option>
+          <option value="listed">{t("workbench.filter.listedListed")}</option>
+        </select>
+        {#if noPriceHidden > 0}
+          <span class="text-xs text-warning" data-workbench-no-price-hidden={noPriceHidden}>
+            {t("workbench.filter.noPriceHidden", { count: noPriceHidden })}
+          </span>
+        {/if}
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="btn-secondary btn-sm"
+          disabled={filteredRows.length === 0}
+          data-workbench-select-all
+          onclick={() => selectFiltered(() => true)}
+        >
+          {t("workbench.selectMatching", { count: filteredRows.length })}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary btn-sm"
+          disabled={selectedCount === 0}
+          data-workbench-select-none
+          onclick={clearSelection}
+        >
+          {t("workbench.selectNone", { count: selectedCount })}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary btn-sm"
+          disabled={filteredRows.length === 0}
+          data-workbench-select-invert
+          onclick={() => selectFiltered((row) => !row.selected)}
+        >
+          {t("workbench.selectInvert", { count: filteredRows.length })}
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
         <button
           type="button"
           class="btn-secondary"
@@ -798,7 +889,11 @@
         </p>
       {:else}
         <div class="text-xs text-text-muted">
-          {t("workbench.queueSummary", { total: rows.length, shown: visibleRows.length })}
+          {t("workbench.queueSummary", {
+            total: rows.length,
+            shown: visibleRows.length,
+            selected: selectedCount,
+          })}
         </div>
         <div class="grid gap-1" data-workbench-queue>
           {#each visibleRows as row (row.rowId)}

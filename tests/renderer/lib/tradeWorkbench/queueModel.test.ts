@@ -16,6 +16,7 @@ import {
   mergeQueueRows,
   effectivePrice,
   eligibleSelectionKeys,
+  filterQueueRows,
   loadQueueMarketData,
   planTotals,
   relicSubtypeFor,
@@ -26,9 +27,11 @@ import {
   rowsNeedingMarketData,
   selectionKeyFor,
   setRowQuantity,
+  unpricedHiddenCount,
   unpricedSelectedRows,
   type WorkbenchQueueRow,
 } from "../../../../src/lib/tradeWorkbench/queueModel.js";
+import { NO_PLAT_RANGE } from "../../../../src/lib/market/platRange.js";
 import {
   parseWorkbenchPlan,
   WORKBENCH_MAX_ROWS_PER_RUN,
@@ -763,6 +766,88 @@ describe("selection safety context inputs", () => {
       pins: [],
     });
     expect(safeToList({ internalName: CHASSIS, amount: 3 }, mastered).reserved).toBe(0);
+  });
+});
+
+describe("workbench queue filtering", () => {
+  function queueRow(name: string, overrides: Partial<WorkbenchQueueRow> = {}): WorkbenchQueueRow {
+    const slug = name.toLowerCase().replace(/\s+/g, "_");
+    const [row] = buildQueueRows([makeItem(name)], EMPTY_CTX, lookupFor({ name, slug }));
+    return { ...row, ...overrides };
+  }
+
+  /** A row whose only known price is the cheapest competing listing. */
+  function priced(name: string, platinum: number): WorkbenchQueueRow {
+    return attachMarketData(queueRow(name), sellBook(platinum), null, []);
+  }
+
+  const names = (rows: readonly WorkbenchQueueRow[]): string[] => rows.map((row) => row.itemName);
+
+  it("matches the name filter case-insensitively and ignores surrounding space", () => {
+    const rows = [priced("Lex Prime Barrel", 30), priced("Boltor Prime Receiver", 40)];
+    expect(names(filterQueueRows(rows, { text: "  lex prime " }))).toEqual(["Lex Prime Barrel"]);
+    expect(names(filterQueueRows(rows, { text: "PRIME" }))).toHaveLength(2);
+    expect(filterQueueRows(rows, { text: "" })).toHaveLength(2);
+    expect(filterQueueRows(rows)).toHaveLength(2);
+  });
+
+  it("applies each plat bound on its own and both together, inclusively", () => {
+    const rows = [priced("Cheap Part", 10), priced("Mid Part", 30), priced("Dear Part", 90)];
+    expect(names(filterQueueRows(rows, { plat: { min: 30, max: null } }))).toEqual([
+      "Mid Part",
+      "Dear Part",
+    ]);
+    expect(names(filterQueueRows(rows, { plat: { min: null, max: 30 } }))).toEqual([
+      "Cheap Part",
+      "Mid Part",
+    ]);
+    expect(names(filterQueueRows(rows, { plat: { min: 20, max: 40 } }))).toEqual(["Mid Part"]);
+    expect(filterQueueRows(rows, { plat: NO_PLAT_RANGE })).toHaveLength(3);
+  });
+
+  it("judges a row on its effective price before the cheapest listing", () => {
+    const row = { ...priced("Lex Prime Barrel", 20), manualPrice: 60 };
+    expect(filterQueueRows([row], { plat: { min: 50, max: null } })).toHaveLength(1);
+    expect(filterQueueRows([row], { plat: { min: null, max: 30 } })).toHaveLength(0);
+  });
+
+  it("drops a row with no price only once a bound is set, and counts it", () => {
+    const rows = [queueRow("Blank Part"), priced("Cheap Part", 20)];
+    expect(names(filterQueueRows(rows, { plat: NO_PLAT_RANGE }))).toEqual([
+      "Blank Part",
+      "Cheap Part",
+    ]);
+    expect(names(filterQueueRows(rows, { plat: { min: 1, max: null } }))).toEqual(["Cheap Part"]);
+    expect(names(filterQueueRows(rows, { plat: { min: null, max: 999 } }))).toEqual(["Cheap Part"]);
+
+    expect(unpricedHiddenCount(rows, { plat: { min: 1, max: null } })).toBe(1);
+    expect(unpricedHiddenCount(rows, { plat: NO_PLAT_RANGE })).toBe(0);
+    // The count is of rows the bound hid, so the other filters still apply.
+    expect(unpricedHiddenCount(rows, { text: "cheap", plat: { min: 1, max: null } })).toBe(0);
+  });
+
+  it("splits rows by whether they are already listed", () => {
+    const listed = attachMarketData(queueRow("Lex Prime Barrel"), null, null, [makeOrder()]);
+    const rows = [listed, queueRow("Boltor Prime Receiver")];
+    expect(names(filterQueueRows(rows, { listed: "listed" }))).toEqual(["Lex Prime Barrel"]);
+    expect(names(filterQueueRows(rows, { listed: "unlisted" }))).toEqual(["Boltor Prime Receiver"]);
+    expect(filterQueueRows(rows, { listed: "all" })).toHaveLength(2);
+  });
+
+  it("combines the filters and leaves the selection alone", () => {
+    const rows = [
+      { ...priced("Lex Prime Barrel", 30), selected: true },
+      { ...priced("Lex Prime Receiver", 90), selected: false },
+      { ...priced("Boltor Prime Barrel", 30), selected: true },
+    ];
+    const filtered = filterQueueRows(rows, {
+      text: "lex",
+      plat: { min: null, max: 50 },
+      listed: "unlisted",
+    });
+    expect(names(filtered)).toEqual(["Lex Prime Barrel"]);
+    // A hidden row keeps its tick: the filter is a view, not a deselection.
+    expect(rows.map((row) => row.selected)).toEqual([true, false, true]);
   });
 });
 

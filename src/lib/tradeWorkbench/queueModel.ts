@@ -10,6 +10,12 @@ import {
 } from "../inventory/safetyRules.js";
 import { getLookupByGameRef, getLookupByName } from "../inventoryMarket.js";
 import {
+  NO_PLAT_RANGE,
+  platRangeActive,
+  withinPlatRange,
+  type PlatRange,
+} from "../market/platRange.js";
+import {
   suggestPrice,
   type DampingRule,
   type PriceSuggestion,
@@ -483,6 +489,60 @@ export function effectivePrice(row: WorkbenchQueueRow): number | null {
   if (row.manualPrice != null) return row.manualPrice;
   if (row.suggestion?.price != null) return row.suggestion.price;
   return row.existingOrder?.platinum ?? null;
+}
+
+export type QueueListedFilter = "all" | "unlisted" | "listed";
+
+interface QueueRowFilter {
+  text?: string;
+  plat?: PlatRange;
+  listed?: QueueListedFilter;
+}
+
+/** What a plat bound is measured against: the price the row would list at, and
+ *  the cheapest competing listing while the user has priced nothing yet. */
+function queueFilterPrice(row: WorkbenchQueueRow): number | null {
+  return effectivePrice(row) ?? row.market?.lowestSell ?? null;
+}
+
+function matchesQueueText(row: WorkbenchQueueRow, text: string): boolean {
+  const needle = text.trim().toLowerCase();
+  return needle ? row.itemName.toLowerCase().includes(needle) : true;
+}
+
+function matchesQueueListed(row: WorkbenchQueueRow, listed: QueueListedFilter): boolean {
+  if (listed === "all") return true;
+  return listed === "listed" ? row.existingOrder != null : row.existingOrder == null;
+}
+
+/** Every matching row, uncapped: the display cap belongs to the view. A filter
+ *  is a view over the queue and never touches `selected`, so a hidden row the
+ *  user ticked earlier still goes out with the plan. */
+export function filterQueueRows(
+  rows: readonly WorkbenchQueueRow[],
+  filter: QueueRowFilter = {},
+): WorkbenchQueueRow[] {
+  const plat = filter.plat ?? NO_PLAT_RANGE;
+  const listed = filter.listed ?? "all";
+  const text = filter.text ?? "";
+  return rows.filter(
+    (row) =>
+      matchesQueueText(row, text) &&
+      matchesQueueListed(row, listed) &&
+      withinPlatRange(queueFilterPrice(row), plat),
+  );
+}
+
+/** Rows a plat bound drops for having no price yet. Shown next to the bounds so
+ *  an empty list reads as unloaded market data rather than as no matches. */
+export function unpricedHiddenCount(
+  rows: readonly WorkbenchQueueRow[],
+  filter: QueueRowFilter = {},
+): number {
+  if (!platRangeActive(filter.plat ?? NO_PLAT_RANGE)) return 0;
+  return filterQueueRows(rows, { ...filter, plat: NO_PLAT_RANGE }).filter(
+    (row) => queueFilterPrice(row) == null,
+  ).length;
 }
 
 export function rowWarnings(row: WorkbenchQueueRow): WorkbenchQueueWarning[] {
