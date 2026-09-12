@@ -109,4 +109,15 @@ describe("template expressions keep their state dependency textual", () => {
       expect(deps).toContain("$translate");
     }
   });
+
+  it("DropsList tracks the owned counts behind the relic badge", () => {
+    const generated = compileComponent("src/components/DropsList.svelte");
+    const sites = trackedDependenciesFor(generated, "isOwned");
+
+    expect(sites.length).toBeGreaterThan(0);
+    for (const deps of sites) {
+      // the open popover is never rebuilt by an inventory push on its own
+      expect(deps).toContain("$relicOwnedCounts");
+    }
+  });
 });

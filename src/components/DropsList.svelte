@@ -10,7 +10,7 @@
   import { buildWikiUrl } from "../lib/wikiUrl.js";
   import { tr } from "../lib/i18n.js";
   import type { DropInfo } from "../types/inventory.js";
-  import type { RelicGroup } from "../types/relics.js";
+  import type { OwnedCounts, RelicGroup } from "../types/relics.js";
 
   export let drops: DropInfo[];
   /** Empty means "use the default heading", which has to stay translatable. */
@@ -83,10 +83,13 @@
     openRelicKey = openRelicKey === key ? null : key;
   }
 
-  function isOwned(groupKey: string): boolean {
-    const counts = $relicOwnedCounts[groupKey];
-    if (!counts) return false;
-    return counts.intact + counts.exceptional + counts.flawless + counts.radiant > 0;
+  // The counts come in as an argument: the popover outlives an inventory push, and
+  // a template call is untracked, so reading the store here would freeze the badge
+  // at whatever ownership held when the row was expanded.
+  function isOwned(groupKey: string, counts: OwnedCounts): boolean {
+    const owned = counts[groupKey];
+    if (!owned) return false;
+    return owned.intact + owned.exceptional + owned.flawless + owned.radiant > 0;
   }
 
   function relicFallbackIcon(rg: RelicGroup): string {
@@ -148,7 +151,7 @@
 
           {#if openRelicKey === rg.key}
             {@const rewards = getPopoverRewards(rg)}
-            {@const owned = isOwned(rg.key)}
+            {@const owned = isOwned(rg.key, $relicOwnedCounts)}
             <div
               class="my-2 rounded-lg border border-border-strong bg-bg-raised px-3 py-2.5 shadow-[var(--ui-panel-shadow)]"
             >
