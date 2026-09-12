@@ -1007,7 +1007,9 @@
                     <div class="item-body">
                       <span class="item-name">{itemLabel(item)}</span>
                       <span class="item-type"
-                        >{item.category}{item.masteryReq ? ` · MR ${item.masteryReq}` : ""}</span
+                        >{item.category}{item.masteryReq
+                          ? ` · ${$tr("rivens.mr", { level: item.masteryReq })}`
+                          : ""}</span
                       >
                       {#if item.foundryStatus || item.subsumed || item.masteryXpRemaining > 0 || item.platinum != null}
                         <div class="mt-1 flex flex-wrap gap-1">
