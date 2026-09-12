@@ -19,6 +19,8 @@
     type RepriceRow,
     type RepriceSkipReason,
   } from "../../lib/market/repriceOrders.js";
+  import { withinPlatRange, type PlatRange } from "../../lib/market/platRange.js";
+  import { numOrUndef } from "../../lib/numberInput.js";
   import type { MessageKey } from "../../lib/i18n.js";
   import type { WfmOrder } from "../../types/market.js";
 
@@ -68,6 +70,11 @@
   let stoppedAuth = $state(false);
   let cancelled = false;
 
+  let filterText = $state("");
+  let minPlatRaw = $state<number | null>(null);
+  let maxPlatRaw = $state<number | null>(null);
+  let showMode = $state<"all" | "changed" | "skipped">("all");
+
   const strategyConfig = $derived.by<StrategyConfig>(() => {
     if (strategyId === "percent-offset") return { id: "percent-offset", percent: percentOffset };
     if (strategyId === "bounded-cheapest-average") {
@@ -85,13 +92,53 @@
   const totals = $derived(repriceTotals(rows));
   const priced = $derived(rows.some((row) => row.sellBook !== null));
 
+  const platRange = $derived<PlatRange>({
+    min: numOrUndef(minPlatRaw) ?? null,
+    max: numOrUndef(maxPlatRaw) ?? null,
+  });
+  const needle = $derived(filterText.trim().toLowerCase());
+  const shownRows = $derived(
+    rows.filter((row) => {
+      if (needle && !row.label.toLowerCase().includes(needle)) return false;
+      if (!withinPlatRange(row.currentPrice, platRange)) return false;
+      if (showMode === "changed") return row.skipReason === null && row.nextPrice !== null;
+      if (showMode === "skipped") return row.skipReason !== null;
+      return true;
+    }),
+  );
+  const selectedCount = $derived(rows.filter((row) => row.selected).length);
+
+  function shownIds(): Set<string> {
+    return new Set(shownRows.map((row) => row.rowId));
+  }
+
+  function selectShown(): void {
+    const ids = shownIds();
+    rows = rows.map((row) => (ids.has(row.rowId) ? { ...row, selected: true } : row));
+  }
+
+  function clearSelection(): void {
+    rows = rows.map((row) => (row.selected ? { ...row, selected: false } : row));
+  }
+
+  function invertShown(): void {
+    const ids = shownIds();
+    rows = rows.map((row) => (ids.has(row.rowId) ? { ...row, selected: !row.selected } : row));
+  }
+
+  function toggleRow(rowId: string, selected: boolean): void {
+    const index = rows.findIndex((row) => row.rowId === rowId);
+    if (index >= 0) rows[index] = { ...rows[index], selected };
+  }
+
   function reprice(): void {
     rows = rows.map((row) => priceRepriceRow(row, strategyConfig, ownUserName));
   }
 
   async function loadBooks(): Promise<void> {
     if (loading) return;
-    const pending = rows.filter((row) => row.sellBook === null);
+    // One request per row, so the filters decide the bill and only selected rows are fetched.
+    const pending = rows.filter((row) => row.selected && row.sellBook === null);
     if (pending.length === 0) return;
     loading = true;
     loaded = 0;
@@ -196,7 +243,7 @@
       <button
         class="btn-secondary btn-sm"
         data-reprice-load
-        disabled={loading || applying}
+        disabled={loading || applying || selectedCount === 0}
         onclick={() => void loadBooks()}
       >
         {loading
@@ -210,22 +257,96 @@
       {/if}
     </div>
 
+    <div class="flex flex-wrap items-end gap-3 border-b border-border px-4 py-3">
+      <label class="flex flex-col gap-1 text-xs text-text-secondary">
+        {$tr("common.name")}
+        <input
+          class="{FIELD} w-48"
+          type="text"
+          data-reprice-filter
+          data-search-focus
+          placeholder={$tr("common.searchPlaceholder")}
+          bind:value={filterText}
+        />
+      </label>
+      <div class="flex flex-col gap-1 text-xs text-text-secondary">
+        <span>{$tr("common.platinum")}</span>
+        <div class="flex items-center gap-2">
+          <label class="flex items-center gap-1">
+            {$tr("common.min")}
+            <input
+              class="{FIELD} w-16"
+              type="number"
+              min="0"
+              data-reprice-min-plat
+              bind:value={minPlatRaw}
+            />
+          </label>
+          <label class="flex items-center gap-1">
+            {$tr("common.max")}
+            <input
+              class="{FIELD} w-16"
+              type="number"
+              min="0"
+              data-reprice-max-plat
+              bind:value={maxPlatRaw}
+            />
+          </label>
+        </div>
+      </div>
+      <label class="flex flex-col gap-1 text-xs text-text-secondary">
+        {$tr("market.reprice.showLabel")}
+        <select class="{FIELD} w-40" data-reprice-show bind:value={showMode}>
+          <option value="all">{$tr("common.all")}</option>
+          <option value="changed">{$tr("market.reprice.showChanged")}</option>
+          <option value="skipped">{$tr("market.reprice.showSkipped")}</option>
+        </select>
+      </label>
+      <div class="ml-auto flex flex-wrap items-center gap-2">
+        <span class="text-xs text-text-secondary" data-reprice-counts>
+          {$tr("market.reprice.counts", {
+            shown: String(shownRows.length),
+            selected: String(selectedCount),
+            total: String(rows.length),
+          })}
+        </span>
+        <button class="btn-secondary btn-sm" data-reprice-select-all onclick={selectShown}>
+          {$tr("common.selectAll")}
+        </button>
+        <button class="btn-secondary btn-sm" data-reprice-select-none onclick={clearSelection}>
+          {$tr("common.none")}
+        </button>
+        <button class="btn-secondary btn-sm" data-reprice-select-invert onclick={invertShown}>
+          {$tr("common.invert")}
+        </button>
+      </div>
+    </div>
+
     <div class="min-h-0 flex-1 overflow-auto px-4 py-3">
       <div class="text-sm" data-reprice-table>
         <div
-          class="grid grid-cols-[1fr_5rem_5rem_12rem] gap-2 pb-1 text-xs uppercase
+          class="grid grid-cols-[1.5rem_1fr_5rem_5rem_12rem] gap-2 pb-1 text-xs uppercase
                  tracking-[0.06em] text-text-muted"
         >
+          <span></span>
           <span>{$tr("common.item")}</span>
           <span class="text-right">{$tr("market.reprice.current")}</span>
           <span class="text-right">{$tr("market.reprice.next")}</span>
           <span>{$tr("common.details")}</span>
         </div>
-        {#each rows as row (row.rowId)}
+        {#each shownRows as row (row.rowId)}
           <div
-            class="grid grid-cols-[1fr_5rem_5rem_12rem] gap-2 border-t border-border py-1"
+            class="grid grid-cols-[1.5rem_1fr_5rem_5rem_12rem] items-center gap-2 border-t
+                   border-border py-1"
             data-reprice-row={row.rowId}
           >
+            <input
+              type="checkbox"
+              aria-label={row.label}
+              data-reprice-select={row.rowId}
+              checked={row.selected}
+              onchange={(event) => toggleRow(row.rowId, event.currentTarget.checked)}
+            />
             <span class="truncate">{row.label}</span>
             <span class="text-right tabular-nums">{row.currentPrice}</span>
             <span class="text-right tabular-nums">

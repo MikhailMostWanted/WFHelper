@@ -7,15 +7,20 @@ import {
   expect,
   _electron as electron,
   type ElectronApplication,
+  type Locator,
   type Page,
 } from "@playwright/test";
 
 import { mainWindow } from "./mainWindow";
 
+// Ids must satisfy the IPC validator's 24-hex WFM ObjectId shape.
+function fixtureId(index: number): string {
+  return (index + 1).toString(16).padStart(24, "0");
+}
+
 function fixtureOrders(): { sell: unknown[]; buy: unknown[] } {
-  // Ids must satisfy the IPC validator's 24-hex WFM ObjectId shape.
   const sell = Array.from({ length: 3 }, (_, index) => ({
-    id: (index + 1).toString(16).padStart(24, "0"),
+    id: fixtureId(index),
     orderType: "sell",
     platinum: 10 + index,
     quantity: 1,
@@ -73,6 +78,17 @@ test.describe("Market reprice (fixture mode)", () => {
     fs.rmSync(sandboxDir, { recursive: true, force: true });
   });
 
+  // A failed test restarts the worker, so later tests reopen the modal themselves.
+  async function openModal(): Promise<Locator> {
+    const modal = page.locator("[data-reprice-modal]");
+    if (!(await modal.isVisible())) {
+      await page.locator("[data-market-select-all]").first().click();
+      await page.locator("[data-market-reprice]").click();
+      await expect(modal).toBeVisible({ timeout: 20_000 });
+    }
+    return modal;
+  }
+
   test("selected listings open a reprice preview at their current prices", async () => {
     await expect(page.locator("[data-market-reprice]")).toHaveCount(0);
 
@@ -87,5 +103,37 @@ test.describe("Market reprice (fixture mode)", () => {
     await expect(modal.locator("[data-reprice-strategy]")).toBeVisible();
 
     await expect(modal.locator("[data-reprice-apply]")).toBeDisabled();
+  });
+
+  test("a minimum platinum bound drops the cheaper listings from the list", async () => {
+    const modal = await openModal();
+    const rows = modal.locator("[data-reprice-row]");
+
+    await modal.locator("[data-reprice-min-plat]").fill("12");
+    await expect(rows).toHaveCount(1);
+    await expect(rows).toHaveAttribute("data-reprice-row", fixtureId(2));
+
+    await modal.locator("[data-reprice-min-plat]").fill("");
+    await expect(rows).toHaveCount(3);
+  });
+
+  test("quick select clears every row and then picks only the filtered ones", async () => {
+    const modal = await openModal();
+    const box = (index: number): Locator =>
+      modal.locator(`[data-reprice-select="${fixtureId(index)}"]`);
+
+    await modal.locator("[data-reprice-select-none]").click();
+    for (const index of [0, 1, 2]) await expect(box(index)).not.toBeChecked();
+    await expect(modal.locator("[data-reprice-apply]")).toBeDisabled();
+
+    await modal.locator("[data-reprice-min-plat]").fill("12");
+    await modal.locator("[data-reprice-select-all]").click();
+    await modal.locator("[data-reprice-min-plat]").fill("");
+    await expect(modal.locator("[data-reprice-row]")).toHaveCount(3);
+    await expect(box(0)).not.toBeChecked();
+    await expect(box(1)).not.toBeChecked();
+    await expect(box(2)).toBeChecked();
+
+    await modal.locator("[data-reprice-select-all]").click();
   });
 });

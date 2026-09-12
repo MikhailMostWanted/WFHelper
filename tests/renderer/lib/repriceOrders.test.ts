@@ -52,6 +52,11 @@ describe("buildRepriceRows", () => {
     expect(rows[0].order.orderType).toBe("sell");
   });
 
+  it("selects every row, so an untouched modal still reprices everything", () => {
+    const rows = buildRepriceRows([order(), order({ id: "b".repeat(24) })]);
+    expect(rows.map((row) => row.selected)).toEqual([true, true]);
+  });
+
   it("carries the listing subtype so the book is filtered to that refinement", () => {
     const rows = buildRepriceRows([order({ subtype: "radiant" }), order({ id: "c".repeat(24) })]);
     expect(rows[0].subtype).toBe("radiant");
@@ -230,6 +235,16 @@ describe("runReprice", () => {
   });
 });
 
+describe("repriceRowsToSend", () => {
+  it("leaves an unselected row alone even when the strategy moved its price", () => {
+    const base = buildRepriceRows([order()])[0];
+    const priced = { ...base, nextPrice: 40, skipReason: null };
+
+    expect(repriceRowsToSend([priced])).toHaveLength(1);
+    expect(repriceRowsToSend([{ ...priced, selected: false }])).toHaveLength(0);
+  });
+});
+
 describe("repriceTotals", () => {
   it("counts the rows a run would send and which way they move", () => {
     const base = buildRepriceRows([order()])[0];
@@ -243,6 +258,20 @@ describe("repriceTotals", () => {
       raised: 1,
       lowered: 1,
       platinumDelta: 0,
+    });
+  });
+
+  it("summarises the selection only, while the row count stays the whole list", () => {
+    const base = buildRepriceRows([order()])[0];
+    const up = { ...base, nextPrice: 60, skipReason: null };
+    const down = { ...base, rowId: "down", nextPrice: 40, skipReason: null, selected: false };
+
+    expect(repriceTotals([up, down])).toEqual({
+      rows: 2,
+      sending: 1,
+      raised: 1,
+      lowered: 0,
+      platinumDelta: 10,
     });
   });
 });

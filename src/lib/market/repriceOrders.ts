@@ -19,6 +19,8 @@ export interface RepriceRow {
   sellBook: readonly PricingListing[] | null;
   nextPrice: number | null;
   skipReason: RepriceSkipReason | null;
+  /** Send gate. An unselected row is still priced, so the preview stays complete. */
+  selected: boolean;
 }
 
 export type RepriceSkipReason = "no-book" | "no-price" | "unchanged" | "not-sell";
@@ -39,6 +41,7 @@ export function buildRepriceRows(orders: readonly WfmOrder[]): RepriceRow[] {
       sellBook: null,
       nextPrice: null,
       skipReason: null,
+      selected: true,
     });
   }
   return rows;
@@ -68,10 +71,11 @@ export function priceRepriceRow(
 }
 
 export function repriceRowsToSend(rows: readonly RepriceRow[]): RepriceRow[] {
-  return rows.filter((row) => row.skipReason === null && row.nextPrice !== null);
+  return rows.filter((row) => row.selected && row.skipReason === null && row.nextPrice !== null);
 }
 
 interface RepriceTotals {
+  /** Every row in the list; the other counts cover the selected rows a run would send. */
   rows: number;
   sending: number;
   raised: number;
