@@ -104,7 +104,9 @@
   import AnalysisYearCompare from "../components/analysis/AnalysisYearCompare.svelte";
   import { KIND_KEYS } from "../components/analysis/analysisMessages.js";
   import { componentOwnership, itemDb, wfmItems } from "../stores/data.js";
-  import { activeItem } from "../stores/modals.js";
+  import { activeItem, activeRelic } from "../stores/modals.js";
+  import { relicDb } from "../stores/relics.js";
+  import { relicGroupForUniqueName } from "../lib/relic/relicInventory.js";
   import { buildParsedItemFromDb } from "../lib/parsedItemFromDb.js";
   import { persistedBoolean } from "../lib/persistence.js";
   import { priceCacheRevision } from "../stores/pricing.js";
@@ -534,12 +536,19 @@
 
   // A riven roll or an unknown name resolves to null and stays an ordinary row.
   const itemLink = $derived.by<AnalyticsItemLink>(() => {
-    const resolve = createAnalyticsItemResolver($itemDb, $wfmItems);
     const db = $itemDb;
+    const relics = $relicDb;
     const ownership = $componentOwnership;
     return {
-      resolve,
+      resolve: createAnalyticsItemResolver(db, $wfmItems, relics),
       open: (uniqueName: string): void => {
+        // The suffixed name is in the item db too, so the relic check goes
+        // first or a relic opens the generic item card.
+        const group = relicGroupForUniqueName(relics, uniqueName);
+        if (group) {
+          activeRelic.set(group);
+          return;
+        }
         const entry = db[uniqueName];
         if (entry) activeItem.set(buildParsedItemFromDb(uniqueName, entry, ownership));
       },

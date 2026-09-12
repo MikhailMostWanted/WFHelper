@@ -1,4 +1,6 @@
 import { makeItemRefResolver } from "./tradeAnalytics.js";
+import { relicGroupForDisplayName } from "../relic/relicInventory.js";
+import type { RelicDatabase } from "../../types/relics.js";
 import type { ItemDbLookup, WfmItemsLookup } from "../../types/ipc.js";
 
 export interface AnalyticsItemLink {
@@ -11,12 +13,19 @@ export interface AnalyticsItemLink {
 export function createAnalyticsItemResolver(
   itemDb: ItemDbLookup,
   wfmItems: WfmItemsLookup,
+  relicDb: RelicDatabase | null,
 ): AnalyticsItemLink["resolve"] {
   const resolveRef = makeItemRefResolver(itemDb, wfmItems);
-  return (key, name) =>
-    resolveRef({
+  return (key, name) => {
+    const direct = resolveRef({
       internalName: (key ?? "").trim(),
       wfmSlug: (key ?? "").trim(),
       displayName: (name ?? "").trim(),
     });
+    if (direct) return direct;
+    // warframe.market sells one listing per relic while DE keys every
+    // refinement with a metal suffix, so a relic gameRef is never an item
+    // database key and every relic row resolved to null.
+    return relicGroupForDisplayName(relicDb, name ?? "")?.qualities.intact?.uniqueName ?? null;
+  };
 }
