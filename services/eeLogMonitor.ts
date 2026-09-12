@@ -534,16 +534,20 @@ export function _parseTradeDialog(lines: string[]): ParsedLogTrade | null {
   function parseItemBlock(block: string): { items: ParsedLogTradeItem[]; plat: number } {
     let plat = 0;
     const counts = new Map<string, number>();
-    for (const raw of block.split("\n")) {
+    // The description separates its items with a bare CR as well as LF, and the
+    // engine can flush the next log entry behind one without starting a line.
+    for (const raw of block.split(/\r\n|[\n\r]/)) {
       const line = raw.trim();
       if (!line) continue;
       // Stop if we hit the closing part of Dialog args
       if (/^(leftItem|rightItem|title)=/.test(line)) break;
+      // Cut the Dialog arg tail ("..., title= leftItem=...") before the framework
+      // check, or a log entry flushed onto that tail rejects the item line too.
+      const withoutTail = stripDialogArgTail(line);
       // Skip EE.log framework lines that may have leaked into the buffer
-      if (isLogFrameworkLine(line)) continue;
-      // Drop Dialog arg tails glued to the last item ("..., title= leftItem=...")
-      // and platform glyphs embedded in names (glyph-only lines become empty).
-      const cleaned = stripPlatformGlyphs(stripDialogArgTail(line).replace(/\r/g, ""));
+      if (isLogFrameworkLine(withoutTail)) continue;
+      // Platform glyphs embedded in names (glyph-only lines become empty).
+      const cleaned = stripPlatformGlyphs(withoutTail);
       if (!cleaned) continue;
 
       const platMatch = cleaned.match(/^Platinum(?:\s+x\s+(\d+))?$/i);
