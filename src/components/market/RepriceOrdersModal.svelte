@@ -171,6 +171,8 @@
   async function apply(): Promise<void> {
     const sending = repriceRowsToSend(rows);
     if (sending.length === 0 || applying) return;
+    // Closing destroys the component and invalidates its reactive prop accessors.
+    const notifyApplied = onApplied;
     applying = true;
     applied = 0;
     failures = [];
@@ -192,7 +194,7 @@
       });
       stoppedAuth = result.stopReason === "auth";
       // Applied even when the modal closed mid-run; those listings did change price.
-      if (result.applied.length > 0) onApplied(result.applied);
+      if (result.applied.length > 0) notifyApplied(result.applied);
     } finally {
       applying = false;
     }
