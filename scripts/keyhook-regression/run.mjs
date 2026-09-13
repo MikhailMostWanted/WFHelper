@@ -16,6 +16,14 @@ if (process.platform !== "win32") {
   process.exit(0);
 }
 
+if (process.argv.length !== 3 || process.argv[2] !== "--active-desktop") {
+  process.stderr.write(
+    "[keyhook-regression] Requires --active-desktop: opens a Warframe decoy and sends F8. " +
+      "An inactive hidden desktop cannot provide foreground input.\n",
+  );
+  process.exit(2);
+}
+
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "wfhelper-keyhook-"));
 const decoyPath = path.join(tempDir, "Warframe.x64.exe");
 const triggerPath = path.join(tempDir, "send.flag");
@@ -31,7 +39,7 @@ const compile = spawnSync(
   cscPath,
   [
     "/nologo",
-    "/target:exe",
+    "/target:winexe",
     `/out:${decoyPath}`,
     "/reference:System.Windows.Forms.dll",
     decoySource,
@@ -45,15 +53,29 @@ if (compile.status !== 0) {
   process.exit(1);
 }
 
-const child = spawn(electronPath, [hostPath, workerPath, decoyPath, triggerPath], {
+const env = {
+  ...process.env,
+  WFHELPER_USER_DATA: path.join(tempDir, "user-data"),
+  APPDATA: path.join(tempDir, "roaming"),
+  LOCALAPPDATA: path.join(tempDir, "local"),
+  WFHELPER_KEYHOOK_ACTIVE_DESKTOP: "1",
+};
+delete env.ELECTRON_RUN_AS_NODE;
+const child = spawn(electronPath, [hostPath, workerPath, decoyPath, triggerPath, "--no-sandbox"], {
   cwd: repoRoot,
   stdio: ["ignore", "pipe", "pipe"],
+  env,
 });
 
 let stdout = "";
 let stderr = "";
 const timeout = setTimeout(() => {
-  child.kill();
+  if (child.pid) {
+    spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+      windowsHide: true,
+      stdio: "ignore",
+    });
+  }
   process.stderr.write("[keyhook-regression] FAIL: host timeout\n");
   process.exitCode = 1;
 }, 30_000);
@@ -69,11 +91,6 @@ child.stderr.on("data", (chunk) => {
 
 child.on("exit", (code) => {
   clearTimeout(timeout);
-  setTimeout(() => {
-    try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    } catch {}
-  }, 500).unref();
 
   const summaryLine = stdout
     .split(/\r?\n/)
@@ -82,6 +99,7 @@ child.on("exit", (code) => {
     process.stderr.write(stdout);
     process.stderr.write(stderr);
     process.stderr.write(`[keyhook-regression] FAIL: host exit ${code}\n`);
+    preserveFailure();
     process.exitCode = 1;
     return;
   }
@@ -97,6 +115,7 @@ child.on("exit", (code) => {
   ) {
     process.stderr.write(`${summaryLine}\n`);
     process.stderr.write("[keyhook-regression] FAIL: incomplete lifecycle\n");
+    preserveFailure();
     process.exitCode = 1;
     return;
   }
@@ -104,4 +123,26 @@ child.on("exit", (code) => {
   process.stdout.write(
     "[keyhook-regression] PASS: F8 intercepted in Warframe decoy; 20 watch updates survived\n",
   );
+  setTimeout(() => {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {}
+  }, 500);
+});
+
+function preserveFailure() {
+  fs.writeFileSync(path.join(tempDir, "host.log"), `${stdout}\n${stderr}`);
+  process.stderr.write(`[keyhook-regression] diagnostics retained: ${tempDir}\n`);
+  if (stdout.includes('"focused":false')) {
+    process.stderr.write(
+      "[keyhook-regression] decoy could not receive focus; use an active desktop in a disposable VM\n",
+    );
+  }
+}
+
+child.on("error", (error) => {
+  clearTimeout(timeout);
+  stderr += String(error);
+  preserveFailure();
+  process.exitCode = 1;
 });

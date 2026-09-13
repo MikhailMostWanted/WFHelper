@@ -26,11 +26,16 @@ function watched() {
 }
 
 app.disableHardwareAcceleration();
+if (!process.env.WFHELPER_USER_DATA) throw new Error("Keyhook harness requires isolated userData");
+if (process.env.WFHELPER_KEYHOOK_ACTIVE_DESKTOP !== "1") {
+  throw new Error("Keyhook harness requires explicit active-desktop mode");
+}
+app.setPath("userData", process.env.WFHELPER_USER_DATA);
 
 app.whenReady().then(() => {
   const decoy = spawn(decoyPath, [triggerPath], {
     stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
+    windowsHide: false,
   });
   const child = utilityProcess.fork(workerPath, [], {
     serviceName: "WFHelper Key Hook Regression",
@@ -52,6 +57,11 @@ app.whenReady().then(() => {
         maybeTrigger();
       } else if (line.startsWith("DECOY_SUMMARY ")) {
         decoyResult = JSON.parse(line.slice("DECOY_SUMMARY ".length));
+        if (!decoyResult.focused) {
+          failed = true;
+          out({ event: "focus-unavailable", decoyResult });
+          child.kill();
+        }
       }
     }
   });

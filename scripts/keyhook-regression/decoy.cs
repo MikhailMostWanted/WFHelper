@@ -55,6 +55,13 @@ internal static class Program
             {
                 sendTimer.Stop();
                 var focused = GetForegroundWindow() == form.Handle;
+                if (!focused)
+                {
+                    Console.WriteLine("DECOY_SUMMARY {\"focused\":false,\"delivered\":0}");
+                    Console.Out.Flush();
+                    form.Close();
+                    return;
+                }
                 keybd_event(VkF8, 0, 0, UIntPtr.Zero);
                 keybd_event(VkF8, 0, KeyUp, UIntPtr.Zero);
 
