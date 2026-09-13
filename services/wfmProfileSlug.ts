@@ -74,7 +74,8 @@ export async function probeProfileSlug(name: string): Promise<ProfileSlugResolut
   try {
     location = await requestRedirectTarget(`/profile/${encodeURIComponent(trimmed)}/reviews/`);
   } catch (err) {
-    // Only backpressure throws; a failed probe answers null and is sorted below.
+    // A full queue or exhausted retries. The probe never saw an answer, so this
+    // is not the "no redirect" case the account route below can tell apart.
     log.warn(`[Slug] redirect probe refused for ${trimmed}:`, String(err));
     return { kind: "unresolved" };
   }
