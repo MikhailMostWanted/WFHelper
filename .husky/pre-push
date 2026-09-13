@@ -16,5 +16,5 @@ pnpm run build
 if [ "${OS:-}" = "Windows_NT" ]; then
   pnpm run test:dbwin
   pnpm run test:reward-scan
-  pnpm exec playwright test --config playwright.config.ts
+  pnpm run test:e2e:built
 fi

@@ -5,7 +5,7 @@ app; the backend is a Cloudflare Worker under `backend/worker`.
 
 ## Getting started
 
-Requires Node 22+ and pnpm 11 (via corepack).
+Requires Node 22.12+ and pnpm 11 (via corepack).
 
 ```
 corepack enable
@@ -14,6 +14,9 @@ pnpm run dev          # Electron + Vite dev loop
 ```
 
 ## Before you open a PR
+
+See [VERIFICATION.md](VERIFICATION.md) for focused checks, isolated launches,
+reproducible scenarios, failure artifacts and platform acceptance limits.
 
 Run the core validation suite before opening a pull request:
 

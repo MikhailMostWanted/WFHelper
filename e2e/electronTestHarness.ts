@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -12,8 +12,11 @@ import {
 } from "@playwright/test";
 
 import { mainWindow } from "./mainWindow";
+import { collectElectronArtifacts } from "./electronArtifacts";
 
 interface ElectronTestHarnessOptions {
+  entryPoint?: string;
+  onApp?: (app: ElectronApplication) => void | Promise<void>;
   storage?: Record<string, string>;
   inventory?: unknown;
   onPage?: (page: Page) => void | Promise<void>;
@@ -31,6 +34,15 @@ export interface ElectronTestHarness {
   sandboxDir: string;
   helperDir: string;
 }
+
+const harnessState = new WeakMap<
+  ElectronTestHarness,
+  {
+    options: ElectronTestHarnessOptions;
+    saveArtifacts: (failed?: boolean, failure?: unknown) => Promise<void>;
+  }
+>();
+const harnessProcesses = new WeakMap<ElectronApplication, ChildProcess>();
 
 export async function launchElectronTestHarness(
   prefix: string,
@@ -50,47 +62,90 @@ export async function launchElectronTestHarness(
     fs.writeFileSync(path.join(userData, name), JSON.stringify(contents));
   }
 
+  return startHarness(sandboxDir, options, true);
+}
+
+async function startHarness(
+  sandboxDir: string,
+  options: ElectronTestHarnessOptions,
+  seedStorage: boolean,
+): Promise<ElectronTestHarness> {
+  const localAppData = path.join(sandboxDir, "local");
+  const userData = path.join(sandboxDir, "user-data");
+  const helperDir = path.join(userData, "api-helper");
+
   const env = { ...process.env } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
   env.WFHELPER_DISABLE_KEYBOARD_HOOK = "1";
   env.LOCALAPPDATA = localAppData;
+  env.APPDATA = path.join(sandboxDir, "roaming");
   env.WFHELPER_USER_DATA = userData;
 
   let app: ElectronApplication | null = null;
+  let saveArtifacts: ((failed?: boolean, failure?: unknown) => Promise<void>) | undefined;
   try {
     app = await electron.launch({
-      args: ["--no-sandbox", `--lang=${options.lang ?? "en-US"}`, "."],
+      args: ["--no-sandbox", `--lang=${options.lang ?? "en-US"}`, options.entryPoint ?? "."],
       env,
     });
+    harnessProcesses.set(app, app.process());
+    saveArtifacts = await collectElectronArtifacts(app, sandboxDir);
+    await options.onApp?.(app);
     const page = await mainWindow(app);
     await options.onPage?.(page);
     await expect(page.locator("#app")).toBeVisible({ timeout: 90_000 });
-    await page.evaluate(
-      (storage) => {
-        for (const [key, value] of Object.entries(storage)) localStorage.setItem(key, value);
-      },
-      {
-        "setup-completed-v2": "1",
-        "feature-tour-done": "1",
-        ...(options.skipLanguageSeed ? {} : { "app-language": "en" }),
-        ...options.storage,
-      },
-    );
+    if (seedStorage)
+      await page.evaluate(
+        (storage) => {
+          for (const [key, value] of Object.entries(storage)) localStorage.setItem(key, value);
+        },
+        {
+          "setup-completed-v2": "1",
+          "feature-tour-done": "1",
+          ...(options.skipLanguageSeed ? {} : { "app-language": "en" }),
+          ...options.storage,
+        },
+      );
     await page.reload();
     await expect(page.locator("#sidebar")).toBeVisible({ timeout: 90_000 });
 
-    return { app, page, sandboxDir, helperDir };
+    const harness = { app, page, sandboxDir, helperDir };
+    harnessState.set(harness, { options, saveArtifacts });
+    return harness;
   } catch (error) {
+    saveArtifacts ??= await collectElectronArtifacts(app, sandboxDir);
+    await saveArtifacts(true, error).catch((artifactError: unknown) =>
+      console.warn("[harness] artifacts:", artifactError),
+    );
     // Without this the caller never gets a harness, so the process and the
     // sandbox dir would both leak on any failure above.
     try {
-      await app?.close();
+      if (app) await stopElectron(app);
     } catch {
       // already gone
     }
-    fs.rmSync(sandboxDir, { recursive: true, force: true });
+    await saveArtifacts(true).catch((artifactError: unknown) =>
+      console.warn("[harness] artifacts:", artifactError),
+    );
+    removeSandbox(sandboxDir);
     throw error;
   }
+}
+
+export async function restartElectronTestHarness(
+  harness: ElectronTestHarness,
+  options: Pick<ElectronTestHarnessOptions, "onPage" | "onApp"> = {},
+): Promise<ElectronTestHarness> {
+  const state = harnessState.get(harness);
+  if (!state) throw new Error("Cannot restart an unknown Electron harness");
+  await state.saveArtifacts();
+  try {
+    await stopElectron(harness.app);
+  } finally {
+    await state.saveArtifacts();
+  }
+  harnessState.delete(harness);
+  return startHarness(harness.sandboxDir, { ...state.options, ...options }, false);
 }
 
 /** Viewport in CSS pixels. setViewportSize takes device pixels and the app
@@ -187,18 +242,44 @@ export async function closeElectronTestHarness(
 ): Promise<void> {
   if (!harness) return;
   try {
-    // close() waits for a clean exit and can hang a CI teardown for the whole
-    // 120s hook budget; a stuck Electron gets 15s, then a hard kill.
-    const closed = harness.app.close().then(
-      () => true,
-      () => false,
-    );
-    if (!(await Promise.race([closed, delay(15_000)]))) {
-      forceKillElectronTree(harness.app.process().pid);
-      await Promise.race([closed, delay(5_000)]);
-    }
+    await harnessState
+      .get(harness)
+      ?.saveArtifacts()
+      .catch((error: unknown) => console.warn("[harness] artifacts:", error));
+    await stopElectron(harness.app);
+  } catch (error) {
+    await harnessState.get(harness)?.saveArtifacts(true, error);
+    throw error;
   } finally {
+    await harnessState
+      .get(harness)
+      ?.saveArtifacts()
+      .catch((error: unknown) => console.warn("[harness] artifacts:", error));
+    harnessState.delete(harness);
     removeSandbox(harness.sandboxDir);
+  }
+}
+
+export async function stopElectron(app: ElectronApplication): Promise<void> {
+  // Playwright waits for any exit, including a crash. Bound the wait and check
+  // the actual process status before counting teardown as successful.
+  const child = harnessProcesses.get(app) ?? app.process();
+  if (child.exitCode !== null || child.signalCode) {
+    if (child.exitCode !== 0 || child.signalCode)
+      throw new Error(`Electron process exited with ${child.exitCode}/${child.signalCode}`);
+    return;
+  }
+  const closed = app.close().then(
+    () => true,
+    () => false,
+  );
+  if (!(await Promise.race([closed, delay(15_000)]))) {
+    forceKillElectronTree(child.pid);
+    await Promise.race([closed, delay(5_000)]);
+    throw new Error("Electron did not close cleanly; its process tree was terminated");
+  }
+  if (child.exitCode !== 0 || child.signalCode) {
+    throw new Error(`Electron process exited with ${child.exitCode}/${child.signalCode}`);
   }
 }
 
