@@ -70,12 +70,19 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      # Advisory smoke test for Linux path and platform regressions.
+      # Missing runner prerequisites are failures, not successful app checks.
       - name: Linux boot smoke
-        continue-on-error: true
         run: |
           pnpm exec playwright install-deps chromium
           xvfb-run -a pnpm run test:linux-boot
+
+      - name: Preserve failed Linux acceptance evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-acceptance
+          path: test-results/
+          if-no-files-found: ignore
 
   # Commit subjects stay enforced in CI when local hooks are skipped.
   commit-style:
@@ -94,7 +101,7 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
 
-  # Native E2E stays on Windows; Linux runs the advisory boot smoke.
+  # Native E2E stays on Windows; Linux also gates application startup.
 
   validate-windows:
     runs-on: windows-latest
@@ -138,9 +145,15 @@ jobs:
         env:
           REWARD_SCAN_READERS: onnx
 
+      - name: Riven scan regression (Electron host)
+        run: pnpm run test:riven-scan
+
       # A retry that goes green still hides a broken test. Flaky fails the job.
       - name: E2E smoke tests (Windows)
-        run: pnpm exec playwright test --config playwright.config.ts --fail-on-flaky-tests
+        run: pnpm run test:e2e:built --fail-on-flaky-tests
+
+      - name: Bounded overlay lifecycle stress
+        run: pnpm run test:overlay-stress --iterations 30 --trigger-iterations 12
 
       # Failure snapshots (error-context.md, traces) for post-mortems.
       - name: Upload Playwright results
