@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { test, expect, type Page } from "@playwright/test";
 
 import {
@@ -22,7 +24,19 @@ test.describe("Bulk sell filters", () => {
   let page: Page;
 
   test.beforeAll(async () => {
-    harness = await launchElectronTestHarness("wfh-bulk-sell-filters-", { inventory: inventory() });
+    harness = await launchElectronTestHarness("wfh-bulk-sell-filters-", {
+      entryPoint: path.resolve("e2e/scenarios/bulk-sell-catalog.cjs"),
+      inventory: inventory(),
+      onPage: async (page) => {
+        await page.addInitScript(() => {
+          window.fetch = async () =>
+            new Response(JSON.stringify({ error: "Fixture price unavailable" }), {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            });
+        });
+      },
+    });
     page = harness.page;
     await openView(page, "inventory");
     await page.locator('[data-tour-tab="all_parts"]').click();
@@ -30,6 +44,7 @@ test.describe("Bulk sell filters", () => {
       timeout: 30_000,
     });
     await page.locator("[data-inventory-select-toggle]").click();
+    await expect(page.locator("[data-inventory-select-all]")).toBeEnabled();
     await page.locator("[data-inventory-select-all]").click();
     await page.locator("[data-bulk-sell-open]").click();
   });

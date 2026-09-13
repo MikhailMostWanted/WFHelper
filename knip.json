@@ -16,6 +16,7 @@
     "backend/worker/test/**/*.ts",
     "tests/**/*.test.ts",
     "e2e/**/*.ts",
+    "e2e/scenarios/**/*.cjs",
     "scripts/**/*.cjs",
     "scripts/**/*.js",
     "scripts/**/*.mjs"
