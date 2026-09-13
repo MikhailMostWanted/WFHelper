@@ -153,8 +153,10 @@ function escapeXml(text: string): string {
 }
 
 // The AUMID shortcut lets Windows route toasts through Focus Assist correctly.
+// Packaged only: process.execPath is the Electron binary in a dev or E2E run, so
+// writing then would repoint the installed app's Start Menu entry at node_modules.
 function ensureStartMenuShortcut(): void {
-  if (process.platform !== "win32") return;
+  if (process.platform !== "win32" || !electronModule.app?.isPackaged) return;
   try {
     const { shell } = require("electron") as typeof import("electron");
     if (
