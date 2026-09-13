@@ -5,6 +5,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 let tmpDir = "";
 
+const encryption = vi.hoisted(() => ({
+  available: false,
+  encrypt: vi.fn<(value: string) => Buffer>(),
+  decrypt: vi.fn<(value: Buffer) => string>(),
+}));
+
 vi.mock("electron", () => ({
   app: {
     getPath: (name: string) => {
@@ -12,7 +18,11 @@ vi.mock("electron", () => ({
       return tmpDir;
     },
   },
-  safeStorage: { isEncryptionAvailable: () => false },
+  safeStorage: {
+    isEncryptionAvailable: () => encryption.available,
+    encryptString: encryption.encrypt,
+    decryptString: encryption.decrypt,
+  },
 }));
 
 vi.mock("../../services/logger", () => ({
@@ -73,11 +83,81 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  encryption.available = false;
+  encryption.encrypt.mockReset();
+  encryption.decrypt.mockReset();
+  fs.rmSync(path.join(tmpDir, "wfm.session"), { force: true });
   client.request.mockReset();
   client.requestRaw.mockReset();
   client.requestV2.mockReset();
   client.requestRedirectTarget.mockReset();
   client.requestV2.mockResolvedValue({ data: {} });
+});
+
+describe("persisted session recovery", () => {
+  it("restores an encrypted session in fresh module state and removes it on sign-out", async () => {
+    encryption.available = true;
+    const ciphertext = Buffer.from("opaque-encrypted-session");
+    encryption.encrypt.mockReturnValue(ciphertext);
+    const original = await signedInAs("Trade Partner");
+    expect(original.getSession().loggedIn).toBe(true);
+    expect(fs.readFileSync(path.join(tmpDir, "wfm.session"))).toEqual(ciphertext);
+    const payload = encryption.encrypt.mock.calls[0]![0];
+    expect(JSON.parse(payload)).toEqual({
+      token: "test-token",
+      userName: "Trade Partner",
+      platform: "pc",
+    });
+
+    encryption.decrypt.mockReturnValue(payload);
+    vi.resetModules();
+    const restored = await import("../../services/wfmSession");
+    expect(restored.getSession().loggedIn).toBe(false);
+    await restored.restoreSession();
+    expect(encryption.decrypt).toHaveBeenCalledWith(ciphertext);
+    expect(restored.getSession()).toEqual(original.getSession());
+    expect(restored.getToken()).toBe("test-token");
+    restored.signOut();
+    expect(fs.existsSync(path.join(tmpDir, "wfm.session"))).toBe(false);
+    expect(restored.getToken()).toBeNull();
+  });
+
+  it.each(["decrypt failure", "malformed JSON"])("starts signed out after %s", async (failure) => {
+    encryption.available = true;
+    fs.writeFileSync(path.join(tmpDir, "wfm.session"), "corrupt-session");
+    encryption.decrypt.mockImplementation(() => {
+      if (failure === "decrypt failure") throw new Error("Unable to decrypt");
+      return "{bad-json";
+    });
+    vi.resetModules();
+    const session = await import("../../services/wfmSession");
+    await expect(session.restoreSession()).resolves.toBeUndefined();
+    expect(session.getSession().loggedIn).toBe(false);
+    expect(session.getToken()).toBeNull();
+  });
+
+  it("keeps login in memory without writing plaintext when encryption is unavailable", async () => {
+    const session = await signedInAs("Trade Partner");
+    expect(session.getSession().loggedIn).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "wfm.session"))).toBe(false);
+    expect(encryption.encrypt).not.toHaveBeenCalled();
+    vi.resetModules();
+    const restarted = await import("../../services/wfmSession");
+    await restarted.restoreSession();
+    expect(restarted.getSession().loggedIn).toBe(false);
+  });
+
+  it("leaves an existing encrypted file intact when the keyring is unavailable", async () => {
+    const ciphertext = Buffer.from("opaque-encrypted-session");
+    const file = path.join(tmpDir, "wfm.session");
+    fs.writeFileSync(file, ciphertext);
+    vi.resetModules();
+    const session = await import("../../services/wfmSession");
+    await session.restoreSession();
+    expect(session.getSession().loggedIn).toBe(false);
+    expect(encryption.decrypt).not.toHaveBeenCalled();
+    expect(fs.readFileSync(file)).toEqual(ciphertext);
+  });
 });
 
 describe("account profile slug", () => {
