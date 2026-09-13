@@ -466,6 +466,80 @@ test("acknowledged drag steps keep the original preview node and pointer capture
   }
 });
 
+for (const [source, control, laterSelection] of [
+  ["preview", "hidden", null],
+  ["preview", "reset-field", null],
+  ["preview", "hidden", "preview"],
+  ["elements", "hidden", null],
+  ["elements", "reset-field", null],
+  ["elements", "hidden", "preview"],
+  ["preview", "hidden", "elements"],
+] as const) {
+  test(`${control} keeps its pending ${source} selection${laterSelection ? ` before another ${laterSelection} selection` : ""}`, async () => {
+    test.setTimeout(120_000);
+    let harness: ElectronTestHarness | undefined;
+    try {
+      harness = await launchElectronTestHarness("wfh-reward-editor-selection-", {
+        userDataFiles: {
+          "overlay-settings.json": {
+            notificationSoundEnabled: false,
+            rewardLayout: {
+              version: 1,
+              fields: { rarity: { x: 23 }, platinumValue: { x: 11 } },
+            },
+          },
+        },
+      });
+      const { page } = harness;
+      const overlay = await openSettingsEditor(harness);
+      const selectField = async (field: string, from: "preview" | "elements") => {
+        if (from === "preview") {
+          await overlay.locator(`[data-reward-field="${field}"]`).first().click();
+        } else {
+          const elements = page.locator("[data-reward-editor-elements]");
+          if ((await elements.getAttribute("open")) === null) {
+            await elements.locator("summary").click();
+          }
+          await page.locator(`[data-reward-editor-field="${field}"]`).click();
+        }
+      };
+      await holdFirstEdit(overlay);
+      await selectField("rarity", source);
+      await expect(overlay.locator("body")).toHaveAttribute("data-edit-held", "true");
+      if (control !== "reset-field") await page.locator("[data-reward-editor-hidden]").check();
+      else await page.locator("[data-reward-editor-reset-field]").click();
+      if (laterSelection) await selectField("ducatValue", laterSelection);
+      await overlay.evaluate(() => {
+        (window as unknown as { releaseEdit: () => void }).releaseEdit();
+      });
+      const finalSelection = laterSelection ? "ducatValue" : "rarity";
+      await expect(page.locator(`[data-reward-editor-field="${finalSelection}"]`)).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      await page.locator("[data-reward-editor-save]").click();
+      await expect(page.locator("[data-reward-editor]")).toHaveCount(0);
+      const saved = JSON.parse(
+        fs.readFileSync(
+          path.join(harness.sandboxDir, "user-data", "overlay-settings.json"),
+          "utf8",
+        ),
+      ) as { rewardLayout: RewardOverlayLayout };
+      if (control !== "reset-field") {
+        expect(saved.rewardLayout.fields.rarity?.hidden).toBe(true);
+        expect(saved.rewardLayout.fields.rarity?.x).toBe(23);
+      } else {
+        expect(saved.rewardLayout.fields.rarity?.x ?? 0).toBe(0);
+      }
+      expect(saved.rewardLayout.fields.platinumValue?.x).toBe(11);
+      expect(saved.rewardLayout.fields.platinumValue?.hidden ?? false).toBe(false);
+      expect(saved.rewardLayout.fields.ducatValue?.hidden ?? false).toBe(false);
+    } finally {
+      await closeElectronTestHarness(harness);
+    }
+  });
+}
+
 test("rapid field selection and a refused drag preserve the last position on Save", async () => {
   test.setTimeout(120_000);
   let harness: ElectronTestHarness | undefined;

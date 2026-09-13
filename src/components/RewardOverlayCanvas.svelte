@@ -18,6 +18,23 @@
   const kind = $derived(editState.kind);
   const descriptor = $derived(getOverlayDescriptor(kind));
   let frame = $state<HTMLIFrameElement>();
+  function selection() {
+    // The same-origin preview owns selection intent before IPC acknowledges it.
+    return (
+      frame?.contentWindow as
+        | (Window & { rewardEditorSelection?: { field?: string; select: (field: string) => void } })
+        | null
+    )?.rewardEditorSelection;
+  }
+  export function getSelectedField(): string | undefined {
+    return selection()?.field;
+  }
+  export function selectField(field: string): boolean {
+    const current = selection();
+    if (!current?.field) return false;
+    current.select(field);
+    return true;
+  }
   let context = $state<IpcInvokeMap["getOverlayPreview"]["return"]>();
   let width = $state(900);
   let failed = $state(false);

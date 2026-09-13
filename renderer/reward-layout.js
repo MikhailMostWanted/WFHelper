@@ -177,6 +177,7 @@
       const previous = state;
       if (previous?.sessionId === next.sessionId) {
         for (const command of [inFlight, ...commands]) {
+          if (command?.type === "select") next.selectedField = command.field;
           if (command?.type === "field") {
             next.layout.fields[command.field] = {
               ...options.defaultFieldStyle,
@@ -264,6 +265,13 @@
       void sendPending();
     }
 
+    function selectField(field) {
+      if (!editing()) return;
+      state = { ...state, selectedField: field };
+      send({ type: "select", field });
+      scheduleLayout();
+    }
+
     document.addEventListener(
       "pointerdown",
       (event) => {
@@ -288,11 +296,7 @@
             y: Number.isFinite(offset[1]) ? offset[1] : 0,
           },
         };
-        if (field) {
-          state = { ...state, selectedField: field };
-          send({ type: "select", field });
-          scheduleLayout();
-        }
+        if (field) selectField(field);
         target.setPointerCapture(event.pointerId);
       },
       true,
@@ -369,6 +373,12 @@
       },
     };
     if (preview) {
+      window.rewardEditorSelection = {
+        get field() {
+          return state?.selectedField;
+        },
+        select: selectField,
+      };
       window.flushRewardEditor = editor.flush;
       document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && editing()) editor.cancel();

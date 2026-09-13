@@ -24,7 +24,11 @@
   let editState = $state<OverlayEditState | null>(null);
   let errorKey = $state<MessageKey | null>(null);
   let ending = $state(false);
-  let canvas = $state<{ flush: () => Promise<void> }>();
+  let canvas = $state<{
+    flush: () => Promise<void>;
+    getSelectedField: () => string | undefined;
+    selectField: (field: string) => boolean;
+  }>();
   let draining = false;
   let hostUpdates: Promise<void> = Promise.resolve();
   let destroyed = false;
@@ -80,7 +84,7 @@
   }
 
   function patch(changes: Partial<OverlayFieldStyle>): void {
-    edit({ type: "field", field: selected, patch: changes });
+    edit({ type: "field", field: canvas?.getSelectedField() ?? selected, patch: changes });
   }
 
   function edit(command: OverlayEditCommand): void {
@@ -182,7 +186,9 @@
                       field
                         ? 'bg-accent/15 text-accent'
                         : 'text-text-secondary hover:bg-bg-hover'}"
-                      onclick={() => edit({ type: "select", field })}
+                      onclick={() => {
+                        if (!canvas?.selectField(field)) edit({ type: "select", field });
+                      }}
                     >
                       <span>{$tr(label.key, label.number ? { number: label.number } : {})}</span>
                       {#if editState.layout.fields[field]?.hidden}
@@ -277,7 +283,8 @@
                 type="button"
                 data-reward-editor-reset-field
                 class="btn-secondary btn-sm"
-                onclick={() => edit({ type: "reset", field: selected })}
+                onclick={() =>
+                  edit({ type: "reset", field: canvas?.getSelectedField() ?? selected })}
                 >{$tr("rewardEditor.resetElement")}</button
               >
               {#if kind !== "tradeNotification"}
