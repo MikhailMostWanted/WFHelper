@@ -114,12 +114,20 @@ function attachLineReader(child, onLine, prefix) {
 }
 
 async function main() {
+  const env = {
+    ...process.env,
+    WFHELPER_USER_DATA: path.join(tmpDir, "profile"),
+    APPDATA: path.join(tmpDir, "roaming"),
+    LOCALAPPDATA: path.join(tmpDir, "local"),
+  };
+  delete env.ELECTRON_RUN_AS_NODE;
   host = spawn(
     electronPath,
-    [hostPath, workerPath, stopFile, dbwinPrefix, path.join(tmpDir, "profile")],
+    [hostPath, workerPath, stopFile, dbwinPrefix, path.join(tmpDir, "profile"), "--no-sandbox"],
     {
       cwd: repoRoot,
       stdio: ["ignore", "pipe", "pipe"],
+      env,
     },
   );
   attachLineReader(
