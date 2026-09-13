@@ -319,7 +319,10 @@ test.describe("Market reprice through production IPC", () => {
     await setMode("partial");
     const modal = await openPricedModal();
     await modal.locator("[data-reprice-apply]").click();
-    await expect(modal.locator("footer .text-danger")).toHaveText("1 failed");
+    await expect(modal.locator("[data-reprice-failed]")).toHaveAttribute(
+      "data-reprice-failed",
+      "1",
+    );
     await expect(modal.locator("[data-reprice-apply]")).toBeEnabled();
     expect((await requests()).map((request) => request.body)).toEqual([
       { platinum: 50, quantity: 1 },

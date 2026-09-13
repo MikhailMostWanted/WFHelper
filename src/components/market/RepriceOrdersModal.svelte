@@ -371,7 +371,7 @@
         })}
       </span>
       {#if failures.length > 0}
-        <span class="text-xs text-danger">
+        <span class="text-xs text-danger" data-reprice-failed={failures.length}>
           {$tr("market.reprice.failed", { count: String(failures.length) })}
         </span>
       {/if}

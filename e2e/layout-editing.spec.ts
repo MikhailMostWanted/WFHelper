@@ -20,9 +20,9 @@ test.describe("Offline World scenarios", () => {
     try {
       harness = await launchElectronTestHarness("wfh-world-loading-", scenario);
       await openView(harness.page, "world");
-      await expect(harness.page.locator("section.view.active > .empty-state")).toContainText(
-        "Loading world data...",
-      );
+      await expect(
+        harness.page.locator('section.view.active > [data-world-state="loading"]'),
+      ).toBeVisible();
       await harness.page.screenshot({ path: test.info().outputPath("world-loading.png") });
       await scenario.releaseWorld(harness.app);
       await expect(harness.page.locator('[data-layout-section="world.darvo"]')).toBeVisible();

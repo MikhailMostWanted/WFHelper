@@ -443,9 +443,11 @@
       {/if}
     </LayoutGrid>
   {:else if !wd && $worldLoading}
-    <div class="empty-state"><p>{$tr("world.loading")}</p></div>
+    <div class="empty-state" data-world-state="loading"><p>{$tr("world.loading")}</p></div>
   {:else if !wd}
-    <div class="empty-state"><p>{$tr("world.unavailable")}</p></div>
+    <div class="empty-state" data-world-state="unavailable">
+      <p>{$tr("world.unavailable")}</p>
+    </div>
   {:else}
     <LayoutGrid
       view="world"
