@@ -264,3 +264,20 @@
     </div>
   </div>
 {/if}
+
+<style>
+  .relic-owned-chip {
+    display: inline-block;
+    border: 1px solid var(--success-dim);
+    border-radius: 999px;
+    background: var(--success-bg);
+    padding: 0 0.3rem;
+    font-family: var(--font-display);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+    color: var(--success);
+    white-space: nowrap;
+  }
+</style>
