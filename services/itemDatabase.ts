@@ -1062,9 +1062,11 @@ export function localizedNameFields(
   return pair.displayName ? { displayName: pair.displayName } : {};
 }
 
-/** True once the mirrored wiki card survived the merge as the item's art. */
+/** True once a mirrored wiki card survived the merge as the item's art. Both
+ *  mirrors count, or a WIKI_ITEM_ART override on a mod would lose to the WFM
+ *  thumbnail that cardArt exists to outrank. */
 function hasCardArt(imageUrl: string | null): boolean {
-  return imageUrl != null && imageUrl.includes("/mod-art/");
+  return imageUrl != null && (imageUrl.includes("/mod-art/") || imageUrl.includes("/item-art/"));
 }
 
 export function getRendererLookup(): Record<string, RendererItemEntry> {
