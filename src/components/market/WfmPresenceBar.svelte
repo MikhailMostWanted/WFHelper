@@ -3,6 +3,7 @@
   // titlebar popover, so the two can never drift apart.
   import { invoke } from "../../lib/ipc.js";
   import { tr } from "../../lib/i18n.js";
+  import { log } from "../../lib/log.js";
   import { setWfmStatus } from "../../lib/wfm/presence.js";
   import { marketViewState } from "../../stores/market.js";
   import { applyOverlaySettingsResponse, overlaySettings } from "../../stores/overlaySettings.js";
@@ -65,7 +66,7 @@
       const saved = await invoke("setOverlaySettings", patch);
       if (saved) applyOverlaySettingsResponse(saved);
     } catch (error) {
-      console.error("[Market] saving presence settings failed:", error);
+      log.error("[Market] saving presence settings failed:", error);
     }
   }
 
