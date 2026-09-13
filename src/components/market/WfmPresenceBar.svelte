@@ -1,6 +1,5 @@
 <script lang="ts">
-  // One copy of the presence controls for both the Market header and the
-  // titlebar popover, so the two can never drift apart.
+  // Shared by the Market header and the titlebar popover.
   import { invoke } from "../../lib/ipc.js";
   import { tr } from "../../lib/i18n.js";
   import { log } from "../../lib/log.js";
@@ -39,9 +38,8 @@
     }),
   );
 
-  // Only tick while there is a deadline to count down, and key the effect on the
-  // deadline alone: reading the whole store here would restart the interval on
-  // every unrelated presence change.
+  // Keyed on the deadline alone, or every unrelated presence change would
+  // restart the interval.
   $effect(() => {
     if (holdDeadline === null) return;
     holdNow = Date.now();
@@ -138,8 +136,7 @@
     {$tr("market.awayClosed")}{awayClosedEnabled ? $tr("market.stateOn") : $tr("market.stateOff")}
   </button>
 
-  <!-- Warframe.market disables the same control while invisible: an already
-       hidden status has nothing left to expire. -->
+  <!-- Warframe.market disables this too; a hidden status cannot expire. -->
   <div class="flex flex-wrap items-center gap-1.5" class:presenceHoldIdle={holdIdle}>
     <span class="ml-1 font-display text-xs text-text-muted">{$tr("market.keepStatusFor")}</span>
     {#each WFM_STATUS_HOLD_MINUTES as minutes, index (minutes)}

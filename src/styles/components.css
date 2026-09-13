@@ -691,7 +691,6 @@
     font-size: 0.6rem;
     line-height: 1.35;
   }
-  /* The other half of the pair, shown where both states carry meaning. */
   .vault-badge--open {
     background: var(--info-bg);
     color: var(--info);

@@ -33,8 +33,7 @@
   let importText = $state("");
   let exportText = $state("");
   let testFiring = $state<string | null>(null);
-  // Display only: the engine keeps searching every seller, this just narrows
-  // what the history shows.
+  // Display only. The engine still searches every seller.
   let hitSellerFilter = $state<"all" | "online" | "ingame">("all");
 
   const LIVE_REFRESH_MS = 20_000;
@@ -93,8 +92,7 @@
   const itemRuleById = $derived(
     new Map(rules.filter((rule) => rule.kind === "item").map((rule) => [rule.id, rule])),
   );
-  // A fresh status object lands on every poll, so the time left is stamped here
-  // rather than in the card, where an unchanged end stamp would freeze it.
+  // Stamped per poll. In the card an unchanged end stamp would freeze.
   const cooldownLeftByRuleId = $derived(
     new Map<string, number>(
       Object.entries(status?.cooldowns ?? {}).map(

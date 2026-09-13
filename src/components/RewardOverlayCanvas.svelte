@@ -19,7 +19,7 @@
   const descriptor = $derived(getOverlayDescriptor(kind));
   let frame = $state<HTMLIFrameElement>();
   function selection() {
-    // The same-origin preview owns selection intent before IPC acknowledges it.
+    // The preview owns the selection before IPC acknowledges it.
     return (
       frame?.contentWindow as
         | (Window & { rewardEditorSelection?: { field?: string; select: (field: string) => void } })

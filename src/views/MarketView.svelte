@@ -345,8 +345,7 @@
       await fetchOrders();
     }
 
-    // Startup seeds this for the titlebar pill; a pop-out or a mid-session
-    // sign-in still reaches the tab with an empty status.
+    // A pop-out or mid-session sign-in reaches the tab with no status.
     if (!$marketViewState.status) {
       await refreshWfmPresence();
     }
@@ -371,8 +370,7 @@
       } else {
         marketSession.set(result);
         password = "";
-        // Signing out cleared the previous account's presence, and the pill is
-        // on every tab now, so refill it here instead of on the next tab visit.
+        // Sign-out cleared the previous account, and the pill is on every tab.
         await refreshWfmPresence();
         await fetchOrders({ clearSelection: true });
         if ($marketViewState.typeTab === "rivens") {

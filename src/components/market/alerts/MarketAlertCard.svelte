@@ -33,7 +33,6 @@
     targetName: string;
     statOptions?: RivenStatOption[];
     lastHitAt?: string | null;
-    /** Time left on the quiet window after a hit; 0 when the rule may fire. */
     cooldownLeftMs?: number;
     testing?: boolean;
     selected: boolean;

@@ -112,9 +112,8 @@
     return new Set(shownRows.map((row) => row.rowId));
   }
 
-  // The selection becomes the filtered rows, unlike the sell queue where ticks
-  // are the user's own. Every listing starts selected here, so an additive
-  // button could never narrow a run down to what the filter is showing.
+  // Replaces the selection. Every listing starts selected, so an additive
+  // button could never narrow a run down to the filtered rows.
   function selectShown(): void {
     const ids = shownIds();
     rows = rows.map((row) => ({ ...row, selected: ids.has(row.rowId) }));
@@ -140,7 +139,7 @@
 
   async function loadBooks(): Promise<void> {
     if (loading) return;
-    // One request per row, so the filters decide the bill and only selected rows are fetched.
+    // One request per row, so only the selected ones are fetched.
     const pending = rows.filter((row) => row.selected && row.sellBook === null);
     if (pending.length === 0) return;
     loading = true;

@@ -65,8 +65,7 @@
     </button>
 
     {#if open}
-      <!-- The same controls the Market header carries: a titlebar row has no
-           space for them, so the panel hangs off the pill instead. -->
+      <!-- A titlebar row has no space, so the panel hangs off the pill. -->
       <div
         class="absolute right-0 top-full z-50 mt-1 w-88 rounded border border-border bg-bg-surface p-2"
         data-wfm-status-menu

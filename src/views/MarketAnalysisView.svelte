@@ -542,8 +542,7 @@
     return {
       resolve: createAnalyticsItemResolver(db, $wfmItems, relics),
       open: (uniqueName: string): void => {
-        // The suffixed name is in the item db too, so the relic check goes
-        // first or a relic opens the generic item card.
+        // The suffixed name is in the item db too, so relics come first.
         const group = relicGroupForUniqueName(relics, uniqueName);
         if (group) {
           activeRelic.set(group);

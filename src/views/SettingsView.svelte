@@ -743,9 +743,7 @@
               <p class="m-0 mt-2 text-xs text-text-muted">{$tr("settings.channelRoutingDesc")}</p>
 
               {#each SOURCE_ROWS as row (row.source)}
-                <!-- channelState is read here instead of through channelToggles because
-                     Svelte untracks a call in a template expression: the async load would
-                     never repaint these boxes, so a remounted view sat on the default. -->
+                <!-- Read here, not through channelToggles, so the async load repaints. -->
                 {@const toggles =
                   channelState?.sources[row.source] ?? DEFAULT_SOURCE_CHANNELS[row.source]}
                 <SettingsRow

@@ -137,8 +137,7 @@
       >
     </span>
   </div>
-  <!-- ml-auto keeps the pill against the window controls: with three children
-       justify-between would centre it instead. -->
+  <!-- ml-auto, because justify-between centres a third child. -->
   <div class="app-region-no-drag ml-auto flex items-center pr-2">
     <WfmStatusPill />
   </div>

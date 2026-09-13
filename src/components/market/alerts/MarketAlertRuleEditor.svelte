@@ -52,7 +52,6 @@
     rule?: MarketAlertRule | null;
     binding?: MarketAlertBinding | null;
     statOptions?: RivenStatOption[];
-    /** Live remaining quiet time, so the button below can say what it clears. */
     cooldownLeftMs?: number;
     onClearCooldown?: (rule: MarketAlertRule) => void;
     onClose: (saved: boolean) => void;
@@ -860,8 +859,7 @@
             max: MARKET_ALERT_MAX_COOLDOWN_MINUTES,
           })}
         </span>
-        <!-- The rule card carries the same button, but a muted rule is usually
-             reopened here, so the quiet time can be ended without going back. -->
+        <!-- Also on the card, but a muted rule is usually reopened here. -->
         {#if initialRule && onClearCooldown}
           <span class="flex items-center gap-2">
             <button

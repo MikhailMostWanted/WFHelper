@@ -327,8 +327,7 @@
 
   // The catalog is English because warframe.market is. Only the label follows the
   // game language; every slug, order and chat line still goes out in English.
-  // `db` is a parameter so call sites name it; a template call is untracked, so
-  // reading $itemDb here would keep the pre-refresh name after item-db-updated.
+  // `db` arrives as a parameter so item-db-updated repaints the name.
   function catalogLabel(
     entry: { name: string; gameRef?: string | null },
     db: typeof $itemDb,
@@ -432,8 +431,7 @@
     }, FEEDBACK_TTL_MS);
   }
 
-  // The translator is a parameter because $translate read inside a function is not
-  // a dependency of the template call that renders this as a tooltip.
+  // The translator arrives as a parameter so the tooltip follows the locale.
   function buildWhisper(entry: OrderBookEntry, t: Translator): string {
     if (!selected) return "";
     const quantitySuffix = entry.quantity > 1 ? ` x${entry.quantity}` : "";

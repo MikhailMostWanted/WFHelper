@@ -22,9 +22,7 @@
     return value !== null && value !== undefined && value !== "";
   }
 
-  // `state` is a parameter, not read off the component: Svelte untracks a call in
-  // a template expression, so reading it here would leave the placeholder stuck on
-  // "..." when a lookup finishes with no data and only `state` changes.
+  // `state` arrives as a parameter so the template call tracks it.
   function valueLabel(value: MetricValue, metricState: MetricState): string {
     if (hasValue(value)) return String(value);
     return metricState === "loading" ? "..." : "-";

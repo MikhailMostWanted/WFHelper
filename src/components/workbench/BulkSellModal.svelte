@@ -114,8 +114,7 @@
   // Rows named one by one in the confirm dialog; main truncates the message.
   const CONFIRM_ROW_PREVIEW = 8;
 
-  // Display cap only. Bulk selection deliberately ignores it and acts on every
-  // filtered row, so a long queue is not silently half-ticked.
+  // Display only. Bulk ticks cover every filtered row, not this slice.
   const QUEUE_DISPLAY_CAP = 100;
 
   const FIELD_CLASS =
@@ -350,15 +349,12 @@
     replaceRow({ ...row, selected: !row.selected });
   }
 
-  /** Bulk ticks cover every filtered row, not the capped slice on screen, so the
-   *  count on the button is what actually changes. */
   function selectFiltered(next: (row: QueueRow) => boolean): void {
     const ids = new Set(filteredRows.map((row) => row.rowId));
     rows = rows.map((row) => (ids.has(row.rowId) ? { ...row, selected: next(row) } : row));
   }
 
-  /** Clears the whole queue, filters included: a row hidden right now would
-   *  otherwise stay ticked and still be listed. */
+  /** Clears hidden rows too, or a filtered-out tick would still be listed. */
   function clearSelection(): void {
     rows = rows.map((row) => (row.selected ? { ...row, selected: false } : row));
   }
