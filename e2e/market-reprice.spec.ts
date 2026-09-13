@@ -148,6 +148,9 @@ interface RepriceFixture {
   mode: "success" | "partial" | "hold" | "unauthorized";
   requests: { id: string; body: Record<string, unknown> }[];
   release?: () => void;
+  holdReads?: boolean;
+  heldReads: number;
+  releaseRead?: () => void;
 }
 
 test.describe("Market reprice through production IPC", () => {
@@ -191,7 +194,7 @@ test.describe("Market reprice through production IPC", () => {
       const { WfmApiError } = load(
         "./services/wfmTypes.js",
       ) as typeof import("../services/wfmTypes");
-      const state: RepriceFixture = { mode: "success", requests: [] };
+      const state: RepriceFixture = { mode: "success", requests: [], heldReads: 0 };
       (globalThis as typeof globalThis & { repriceFixture: RepriceFixture }).repriceFixture = state;
       const orders = Array.from({ length: 3 }, (_, index) => ({
         id: (index + 1).toString(16).padStart(24, "0"),
@@ -216,7 +219,16 @@ test.describe("Market reprice through production IPC", () => {
         body: { payload: { user: { ingame_name: "Fixture Account", platform: "pc" } } },
       });
       client.requestV2 = async (method, endpoint, options) => {
-        if (method === "GET" && endpoint === "/orders/my") return { data: structuredClone(orders) };
+        if (method === "GET" && endpoint === "/orders/my") {
+          const snapshot = structuredClone(orders);
+          if (state.holdReads) {
+            state.heldReads += 1;
+            await new Promise<void>((resolve) => {
+              state.releaseRead = resolve;
+            });
+          }
+          return { data: snapshot };
+        }
         if (method === "GET" && endpoint === "/me")
           return { data: { status: "online", ingameName: "Fixture Account" } };
         if (method === "PATCH") {
@@ -250,9 +262,10 @@ test.describe("Market reprice through production IPC", () => {
     try {
       if (harness)
         await evaluateInMain(harness.app, () => {
-          (
-            globalThis as typeof globalThis & { repriceFixture: RepriceFixture }
-          ).repriceFixture.release?.();
+          const state = (globalThis as typeof globalThis & { repriceFixture: RepriceFixture })
+            .repriceFixture;
+          state.release?.();
+          state.releaseRead?.();
         }).catch(() => {});
       expect(pageErrors).toEqual([]);
     } finally {
@@ -349,6 +362,57 @@ test.describe("Market reprice through production IPC", () => {
     expect((await requests()).map((request) => request.id)).toEqual([fixtureId(0)]);
     await harness.page.reload();
     await harness.page.locator('#sidebar [data-view="market"]').click();
+    await expectPrices([50, 11, 12]);
+  });
+
+  test("a stale background refresh cannot overwrite the in-flight reprice success", async () => {
+    await setMode("hold");
+    const modal = await openPricedModal();
+    await evaluateInMain(harness.app, () => {
+      (
+        globalThis as typeof globalThis & { repriceFixture: RepriceFixture }
+      ).repriceFixture.holdReads = true;
+    });
+    await harness.page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect
+      .poll(() =>
+        evaluateInMain(
+          harness.app,
+          () =>
+            (globalThis as typeof globalThis & { repriceFixture: RepriceFixture }).repriceFixture
+              .heldReads,
+        ),
+      )
+      .toBe(1);
+    await modal.locator("[data-reprice-apply]").click();
+    await expect.poll(async () => (await requests()).length).toBe(1);
+    await harness.page.keyboard.press("Escape");
+    await expect(modal).toHaveCount(0);
+    await evaluateInMain(harness.app, () => {
+      const state = (globalThis as typeof globalThis & { repriceFixture: RepriceFixture })
+        .repriceFixture;
+      state.mode = "success";
+      state.release?.();
+    });
+    await expectPrices([50, 11, 12]);
+    await evaluateInMain(harness.app, () => {
+      (
+        globalThis as typeof globalThis & { repriceFixture: RepriceFixture }
+      ).repriceFixture.releaseRead?.();
+    });
+    // A second background read starts only after the first stops blocking it.
+    // Keep that response held so it cannot repair a stale overwrite.
+    await expect
+      .poll(async () => {
+        await harness.page.evaluate(() => window.dispatchEvent(new Event("focus")));
+        return evaluateInMain(
+          harness.app,
+          () =>
+            (globalThis as typeof globalThis & { repriceFixture: RepriceFixture }).repriceFixture
+              .heldReads,
+        );
+      })
+      .toBe(2);
     await expectPrices([50, 11, 12]);
   });
 

@@ -620,6 +620,7 @@
 
   /** Applies sent prices in place; a refetch would resort the list under the user. */
   function onRepriced(updates: Array<{ id: string; platinum: number }>): void {
+    invalidateMarketOrdersRefresh();
     const byId = new Map(updates.map((entry) => [entry.id, entry.platinum]));
     marketOrders.update((state) => ({
       sell: state.sell.map((entry) =>
