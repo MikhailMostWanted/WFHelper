@@ -14,7 +14,7 @@ export const RELIC_TIER_ORDER: Record<string, number> = {
 
 export const QUALITY_MODES: RelicQuality[] = ["intact", "exceptional", "flawless", "radiant"];
 
-/** Int / Ex / Fl / Rad, translated at the use site so a template stays reactive. */
+/** Int / Ex / Fl / Rad. */
 export const RELIC_QUALITY_SHORT_KEY: Record<RelicQuality, MessageKey> = {
   intact: "relics.qualityShort.intact",
   exceptional: "relics.qualityShort.exceptional",

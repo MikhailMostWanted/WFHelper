@@ -3,10 +3,8 @@ import { QUALITY_MODES } from "./relicConstants.js";
 import type { RawInventoryData } from "../../types/inventory.js";
 import type { OwnedCounts, RelicDatabase, RelicGroup, RelicQuality } from "../../types/relics.js";
 
-/** The refinements of one relic the player holds, in the game's tier order and
- *  with the empty ones dropped. Counts come in as an argument: a template call
- *  in a legacy component is untracked, so reading the store inside would leave
- *  the row showing whatever ownership held when it was first drawn. */
+/** The refinements of one relic the player holds, in the game's tier order,
+ *  with the empty ones dropped. */
 export function ownedRelicQualities(
   counts: OwnedCounts,
   groupKey: string,
@@ -29,9 +27,8 @@ export function relicGroupForUniqueName(
   return ref ? (relicDb?.groups[ref.groupKey] ?? null) : null;
 }
 
-/** Group for a drop-table label ("Lith A1 Relic", "Lith A1 Relic (Radiant)").
- *  The group key is the bare "<tier> <code>", so the suffix and any refinement
- *  in parentheses are dropped before matching. */
+/** Group for a drop-table label ("Lith A1 Relic", "Lith A1 Relic (Radiant)");
+ *  the suffix and any parenthetical refinement are dropped before matching. */
 export function relicGroupForDisplayName(
   relicDb: RelicDatabase | null,
   displayName: string,

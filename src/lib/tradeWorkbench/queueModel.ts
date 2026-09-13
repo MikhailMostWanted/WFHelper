@@ -77,9 +77,8 @@ const RELIC_SUBTYPE_RE = /\b(intact|exceptional|flawless|radiant)\b/i;
 /** Relic uniqueNames spell the refinement as a suffix with no separator. */
 const RELIC_SUBTYPE_SUFFIX_RE = /(intact|exceptional|flawless|radiant)$/i;
 
-/** The parser types name as string but odd inventory rows have leaked other
- *  primitives (see 9bdc324f). Selection mode builds the whole queue from a
- *  reactive statement, so one bad row must not throw the rest away. */
+/** The parser types name as string, but odd inventory rows have leaked other
+ *  primitives (see 9bdc324f), and one bad row must not throw the queue away. */
 function queueItemName(item: ParsedItem): string {
   return typeof item.name === "string" ? item.name : String(item.name ?? "");
 }
@@ -132,10 +131,8 @@ function masteryIndex(mastery: MasteryData | null): MasteryIndex {
   return masteryIndexCache;
 }
 
-/** The one safety context both the inventory grid's eligibility pass and the
- *  bulk sell queue run on. Feeding it mastery and pins is what keeps the
- *  pinnedGoal and unmasteredRecipe rules out of `degradedRules`, where they
- *  would silently never fire. */
+/** Shared by the grid's eligibility pass and the sell queue; feeding it mastery
+ *  and pins keeps pinnedGoal/unmasteredRecipe from silently degrading. */
 export function buildSelectionSafetyContext(input: SelectionSafetyInput): SafetyContext {
   const { mastered: masteredUniqueNames, owned: ownedUniqueNames } = masteryIndex(input.mastery);
 
@@ -184,7 +181,7 @@ export function relicSubtypeFor(item: ParsedItem, resolve?: RelicQualityResolver
   return match ? match[1].toLowerCase() : "intact";
 }
 
-/** Inventory rows to workbench queue rows. Pure: market data attaches later. */
+/** Pure; market data attaches later. */
 export function buildQueueRows(
   items: readonly ParsedItem[],
   context: SafetyContext,
@@ -241,9 +238,8 @@ export function eligibleSelectionKeys(
   return keys;
 }
 
-/** Queue rows for the ticked inventory rows only. Every rank row of a selected
- *  item comes through, since they all share its selection key, and each starts
- *  ticked because the user already opted it in from the grid. */
+/** Queue rows for ticked inventory only; every rank row of a selected item comes
+ *  through since they share its selection key, and each starts ticked already. */
 export function buildSelectedQueueRows(
   items: readonly ParsedItem[],
   context: SafetyContext,
@@ -295,9 +291,8 @@ function carryQueueRow(prior: WorkbenchQueueRow, fresh: WorkbenchQueueRow): Work
   };
 }
 
-/** Rebuilds the queue for the current selection without discarding what the user
- *  already loaded: rows whose identity survived keep their order book, applied
- *  price and quantity, and rows the selection dropped fall away. */
+/** Rebuilds the queue without discarding what the user already loaded: rows whose
+ *  identity survived keep their order book, price and quantity; dropped rows fall away. */
 export function mergeQueueRows(
   previous: readonly WorkbenchQueueRow[],
   next: readonly WorkbenchQueueRow[],
@@ -310,9 +305,8 @@ export function mergeQueueRows(
   });
 }
 
-/** Strips everything that came from a fetched order book, so an aged queue
- *  re-prices before it can execute. Quantities and typed prices are the user's
- *  own input and stay; `market` is derived from the book and goes with it. */
+/** Strips fetched order-book data so an aged queue re-prices before it can execute.
+ *  Quantities and typed prices are the user's own input and stay. */
 export function dropStaleMarketData(
   rows: readonly WorkbenchQueueRow[],
 ): readonly WorkbenchQueueRow[] {
@@ -515,9 +509,8 @@ function matchesQueueListed(row: WorkbenchQueueRow, listed: QueueListedFilter): 
   return listed === "listed" ? row.existingOrder != null : row.existingOrder == null;
 }
 
-/** Every matching row, uncapped: the display cap belongs to the view. A filter
- *  is a view over the queue and never touches `selected`, so a hidden row the
- *  user ticked earlier still goes out with the plan. */
+/** Every matching row, uncapped (the display cap belongs to the view). A filter
+ *  never touches `selected`, so a hidden ticked row still goes out with the plan. */
 export function filterQueueRows(
   rows: readonly WorkbenchQueueRow[],
   filter: QueueRowFilter = {},

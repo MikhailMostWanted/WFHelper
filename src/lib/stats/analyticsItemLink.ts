@@ -23,9 +23,8 @@ export function createAnalyticsItemResolver(
       displayName: (name ?? "").trim(),
     });
     if (direct) return direct;
-    // warframe.market sells one listing per relic while DE keys every
-    // refinement with a metal suffix, so a relic gameRef is never an item
-    // database key and every relic row resolved to null.
+    // warframe.market sells one listing per relic while DE keys every refinement
+    // with a metal suffix, so a relic gameRef is never an item database key.
     return relicGroupForDisplayName(relicDb, name ?? "")?.qualities.intact?.uniqueName ?? null;
   };
 }

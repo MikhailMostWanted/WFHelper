@@ -48,9 +48,8 @@ export function initStartup(options: StartupOptions = {}): StartupHandle {
 
   startupPriceCacheReady.set(false);
 
-  // The steps below are independent, so they run concurrently: a slow (or
-  // missing) snapshot network fetch must not hold the local IPC loads hostage;
-  // worst-case startup is max(network, local), not their sum.
+  // These steps are independent and run concurrently: a slow snapshot fetch must
+  // not hold up local IPC loads; worst case is max(network, local), not their sum.
   void (async () => {
     // Hotset and snapshot both write the shared price caches, so only these
     // two stay ordered relative to each other.
@@ -93,9 +92,8 @@ export function initStartup(options: StartupOptions = {}): StartupHandle {
       }
     })();
 
-    // Main pushes inventory once, on the window's first load. A reload past that
-    // point kept the stores empty until the helper next rewrote the file, so pull
-    // it here too; onInventoryLoaded is idempotent and a push may still beat us.
+    // Main pushes inventory once, on first load. A reload after that leaves stores
+    // empty until the next file write, so pull it here too; onInventoryLoaded is idempotent.
     const inventoryTask = (async () => {
       try {
         const stageStart = Date.now();
@@ -242,8 +240,7 @@ export function initStartup(options: StartupOptions = {}): StartupHandle {
 }
 
 /** Watches saved bulk sell selections for the moment every key becomes owned.
- *  It lives here, not in a view, because views mount lazily and the inventory
- *  can complete a set while the user is on any other tab. */
+ *  Lives here, not in a view, since views mount lazily and completion can happen anytime. */
 function watchSelectionAlerts(): () => void {
   let evaluating = false;
   // Completeness is recorded only once the notification landed, so a rejected
@@ -271,9 +268,8 @@ function watchSelectionAlerts(): () => void {
         const owned = selectionOwnership(selection, items).owned;
         void invoke("notifySelectionComplete", { name: selection.name, owned })
           .then(() => {
-            // The set can break while the notify is in flight, and recording it
-            // complete then would disarm an alert that has to fire again. An empty
-            // list is a reload rather than a loss, same rule as the subscriber.
+            // The set can break while the notify is in flight; recording it complete
+            // then would disarm an alert that must fire again (empty list = reload, not loss).
             const current = get(parsedItems);
             recordSelectionCompleteness(
               selection.name,

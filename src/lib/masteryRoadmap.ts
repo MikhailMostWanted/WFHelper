@@ -92,19 +92,16 @@ const ACCESS_PRIORITY: Record<MasteryRoadmapAccess, number> = {
   marketBlueprint: 6,
 };
 
-// Parts in the foundry are neither owned nor missing, so relics and platinum both
-// read the set as complete and drop the item. The foundry copy only covers one
-// required unit, which keeps a short build resource missing.
+// Parts in the foundry are neither owned nor missing, so relics and platinum
+// read the set as complete. A foundry copy covers only one required unit.
 function partsWaitingInFoundry(item: MasteryRoadmapSourceItem): boolean {
   if (item.components.length === 0) return false;
   if (!item.components.some((component) => component.building === true)) return false;
   return missingMasteryComponents(item.components).length === 0;
 }
 
-// Only worth calling easy when the blueprint is the last thing missing. A
-// warframe whose chassis is still unfarmed stays in the relic and platinum
-// lists, where its parts are actually priced, instead of reading as one credit
-// purchase away.
+// Only counts as easy when the blueprint is the last thing missing; an item
+// with unfarmed parts stays in the relic/platinum lists where they get priced.
 function marketBlueprintFinishesIt(item: MasteryRoadmapSourceItem): boolean {
   if (!item.marketBuyable) return false;
   const missing = missingMasteryComponents(item.components);

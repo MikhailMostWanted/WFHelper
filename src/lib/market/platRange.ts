@@ -1,6 +1,5 @@
-// A plat bound the user typed applies to both selling lists, so the rule for a
-// row whose price is not known yet lives in one place: it drops out of the list
-// instead of quietly passing a filter it was never measured against.
+// A plat bound applies to both selling lists, so how to treat a row whose price
+// is unknown lives here: it drops out instead of quietly passing an unmeasured filter.
 
 export interface PlatRange {
   min: number | null;

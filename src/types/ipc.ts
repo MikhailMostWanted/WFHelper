@@ -199,8 +199,7 @@ import type {
   OverlayDescriptor,
 } from "../../config/shared/overlayLayout.js";
 
-/** The engine status plus the live per-rule cooldowns. Main composes the two so
- *  the cooldowns ride the poll the alerts view already runs. */
+/** The engine status plus the live per-rule cooldowns. */
 export interface MarketAlertStatusPayload extends MarketAlertEngineStatus {
   /** Rule id to cooldown end, epoch ms; a rule not in cooldown is absent. */
   cooldowns: Record<string, number>;
