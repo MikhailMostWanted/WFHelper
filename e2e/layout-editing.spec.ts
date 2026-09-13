@@ -7,8 +7,48 @@ import {
   type ElectronTestHarness,
   setLayoutViewport,
 } from "./electronTestHarness";
+import { createOfflineScenario } from "./offlineScenario";
 
 const LAYOUT_KEY = "wf_layout_v1";
+
+test.describe("Offline World scenarios", () => {
+  test.setTimeout(120_000);
+
+  test("a held response renders loading until the fixture is released", async () => {
+    const scenario = createOfflineScenario("world-loading");
+    let harness: ElectronTestHarness | undefined;
+    try {
+      harness = await launchElectronTestHarness("wfh-world-loading-", scenario);
+      await openView(harness.page, "world");
+      await expect(harness.page.locator("section.view.active > .empty-state")).toContainText(
+        "Loading world data...",
+      );
+      await harness.page.screenshot({ path: test.info().outputPath("world-loading.png") });
+      await scenario.releaseWorld(harness.app);
+      await expect(harness.page.locator('[data-layout-section="world.darvo"]')).toBeVisible();
+      scenario.assertNoUnexpectedRequests();
+    } finally {
+      await closeElectronTestHarness(harness);
+      scenario.dispose();
+    }
+  });
+
+  test("unavailable world sources render the fallback layout without a fabricated deal", async () => {
+    const scenario = createOfflineScenario("world-unavailable");
+    let harness: ElectronTestHarness | undefined;
+    try {
+      harness = await launchElectronTestHarness("wfh-world-unavailable-", scenario);
+      await openView(harness.page, "world");
+      await expect(harness.page.locator('[data-layout-grid="world"]')).toBeVisible();
+      await expect(harness.page.locator('[data-layout-section="world.darvo"]')).toHaveCount(0);
+      await harness.page.screenshot({ path: test.info().outputPath("world-unavailable.png") });
+      scenario.assertNoUnexpectedRequests();
+    } finally {
+      await closeElectronTestHarness(harness);
+      scenario.dispose();
+    }
+  });
+});
 
 // Stats is the cheapest wrapped view to drive: both of its grid sections render
 // with no inventory, no world state and no network.
@@ -17,15 +57,20 @@ test.describe("Per-view layout editing", () => {
 
   let harness: ElectronTestHarness;
   let page: Page;
+  let scenario: ReturnType<typeof createOfflineScenario>;
 
   test.beforeAll(async () => {
-    harness = await launchElectronTestHarness("wfh-layout-edit-e2e-");
+    scenario = createOfflineScenario("world-darvo");
+    harness = await launchElectronTestHarness("wfh-layout-edit-e2e-", scenario);
     page = harness.page;
   });
 
   test.afterAll(async () => {
     await closeElectronTestHarness(harness);
+    scenario?.dispose();
   });
+
+  test.afterEach(() => scenario.assertNoUnexpectedRequests());
 
   function order(): Promise<string[]> {
     return page
@@ -187,9 +232,9 @@ test.describe("Per-view layout editing", () => {
     await openView(page, "world");
 
     const grid = page.locator('[data-layout-grid="world"]');
-    await grid.waitFor({ state: "visible", timeout: 60_000 }).catch(() => undefined);
+    await expect(grid).toBeVisible();
     const darvo = page.locator('[data-layout-section="world.darvo"]');
-    test.skip((await darvo.count()) === 0, "this world state carries no Darvo deal");
+    await expect(darvo).toBeVisible();
     await expect(grid).toHaveAttribute("data-layout-breakpoint", "wide");
 
     const toggle = page.locator('[data-layout-edit-toggle="world"]');
@@ -228,20 +273,7 @@ test.describe("Per-view layout editing", () => {
       return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     };
 
-    // The live world state keeps landing for a while and every arrival reflows
-    // the grid, so a handle measured too early is grabbed at a stale spot.
     const handle = page.locator('[data-layout-handle="world.darvo"]');
-    await expect
-      .poll(
-        async () => {
-          const a = await center("world.darvo");
-          await page.waitForTimeout(400);
-          const b = await center("world.darvo");
-          return a.x === b.x && a.y === b.y;
-        },
-        { timeout: 20_000 },
-      )
-      .toBe(true);
     await handle.hover();
     await page.mouse.down();
     const drop = await center(target.id);
@@ -268,6 +300,7 @@ test.describe("Per-view layout editing", () => {
     expect(await bystanders()).toEqual(settledBystanders);
 
     if ((await toggle.getAttribute("aria-pressed")) === "true") await toggle.click();
+    await page.screenshot({ path: test.info().outputPath("world-darvo-offline.png") });
     await setLayoutViewport(page, 1280, 820);
   });
 
