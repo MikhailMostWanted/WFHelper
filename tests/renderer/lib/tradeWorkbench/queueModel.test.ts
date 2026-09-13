@@ -163,9 +163,8 @@ describe("workbench queue selection", () => {
     // Quantity never exceeds what the account holds.
     expect(setRowQuantity(row, 99).quantity).toBe(2);
 
-    // What the modal does when the safety settings change under a built queue:
-    // re-running the row's own quantity against a smaller verdict clamps it, so
-    // the caller needs no clamp of its own.
+    // Re-running a row's quantity against a smaller verdict clamps it, so the
+    // caller needs no clamp of its own.
     const sold = setRowQuantity(
       { ...row, verdict: { ...row.verdict, total: 1, safe: 1, reserved: 0 } },
       row.quantity,
@@ -311,7 +310,6 @@ describe("workbench queue selection", () => {
     );
     expect(rows[0].verdict.safe).toBe(5);
 
-    // The user locks the item after the queue was built.
     const lockedCtx = buildSafetyContext({
       itemDb: {},
       settings: {
@@ -388,8 +386,7 @@ describe("inventory selection join", () => {
   });
 
   it("skips an inventory row whose name is not a string instead of throwing", () => {
-    // A non-string name once crashed every market join. This runs from the reactive
-    // statement that owns selection mode, so one bad row would take the whole queue.
+    // One bad row's name must not crash the whole market join.
     const broken = makeItem("Broken", { name: 117 as unknown as string, inventoryKey: "broken#0" });
     const sellable = makeItem("Lex Prime Barrel", { inventoryKey: "lex#0" });
     const lookup = lookupFor({ name: "Lex Prime Barrel", slug: "lex_prime_barrel" });
@@ -776,7 +773,6 @@ describe("workbench queue filtering", () => {
     return { ...row, ...overrides };
   }
 
-  /** A row whose only known price is the cheapest competing listing. */
   function priced(name: string, platinum: number): WorkbenchQueueRow {
     return attachMarketData(queueRow(name), sellBook(platinum), null, []);
   }

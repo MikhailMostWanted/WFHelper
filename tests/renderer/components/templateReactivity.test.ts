@@ -7,9 +7,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 // Svelte wraps a call inside a template expression in untrack, so only the
-// bindings spelled out in the expression are its dependencies. A helper that
-// reads component state internally renders once and never repaints; these
-// components shipped that bug, and the fix passes the state in as an argument.
+// bindings spelled out in the expression are tracked as its dependencies.
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -86,7 +84,6 @@ describe("template expressions keep their state dependency textual", () => {
     const generated = compileComponent("src/components/MarketMetricStrip.svelte");
     const sites = trackedDependenciesFor(generated, "valueLabel");
 
-    // platinum, ducats and ratio
     expect(sites).toHaveLength(3);
     for (const deps of sites) {
       // without this the placeholder stays "..." when a lookup ends with no data

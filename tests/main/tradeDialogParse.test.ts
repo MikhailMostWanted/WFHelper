@@ -106,8 +106,7 @@ describe("_parseTradeDialog corruption hardening", () => {
 });
 
 // The dialog description separates items with a bare CR, which the log reader
-// does not treat as a line break - the engine can flush the next entry behind
-// one and glue it to the last item. Reported 2026-09 as a 12p sale read as 0p.
+// does not treat as a line break, so the engine can flush the next entry behind one.
 const GLYPH = String.fromCharCode(0xe000);
 const DIALOG_HEAD =
   "2416.657 Script [Info]: Dialog.lua: Dialog::CreateOkCancel(description=" +
@@ -115,7 +114,6 @@ const DIALOG_HEAD =
 const DIALOG_TAIL = ", title= leftItem=/Menu/Confirm_Item_Ok, rightItem=/Menu/Confirm_Item_Cancel)";
 const NEXT_ENTRY = "2416.702 Sys [Info]: Fade out complete";
 
-/** Buffer the reader builds from raw bytes: split on LF, drop empty lines. */
 function bufferFromRawLog(raw: string): string[] {
   return raw.split(/\r?\n/).filter((line) => line !== "");
 }

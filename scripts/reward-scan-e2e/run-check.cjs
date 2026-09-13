@@ -33,9 +33,8 @@ function parseReaderFilter(raw) {
 
 const ROOT = path.resolve(__dirname, "..", "..");
 
-// expected item name per slot index; info screens report but do not gate.
-// expectMeta pins scan meta fields; cardCount>0 with layoutCount 1 is the proof
-// the card-bar counter answered the frame and its layout drove every read.
+// expect pins the item name per slot (info screens report only, no gate).
+// expectMeta (e.g. cardCount>0, layoutCount 1) proves the counter drove the read.
 const SCREENS = [
   {
     file: "synthetic-clean.png",
@@ -105,10 +104,8 @@ const SCREENS = [
       3: "Wukong Prime Chassis Blueprint",
     },
   },
-  // 4K frames hand the readers title strips twice the size they were tuned on.
-  // Upscaled from real-4p, so it pins the size handling, not 4K glyph rendering.
-  // Windows band-OCR loses the wrapped slot-4 title here, as it does on other
-  // merged-wrap screens.
+  // Upscaled from real-4p, so it pins size handling, not 4K glyph rendering; title
+  // strips arrive twice the tuned size, and Windows band-OCR loses the wrapped slot-4 title.
   {
     file: "sim-4k-4p.png",
     readers: ["onnx", "both"],

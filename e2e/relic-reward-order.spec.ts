@@ -11,7 +11,6 @@ import {
   type ElectronTestHarness,
 } from "./electronTestHarness";
 
-// @wfcd hands a relic over rare first, which is the order the card used to draw.
 const SOURCE_REWARDS: RelicReward[] = [
   { name: "Rare Drop", rarity: "Rare", chance: 2, urlName: "rare_drop", ducats: 100 },
   { name: "Uncommon A", rarity: "Uncommon", chance: 11, urlName: "uncommon_a", ducats: 45 },

@@ -14,9 +14,8 @@ function shotPath(name: string): string {
   return test.info().outputPath(name);
 }
 
-// A fresh sandbox has no supporters cache, so the panel would only appear if a
-// live backend answered in time. Seeding the cache makes the layout
-// deterministic; loadSupporters() returns a fresh cache without fetching.
+// The panel only renders with a supporters cache; seeding one keeps the layout
+// deterministic since loadSupporters() then returns it without fetching.
 const SUPPORTERS_CACHE = JSON.stringify({
   cachedAt: Date.now(),
   supporters: [
@@ -219,10 +218,8 @@ test.describe("Settings rows degrade without colliding", () => {
     await page.screenshot({ path: test.info().outputPath("settings-supporters-wide.png") });
   });
 
-  // The About rows are a label beside a link, and the narrowest masonry column
-  // lands around 1040px. Each row keeps label and link on one line or stacks
-  // them, never splitting into two ragged columns. A raised font scale is what
-  // makes the row narrow enough for the difference to show.
+  // The narrowest masonry column lands around 1040px; each row keeps label and
+  // link on one line or fully stacks, and a raised font scale is what forces it to show.
   test("Settings About and Supporters cards stay readable when the window narrows", async () => {
     await setFontScale(page, 1.25);
 
@@ -289,9 +286,8 @@ test.describe("Settings rows degrade without colliding", () => {
     await setFontScale(page, null);
   });
 
-  // The boxes used to be painted from a default that the async channel load
-  // never repainted, so leaving settings and coming back dropped the webhook
-  // tick while main kept routing notifications to it.
+  // The async channel load must not repaint these checkboxes back to their default
+  // when settings remounts, or a re-checked box would silently revert.
   test("notification channel boxes survive leaving settings", async () => {
     await openSettings(page, 1100);
     const boxes = () =>

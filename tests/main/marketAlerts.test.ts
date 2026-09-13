@@ -659,7 +659,7 @@ describe("cooldown and dedup", () => {
     await runMarketAlertTickForTest();
     expect(mocks.requestMock).toHaveBeenCalledTimes(1);
 
-    // The reported workaround: off, then on, to get the rule checking again.
+    // Disabling then re-enabling a rule clears its cooldown.
     setMarketAlertRuleEnabled("rule-riven", false);
     setMarketAlertRuleEnabled("rule-riven", true);
     expect(getMarketAlertCooldowns()["rule-riven"]).toBeUndefined();
@@ -899,10 +899,8 @@ describe("engine plumbing", () => {
       );
     }
     initEngine();
-    // setSystemTime, not advanceTimersByTime: letting the engine's own interval
-    // fire would hand out extra slots and hide the starvation entirely.
-    // Four ticks at four requests each is enough only if the oldest waiter goes
-    // first; array order never reaches the last two rules.
+    // setSystemTime avoids extra slots from the engine's own interval hiding starvation.
+    // Four ticks cover all 14 rules only because the oldest waiter always goes first.
     const start = Date.now();
     for (let t = 0; t < 4; t++) {
       vi.setSystemTime(start + t * 60_000);
@@ -1192,9 +1190,8 @@ describe("soak: hours of evaluation under 429s", () => {
     saveOk(rivenRuleRaw());
     initEngine();
 
-    // Phase A: four hours of continuous 429s. The per-rule backoff doubles
-    // 5 -> 10 -> 20 -> 40 -> 60 and then holds the 60 minute ceiling, so the
-    // engine sends a handful of requests, not hundreds of ticks' worth.
+    // Phase A: 429s for four hours. Backoff doubles 5 -> 10 -> 20 -> 40 -> 60 then
+    // holds, so the engine sends a handful of requests, not hundreds of ticks' worth.
     await vi.advanceTimersByTimeAsync(4 * 60 * 60_000);
     const phaseACalls = mocks.requestMock.mock.calls.length;
     expect(phaseACalls).toBeGreaterThanOrEqual(5);

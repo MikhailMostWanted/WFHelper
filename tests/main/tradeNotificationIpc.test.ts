@@ -173,8 +173,7 @@ function sale(partner: string): TradeMatchPayload {
   };
 }
 
-// Buying through warframe.market means whispering somebody else's sell order,
-// which closes no listing of ours, so the toast arrives with no order id.
+// Buying on warframe.market closes no listing of ours, so purchases carry no order id.
 function purchase(partner: string): TradeMatchPayload {
   return { ...sale(partner), orderId: "", type: "purchase" };
 }

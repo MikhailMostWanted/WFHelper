@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-// Runs a command on a separate Windows desktop so the Electron windows that tests and
-// harnesses launch never appear on screen. Playwright screenshots still work: they come
-// from Chromium, not from the visible desktop. On other platforms the command runs as is.
+// Runs a command on a separate Windows desktop so Electron windows never reach the screen;
+// Playwright screenshots still work since they come from Chromium, not the visible desktop.
 import { spawn, spawnSync } from "node:child_process";
 import process from "node:process";
 

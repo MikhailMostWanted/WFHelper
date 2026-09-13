@@ -90,8 +90,7 @@ describe("resolveRepOffer", () => {
     expect(resolveRepOffer(purchase, "close-failed", enabled)).not.toBeNull();
   });
 
-  // Buying on warframe.market means whispering somebody else's sell order, which
-  // closes no listing of ours, so the common case arrives with no order id.
+  // Buying on warframe.market closes no listing of ours, so this case has no order id.
   it("offers rep for a purchase that matched no order once the orders were checked", () => {
     const purchase = { ...match("Serration", 20), type: "purchase" as const, orderId: "" };
     expect(resolveRepOffer(purchase, "no-match", enabled)).toEqual({
