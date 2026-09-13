@@ -152,9 +152,8 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
-// The AUMID shortcut lets Windows route toasts through Focus Assist correctly.
-// Packaged only: process.execPath is the Electron binary in a dev or E2E run, so
-// writing then would repoint the installed app's Start Menu entry at node_modules.
+// The AUMID shortcut routes toasts through Focus Assist. Packaged-only: in dev or
+// E2E, process.execPath is the Electron binary; writing then repoints it at node_modules.
 function ensureStartMenuShortcut(): void {
   if (process.platform !== "win32" || !electronModule.app?.isPackaged) return;
   try {
@@ -259,9 +258,8 @@ function notificationSoundEnabled(): boolean {
 const SOUND_MIN_GAP_MS = 3_000;
 let _lastSoundAt = 0;
 
-// The two are exclusive on purpose. The app's own clip is billed to WFHelper in
-// the volume mixer, so its slider applies; the system sound is billed to System
-// Sounds, so that slider applies instead. Neither one obeys both.
+// The two are exclusive: the app's own clip is billed to WFHelper in the volume mixer
+// (its slider applies); the system sound is billed to System Sounds instead.
 const TOAST_SILENT_AUDIO = '<audio silent="true"/>';
 // loop="false" is required: the incomingCall scenario below defaults to looping.
 const TOAST_SYSTEM_AUDIO = '<audio src="ms-winsoundevent:Notification.Default" loop="false"/>';
@@ -413,10 +411,8 @@ function sendDesktopNotification(title: string, body: string): void {
   });
 }
 
-/** Sends a toast. History is recorded before the platform gate, so a caller
- *  that reaches here still leaves an entry on a system that cannot show toasts;
- *  a caller whose own settings gate turned it away never reaches here and
- *  records nothing. */
+/** Sends a toast; history is recorded before the platform gate, so even a system that
+ *  can't show toasts still gets a logged entry (a settings-gated caller never reaches here). */
 export function sendDesktopNotificationRaw(
   title: string,
   body: string,
@@ -744,9 +740,8 @@ function register(
     throw new Error("IPC main bridge is unavailable");
   }
 
-  // Settings needs a way to see a notification without waiting for a cycle, a
-  // whisper or a trade. It bypasses the per-feature gates, so it exists only
-  // where the dev-mode button that calls it does.
+  // Lets Settings show a notification without waiting for a cycle, whisper or trade.
+  // Bypasses the per-feature gates, so it exists only where the dev-mode button calls it.
   if (!electronModule.app?.isPackaged) {
     ipc.handle(NOTIFICATION_TEST, async (event: unknown) => {
       assertAuthorizedSender(assertMainRendererSender, event as never, NOTIFICATION_TEST);
@@ -779,9 +774,8 @@ function register(
   _registered = true;
 
   const quitEmitter = options.app ?? (electronModule.app as QuitEmitter | undefined);
-  // Not once: quit is deferred and re-fired while the DBWIN worker stops, and a
-  // toast raised in that window would otherwise never be pulled. Removing an
-  // empty set is a no-op, so the extra call costs nothing.
+  // Not once: quit is deferred and re-fired while the DBWIN worker stops, so a toast
+  // raised in that window would otherwise never be pulled; removing an empty set is free.
   if (typeof quitEmitter?.on === "function") {
     quitEmitter.on("before-quit", removeOutstandingToasts);
   }

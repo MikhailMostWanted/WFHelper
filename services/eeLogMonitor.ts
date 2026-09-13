@@ -306,9 +306,8 @@ function pollReadNewBytes(): void {
   }
 }
 
-/** Consume EE.log bytes already on disk now instead of waiting for the next 500ms
- * tick. Only moves the needle on a backlog past one tick's 2 MiB read cap; the
- * engine's lazy flush is what delays fresh lines, and no poll shortens that. */
+/** Consume EE.log bytes already on disk instead of waiting for the next 500ms tick.
+ *  Only helps a backlog past one tick's 2 MiB cap; lazy flush delay is unaffected. */
 export function forceEeLogPoll(): void {
   pollReadNewBytes();
 }
@@ -512,7 +511,6 @@ function handleLine(line: string, source: "dbwin" | "file" = "file"): void {
   }
 }
 
-/** Parse the buffered trade confirmation dialog. */
 export function _parseTradeDialog(lines: string[]): ParsedLogTrade | null {
   const text = lines.join("\n");
 
@@ -576,7 +574,6 @@ export function _parseTradeDialog(lines: string[]): ParsedLogTrade | null {
   const offered = parseItemBlock(offeringBlock);
   const received = parseItemBlock(receivingBlock);
 
-  // Determine trade type and plat
   const platGained = received.plat;
   const platSpent = offered.plat;
   const isSale = platGained > 0 && platSpent === 0;

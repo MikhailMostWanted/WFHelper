@@ -1,6 +1,5 @@
-// The game lists a relic's drops common first with the rare last, while @wfcd
-// hands them over the other way round. The planner overlay wants rare first,
-// because its slot n is named after the rarity it shows.
+// The game lists drops common-first, @wfcd hands them rare-first. The planner
+// overlay wants rare-first because its slot n is named after the rarity it shows.
 type RelicRewardOrder = "common-first" | "rare-first";
 
 const RELIC_RARITY_RANK: Readonly<Record<string, number>> = Object.freeze({

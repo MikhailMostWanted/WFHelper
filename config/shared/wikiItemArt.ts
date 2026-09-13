@@ -1,7 +1,5 @@
-// Hand-kept, unlike the generated wikiModArt.ts: items whose DE art does not
-// survive a thumbnail. The tauforged Green, Orange and Violet plates are
-// near-transparent haze, so the whole tauforged set takes wiki art instead.
-// Source: wiki.warframe.com (CC BY-SA); see scripts/icon-mirror/README.md.
+// Hand-kept, unlike generated wikiModArt.ts: items whose DE art does not survive a
+// thumbnail (tauforged plates render as near-transparent haze); wiki.warframe.com, CC BY-SA.
 export const WIKI_ITEM_ART: Readonly<Record<string, string>> = Object.freeze({
   "/Lotus/Types/Gameplay/NarmerSorties/ArchonCrystalAmarMythic": "TauforgedCrimsonArchonShard",
   "/Lotus/Types/Gameplay/NarmerSorties/ArchonCrystalBorealMythic": "TauforgedAzureArchonShard",

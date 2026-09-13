@@ -25,9 +25,8 @@
   outline-offset: 2px;
 }
 
-/* The editor's scale wants a top-left anchor, but the field tag lands on the
-   scan spinner too and made its ring orbit the corner instead of turning in
-   place. Specificity here beats the plain .scan-spinner rule in each overlay. */
+/* The editor's scale wants a top-left anchor, but the field tag also lands on the
+   scan spinner, making its ring orbit the corner; this beats the plain .scan-spinner rule. */
 .scan-spinner[data-reward-field] {
   transform-origin: center;
 }

@@ -40,9 +40,8 @@ export interface TradeRepOffer {
   hotkey: string;
 }
 
-/** Whether warframe.market can be credited for the trade. A listing of ours
- *  proves it; buying closes no listing, so there the proof is that we compared
- *  the trade against our own orders and found none. */
+/** Whether warframe.market can be credited for the trade. A listing of ours proves
+ *  it; for a purchase, the proof is that we checked our own orders and found none. */
 function repTradeIsAttributable(
   match: TradeMatchPayload,
   status: TradeNotificationStatus,

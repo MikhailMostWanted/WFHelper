@@ -1,6 +1,5 @@
-/** Market alert engine: one evaluation loop over the saved rules, main-process
- *  only, alive with every view unmounted. All WFM traffic rides wfmClient at
- *  background priority; hits dedup across restarts via a persisted seen file. */
+/** Market alert engine: one evaluation loop over the saved rules, main-process only.
+ *  WFM traffic rides wfmClient at background priority; hits dedup via a persisted seen file. */
 
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -284,9 +283,8 @@ async function wfmGetV2(path: string): Promise<unknown> {
   return wfmClient.requestV2("GET", path, { priority: "background" });
 }
 
-// Raw auction fields the engine reads. Parsed here instead of widening the
-// shared WfmRawAuction type: an unexpected shape must degrade to a skipped
-// auction, never to a thrown tick.
+// Raw auction fields the engine reads, parsed here instead of widening the shared
+// WfmRawAuction type: an unexpected shape must degrade to a skipped auction, not a thrown tick.
 interface AuctionView {
   id: string;
   seller: string;
@@ -350,9 +348,8 @@ function parseAuctionViews(raw: unknown): AuctionView[] {
 
 function buildRivenSearchPath(match: RivenAlertMatch): string {
   let path = `/auctions/search?type=riven&weapon_url_name=${encodeURIComponent(match.weaponUrlName)}`;
-  // The stat keys are a server-side AND and WFM ignores `similarity`, so only an
-  // all-required rule may push its positives; a partial-match rule would have the
-  // rolls it wants filtered out. Only a one-entry curse list is safe: two would AND.
+  // WFM's stat keys AND server-side and ignore `similarity`, so only an all-required
+  // rule may push positives; only a one-entry curse list is safe since two would AND.
   const pushPositive = (match.minSimilarityPct ?? 100) >= 100;
   const allowed = match.allowedNegatives ?? [];
   const pushNegative = match.hasNegative === true && allowed.length === 1 ? allowed : [];
@@ -482,9 +479,8 @@ interface OrderView {
   quantity: number;
 }
 
-// Reads both envelopes: v2 `{ data: [...] }` with `type` / `user.ingameName`
-// is what the engine fetches; the v1 field names stay accepted for fixtures
-// and for the day the endpoint is swapped again.
+// Reads both envelopes: v2 `{ data: [...] }` is what the engine fetches; v1 field
+// names stay accepted for fixtures and for a future endpoint swap.
 function parseOrderViews(raw: unknown): OrderView[] {
   const orders = extractWfmOrderList(raw);
   if (!orders) return [];
@@ -493,9 +489,8 @@ function parseOrderViews(raw: unknown): OrderView[] {
     if (!isRecord(entry) || typeof entry.id !== "string") continue;
     if (entry.visible === false) continue;
     const user = isRecord(entry.user) ? entry.user : {};
-    // v2 requests carry Crossplay: true, so the answer holds console and mobile
-    // sellers; only one with crossplay on can trade with a PC account. A row
-    // that names no platform is kept: silencing every unlabelled order is worse.
+    // v2 requests carry Crossplay: true, so the answer includes console/mobile sellers;
+    // only crossplay-on ones can trade with PC. An unlabelled row is kept, never silenced.
     const platform = parseOrderPlatform(entry);
     if (platform !== null && platform !== "pc" && user.crossplay !== true) continue;
     const side = parseOrderType(entry);
@@ -708,9 +703,8 @@ function clearLastErrorForRule(id: string): void {
 async function runRule(rule: MarketAlertRule): Promise<void> {
   try {
     const outcome = await evaluateRule(rule, false);
-    // A delete, an edit or a stop landing while the request was in flight: the
-    // result must not resurrect seen buckets, hits or pacing state, and a
-    // teardown must not have the seen and hits files rewritten under it.
+    // A delete, edit or stop landing mid-request must not resurrect seen buckets, hits
+    // or pacing state, nor let a teardown rewrite the seen/hits files under it.
     if (_stopped || !isCurrentRule(rule)) return;
     const now = Date.now();
     _failureCount.delete(rule.id);
@@ -741,9 +735,8 @@ async function runRule(rule: MarketAlertRule): Promise<void> {
   }
 }
 
-/** Drops the quiet window and the eval spacing, including any failure backoff,
- *  so the rule runs on the next tick. Forcing a retry is the whole point: the
- *  count is kept only to size the next backoff if it fails again. */
+/** Drops the quiet window and eval spacing (including failure backoff) so the rule
+ *  runs next tick; the failure count is kept only to size the next backoff. */
 function clearRuleCooldown(id: string): void {
   _cooldownUntil.delete(id);
   _nextEvalAt.delete(id);
@@ -765,9 +758,8 @@ async function tick(): Promise<void> {
     // background alerts must never compete with a recovering scheduler.
     if (getWfmSchedulerHealth().state !== "ok") return;
     const now = Date.now();
-    // Longest-waiting first, over a snapshot: array order plus the per-tick cap
-    // starved every rule past the twelfth, and the live array is spliced by a
-    // delete that can land mid-tick.
+    // Longest-waiting first, over a snapshot: plain array order plus the per-tick cap
+    // would starve later rules, and the live array can be spliced by a mid-tick delete.
     const due = state()
       .rules.filter((rule) => isDue(rule, now))
       .sort((a, b) => (_nextEvalAt.get(a.id) ?? 0) - (_nextEvalAt.get(b.id) ?? 0))

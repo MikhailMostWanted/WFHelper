@@ -16,9 +16,8 @@ export type SendRepResult =
 const REVIEW_REDIRECT = /^https:\/\/api\.warframe\.market\/v1\/profile\/([^/?#]+)\/review\/?$/;
 const REDIRECT_STATUSES = new Set([301, 302, 307, 308]);
 
-/** The review path WFM redirected a POST to, or null. The probe already covers
- *  the common case; this catches a failed or stale probe, when WFM answers the
- *  POST itself with a 301 to the lowercase slug and never re-sends the body. */
+/** The review path WFM redirected a POST to, or null. Catches a failed or stale
+ *  probe: WFM answers the POST with a 301 to the lowercase slug, never re-sending the body. */
 function redirectedReviewPath(err: unknown): string | null {
   if (!(err instanceof WfmApiError) || !err.status || !REDIRECT_STATUSES.has(err.status))
     return null;

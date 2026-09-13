@@ -7,9 +7,8 @@ const log = withScope("wfmProfileSlug");
 
 const SLUG_FROM_LOCATION = /\/profile\/([^/?#]+)\/reviews\/?$/;
 
-/** Where a profile name lives on warframe.market. "unresolved" is the lookup
- *  failing rather than an answer, so a caller that writes must refuse instead of
- *  falling back to the name: a near miss lands on a different real user. */
+/** Where a profile name lives on warframe.market. "unresolved" means the lookup
+ *  failed, so a caller that writes must refuse rather than fall back to the name. */
 type ProfileSlugResolution =
   | { kind: "resolved"; slug: string }
   | { kind: "not-found" }
@@ -27,10 +26,8 @@ function decodedSlug(captured: string): string | null {
   }
 }
 
-/** A HEAD that did not redirect means one of three things alike: WFM serves the
- *  name itself, there is no such profile, or the probe failed. The account route
- *  tells them apart, but it is keyed by the minted slug and is case sensitive
- *  ("seganku" answers, "Seganku" 404s), so the name is folded before asking. */
+/** A HEAD with no redirect is ambiguous (served as-is, no profile, or probe failed).
+ *  The account route disambiguates but is case sensitive, so the name is folded first. */
 async function confirmServedName(name: string): Promise<ProfileSlugResolution> {
   const candidate = sanitizeWfmSlug(name.toLowerCase());
   if (!candidate) return { kind: "not-found" };
@@ -53,8 +50,7 @@ async function confirmServedName(name: string): Promise<ProfileSlugResolution> {
     log.warn(`[Slug] profile for ${name} carries no usable slug`);
     return { kind: "unresolved" };
   }
-  // Folding can collide, so the account WFM served has to be the one we traded
-  // with. Without this a near miss writes a review to a different real user.
+  // Folding can collide, so the served name must match the one we traded with.
   if (served.trim().toLowerCase() !== name.trim().toLowerCase()) {
     log.warn(`[Slug] ${candidate} belongs to ${served || "someone else"}, not ${name}`);
     return { kind: "not-found" };
@@ -62,10 +58,8 @@ async function confirmServedName(name: string): Promise<ProfileSlugResolution> {
   return { kind: "resolved", slug };
 }
 
-/** The slug warframe.market serves a profile name under, read back from WFM
- *  itself. WFM mints it - lowercased, edge punctuation stripped, spaces turned
- *  into hyphens, underscores kept only sometimes - so no local rule reproduces
- *  it and no caller may invent one. */
+/** The slug warframe.market serves a profile name under, read back from WFM itself.
+ *  WFM mints it (lowercased, punctuation stripped, spaces to hyphens); no caller invents one. */
 export async function probeProfileSlug(name: string): Promise<ProfileSlugResolution> {
   const trimmed = String(name || "").trim();
   if (!trimmed) return { kind: "not-found" };

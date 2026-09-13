@@ -1,7 +1,5 @@
-// Rule schema for the market alert engine. Split in two on purpose: the rule is
-// the shareable half an export carries, MarketAlertBinding is the device-local
-// half (delivery choices) that never leaves the machine. Anything added here
-// has to stay on the right side of that line.
+// Rule schema for the market alert engine. Split in two on purpose: the rule is the
+// shareable half an export carries; MarketAlertBinding (device-local) never leaves the machine.
 
 import { TAG_TO_WFM_URL_NAME } from "./wfmRivenVocabulary";
 
@@ -207,9 +205,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-// Unknown keys are rejected rather than dropped: a file we did not write is
-// either a different version or hand-edited, and both deserve a hard error
-// instead of a rule that silently means something else.
+// Unknown keys are rejected rather than dropped: a file we did not write is either
+// a different version or hand-edited, and both deserve a hard error, not silent reinterpretation.
 function rejectUnknownKeys(
   raw: Record<string, unknown>,
   allowed: readonly string[],

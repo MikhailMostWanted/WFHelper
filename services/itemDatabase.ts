@@ -1020,9 +1020,8 @@ function toRendererDrop(d: DropEntry): DropEntry {
 const BLUEPRINT_PATTERN_KEY = "/Lotus/Language/Items/BlueprintAndItem";
 const BLUEPRINT_PATTERN_EN = "|ITEM| Blueprint";
 
-// Recipes carry no name of their own, so theirs is composed from the item they
-// build. DE ships the pattern for it, which is the only thing that puts the word
-// where the language wants it: Spanish and Russian lead with it, Japanese does not.
+// Recipes carry no name of their own; theirs is composed from the item they build,
+// using DE's word-order pattern (Spanish/Russian lead with it, Japanese does not).
 function localizeItemName(
   uniqueName: string,
   nameKey: string | null | undefined,
@@ -1057,9 +1056,8 @@ export function localizedNameFields(
   return pair.displayName ? { displayName: pair.displayName } : {};
 }
 
-/** True once a mirrored wiki card survived the merge as the item's art. Both
- *  mirrors count, or a WIKI_ITEM_ART override on a mod would lose to the WFM
- *  thumbnail that cardArt exists to outrank. */
+/** True once a mirrored wiki card survived the merge as the item's art - lets a
+ *  WIKI_ITEM_ART override on a mod outrank the WFM thumbnail. */
 function hasCardArt(imageUrl: string | null): boolean {
   return imageUrl != null && (imageUrl.includes("/mod-art/") || imageUrl.includes("/item-art/"));
 }
