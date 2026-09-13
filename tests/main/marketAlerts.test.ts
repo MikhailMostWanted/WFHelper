@@ -214,7 +214,9 @@ afterEach(() => {
 describe("riven rule evaluation", () => {
   it("fires on a matching auction and records a hit with endo per plat", async () => {
     mocks.requestMock.mockResolvedValue(
-      auctionPayload([{ id: "abc123", buyout: 100, mastery: 13, modRank: 0, rerolls: 0 }]),
+      auctionPayload([
+        { id: "abc123", buyout: 100, mastery: 13, modRank: 0, rerolls: 0, status: "Online" },
+      ]),
     );
     saveOk(rivenRuleRaw());
     initEngine();
@@ -229,6 +231,8 @@ describe("riven rule evaluation", () => {
     expect(hits[0].platinum).toBe(100);
     // MR13 r0 0 rolls dissolves for 515 endo.
     expect(hits[0].endoPerPlat).toBeCloseTo(5.2, 1);
+    // Folded, because the history filters on it.
+    expect(hits[0].sellerStatus).toBe("online");
   });
 
   it("leads the hit with every stat on the roll, curses signed by the flag", async () => {
@@ -794,6 +798,8 @@ describe("item rule evaluation", () => {
     expect(hits).toHaveLength(1);
     // The seller name is shown, so it keeps the case WFM sent.
     expect(hits[0].seller).toBe("LoudSeller");
+    // The presence is a filter key instead, so it is folded.
+    expect(hits[0].sellerStatus).toBe("ingame");
   });
 
   it("excludes the user's own orders", async () => {

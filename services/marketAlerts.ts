@@ -173,6 +173,7 @@ function reviveHits(parsed: unknown): PersistedHits | null {
         platinum: typeof raw.platinum === "number" ? raw.platinum : null,
       };
       if (typeof raw.seller === "string") hit.seller = raw.seller;
+      if (typeof raw.sellerStatus === "string") hit.sellerStatus = raw.sellerStatus;
       if (typeof raw.endoPerPlat === "number") hit.endoPerPlat = raw.endoPerPlat;
       hits.push(hit);
     }
@@ -289,6 +290,7 @@ async function wfmGetV2(path: string): Promise<unknown> {
 interface AuctionView {
   id: string;
   seller: string;
+  sellerStatus: string;
   platinum: number;
   masteryLevel: number;
   modRank: number;
@@ -333,6 +335,7 @@ function parseAuctionViews(raw: unknown): AuctionView[] {
     out.push({
       id: entry.id,
       seller: typeof owner.ingame_name === "string" ? owner.ingame_name : "",
+      sellerStatus: typeof owner.status === "string" ? owner.status.toLowerCase() : "",
       platinum: hasBuyout ? num(entry.buyout_price) : num(entry.starting_price),
       masteryLevel: num(item.mastery_level),
       modRank: num(item.mod_rank),
@@ -465,6 +468,7 @@ function rivenHit(rule: MarketAlertRule, auction: AuctionView): MarketAlertHit {
     platinum: auction.platinum,
   };
   if (auction.seller) hit.seller = auction.seller;
+  if (auction.sellerStatus) hit.sellerStatus = auction.sellerStatus;
   if (ratio !== null) hit.endoPerPlat = Math.round(ratio * 10) / 10;
   return hit;
 }
@@ -557,6 +561,7 @@ function itemHit(
     platinum: order.platinum,
   };
   if (order.owner) hit.seller = order.owner;
+  if (order.status) hit.sellerStatus = order.status;
   return hit;
 }
 

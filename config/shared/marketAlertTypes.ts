@@ -145,6 +145,9 @@ export interface MarketAlertHit {
   url: string;
   platinum: number | null;
   seller?: string;
+  /** Presence at fire time, so the history can be read back by who was around;
+   *  hits saved before this field existed simply have none. */
+  sellerStatus?: string;
   endoPerPlat?: number;
 }
 

@@ -10,6 +10,7 @@
   import { openBulkSellForAlertRule, setAlertSellLink } from "./alertBulkSell.js";
   import { resolveAlertTarget, resolveAlertThumb } from "./alertResolve.js";
   import { MARKET_ALERT_MAX_NAME_CHARS } from "../../../../config/shared/marketAlertTypes.js";
+  import { isActiveOrderStatus } from "../../../../config/shared/wfmOrders.js";
   import type {
     MarketAlertBinding,
     MarketAlertEngineStatus,
@@ -32,6 +33,9 @@
   let importText = $state("");
   let exportText = $state("");
   let testFiring = $state<string | null>(null);
+  // Display only: the engine keeps searching every seller, this just narrows
+  // what the history shows.
+  let hitSellerFilter = $state<"all" | "online" | "ingame">("all");
 
   const LIVE_REFRESH_MS = 20_000;
 
@@ -97,6 +101,13 @@
         ([id, until]) => [id, Math.max(0, until - Date.now())] as const,
       ),
     ),
+  );
+  const visibleHits = $derived(
+    hits.filter((hit) => {
+      if (hitSellerFilter === "all") return true;
+      const status = hit.sellerStatus ?? "";
+      return hitSellerFilter === "ingame" ? status === "ingame" : isActiveOrderStatus(status);
+    }),
   );
   const lastHitByRuleId = $derived(
     hits.reduce((map, hit) => {
@@ -393,17 +404,31 @@
   <div class="mt-2">
     <div class="mb-1 flex items-center justify-between">
       <h3 class="m-0 font-display text-base font-bold">{$tr("marketAlerts.hitHistory")}</h3>
-      {#if hits.length > 0}
-        <button class="btn-secondary btn-sm" onclick={() => void clearHits()}
-          >{$tr("marketAlerts.clearHits")}</button
+      <div class="flex items-center gap-2">
+        <select
+          class="shared-filter-select"
+          data-alert-hit-seller-filter
+          aria-label={$tr("marketAlerts.sellerStatus")}
+          bind:value={hitSellerFilter}
         >
-      {/if}
+          <option value="all">{$tr("common.all")}</option>
+          <option value="online">{$tr("common.online")}</option>
+          <option value="ingame">{$tr("common.inGame")}</option>
+        </select>
+        {#if hits.length > 0}
+          <button class="btn-secondary btn-sm" onclick={() => void clearHits()}
+            >{$tr("marketAlerts.clearHits")}</button
+          >
+        {/if}
+      </div>
     </div>
-    {#if hits.length === 0}
-      <p class="text-sm text-text-secondary">{$tr("marketAlerts.noHits")}</p>
+    {#if visibleHits.length === 0}
+      <p class="text-sm text-text-secondary">
+        {hits.length === 0 ? $tr("marketAlerts.noHits") : $tr("marketAlerts.noHitsForFilter")}
+      </p>
     {:else}
       <div class="flex flex-col gap-1">
-        {#each hits as hit (hit.id)}
+        {#each visibleHits as hit (hit.id)}
           {@const sellRule = itemRuleById.get(hit.ruleId)}
           <div
             class="flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-border px-2 py-1.5 text-sm"

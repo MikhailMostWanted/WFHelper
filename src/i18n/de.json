@@ -2027,6 +2027,7 @@
   "marketAlerts.testFailed": "Test fehlgeschlagen: {error}",
   "marketAlerts.hitHistory": "Trefferverlauf",
   "marketAlerts.noHits": "Noch keine Treffer.",
+  "marketAlerts.noHitsForFilter": "Keine Treffer von einem Verkäufer mit diesem Status.",
   "marketAlerts.clearHits": "Verlauf löschen",
   "marketAlerts.clearHitsConfirm": "Trefferverlauf löschen?",
   "marketAlerts.noRules": "Noch keine Alarmregeln. Lege eine an, um bei passenden Angeboten benachrichtigt zu werden.",

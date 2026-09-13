@@ -104,3 +104,131 @@ test("the riven alert editor offers stat layouts and clamps the rank fields", as
     fs.rmSync(harness.sandboxDir, { recursive: true, force: true });
   }
 });
+
+const SEEDED_HITS = {
+  schema: 1,
+  hits: [
+    {
+      id: "hit-ingame",
+      ruleId: SEED_RULE_ID,
+      ruleName: "Seeded Boar",
+      at: "2026-09-12T10:00:00.000Z",
+      kind: "riven",
+      title: "Riven: Seeded Boar",
+      detail: "in game seller",
+      url: "https://warframe.market/auction/hit-ingame",
+      platinum: 100,
+      seller: "InGameSeller",
+      sellerStatus: "ingame",
+    },
+    {
+      id: "hit-online",
+      ruleId: SEED_RULE_ID,
+      ruleName: "Seeded Boar",
+      at: "2026-09-12T09:00:00.000Z",
+      kind: "riven",
+      title: "Riven: Seeded Boar",
+      detail: "online seller",
+      url: "https://warframe.market/auction/hit-online",
+      platinum: 90,
+      seller: "OnlineSeller",
+      sellerStatus: "online",
+    },
+    {
+      id: "hit-offline",
+      ruleId: SEED_RULE_ID,
+      ruleName: "Seeded Boar",
+      at: "2026-09-12T08:00:00.000Z",
+      kind: "riven",
+      title: "Riven: Seeded Boar",
+      detail: "offline seller",
+      url: "https://warframe.market/auction/hit-offline",
+      platinum: 80,
+      seller: "OfflineSeller",
+      sellerStatus: "offline",
+    },
+    {
+      // Recorded before hits carried a presence, so it can only show under All.
+      id: "hit-legacy",
+      ruleId: SEED_RULE_ID,
+      ruleName: "Seeded Boar",
+      at: "2026-09-12T07:00:00.000Z",
+      kind: "riven",
+      title: "Riven: Seeded Boar",
+      detail: "legacy hit",
+      url: "https://warframe.market/auction/hit-legacy",
+      platinum: 70,
+      seller: "LegacySeller",
+    },
+  ],
+};
+
+const LEGACY_ONLY_HITS = {
+  schema: 1,
+  hits: SEEDED_HITS.hits.filter((hit) => !("sellerStatus" in hit)),
+};
+
+test("the hit history narrows by who was around, without changing the search", async () => {
+  const harness = await launchElectronTestHarness("wfh-alert-hits-", {
+    userDataFiles: {
+      "market-alert-rules.json": SEEDED_RULES,
+      "market-alert-hits.json": SEEDED_HITS,
+    },
+  });
+  const page = harness.page;
+
+  try {
+    await openView(page, "market");
+    await page.locator('#content [data-tour-tab="alerts"]').first().click();
+
+    const rows = page.locator("[data-alert-hit]");
+    await expect(rows).toHaveCount(4, { timeout: 30_000 });
+
+    const filter = page.locator("[data-alert-hit-seller-filter]");
+    await expect(filter).toBeVisible();
+    expect(await selectOptionValues(filter)).toEqual(["all", "online", "ingame"]);
+
+    // Online covers in game too, the way an order book counts an active seller.
+    await filter.selectOption("online");
+    await expect(rows).toHaveCount(2);
+    await filter.selectOption("ingame");
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText("InGameSeller");
+    await page.screenshot({ path: test.info().outputPath("alert-hit-filter.png") });
+
+    // The rule itself is untouched: this only narrows what is shown.
+    await filter.selectOption("all");
+    await expect(rows).toHaveCount(4);
+  } finally {
+    await harness.app.close();
+    fs.rmSync(harness.sandboxDir, { recursive: true, force: true });
+  }
+});
+
+test("a history with no recorded presence says so instead of claiming it is empty", async () => {
+  const harness = await launchElectronTestHarness("wfh-alert-legacy-hits-", {
+    userDataFiles: {
+      "market-alert-rules.json": SEEDED_RULES,
+      "market-alert-hits.json": LEGACY_ONLY_HITS,
+    },
+  });
+  const page = harness.page;
+
+  try {
+    await openView(page, "market");
+    await page.locator('#content [data-tour-tab="alerts"]').first().click();
+
+    const rows = page.locator("[data-alert-hit]");
+    await expect(rows).toHaveCount(1, { timeout: 30_000 });
+    await page.locator("[data-alert-hit-seller-filter]").selectOption("online");
+    await expect(rows).toHaveCount(0);
+
+    // "No hits recorded yet" would be a lie while the history holds one.
+    const empty = page.locator("#content p", { hasText: /.+/ }).last();
+    expect(await empty.innerText()).not.toContain("recorded yet");
+    expect(await empty.innerText()).not.toContain("marketAlerts.");
+  } finally {
+    await harness.app.close();
+    fs.rmSync(harness.sandboxDir, { recursive: true, force: true });
+  }
+});

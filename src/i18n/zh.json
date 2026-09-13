@@ -2026,6 +2026,7 @@
   "marketAlerts.testFailed": "测试失败：{error}",
   "marketAlerts.hitHistory": "命中记录",
   "marketAlerts.noHits": "暂无命中记录。",
+  "marketAlerts.noHitsForFilter": "没有该状态卖家的记录。",
   "marketAlerts.clearHits": "清空记录",
   "marketAlerts.clearHitsConfirm": "清空命中记录？",
   "marketAlerts.noRules": "还没有警报规则。创建规则后，当出现匹配的挂单时会收到通知。",

@@ -2044,6 +2044,7 @@
   "marketAlerts.testFailed": "Test failed: {error}",
   "marketAlerts.hitHistory": "Hit history",
   "marketAlerts.noHits": "No hits recorded yet.",
+  "marketAlerts.noHitsForFilter": "No hits from a seller with that status.",
   "marketAlerts.clearHits": "Clear history",
   "marketAlerts.clearHitsConfirm": "Clear the hit history?",
   "marketAlerts.noRules": "No alert rules yet. Create one to get notified when a matching listing appears.",
