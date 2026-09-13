@@ -54,6 +54,7 @@ test.describe("Native main window startup fallbacks", () => {
     const env = {
       ...process.env,
       WFHELPER_USER_DATA: userData,
+      WFHELPER_EE_LOG: path.join(sandbox, "EE.log"),
       LOCALAPPDATA: path.join(sandbox, "local"),
       APPDATA: path.join(sandbox, "roaming"),
       WFHELPER_DISABLE_KEYBOARD_HOOK: "1",

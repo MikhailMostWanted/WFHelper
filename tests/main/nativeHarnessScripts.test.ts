@@ -9,6 +9,9 @@ import vm from "node:vm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const tempDirs: string[] = [];
+const { closeNativeElectron } = createRequire(__filename)("../../scripts/native-electron.cjs") as {
+  closeNativeElectron: (app: unknown) => Promise<void>;
+};
 const root = path.resolve(__dirname, "../..");
 const { preserveNativeDiagnostics } = createRequire(__filename)(
   "../../scripts/native-artifacts.cjs",
@@ -32,7 +35,11 @@ async function runRewardHarness(
   tempDirs.push(scratch);
   const messages: string[] = [];
   let exitCode = 0;
-  const host = Object.assign(new EventEmitter(), { stderr: new EventEmitter() });
+  const host = Object.assign(new EventEmitter(), {
+    stderr: new EventEmitter(),
+    exitCode: 134,
+    signalCode: null,
+  });
   const launch = vi.fn(async () => ({
     process: () => host,
     evaluate: async () => {
@@ -70,6 +77,7 @@ async function runRewardHarness(
     "@playwright/test": { _electron: { launch } },
     "./build-screens.cjs": { buildRealScreens: async () => {} },
     "../native-artifacts.cjs": { preserveNativeDiagnostics },
+    "../native-electron.cjs": { closeNativeElectron },
     sharp,
   };
   const script = path.join(root, "scripts/reward-scan-e2e/run-check.cjs");
@@ -98,7 +106,11 @@ async function runRewardHarness(
   return { exitCode, launch, output: messages.join("\n"), scratch };
 }
 
-async function runLinuxSmoke(options: { launchError?: string; pageError?: string }) {
+async function runLinuxSmoke(options: {
+  launchError?: string;
+  pageError?: string;
+  closeCode?: number;
+}) {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "wfh-linux-contract-"));
   tempDirs.push(scratch);
   const messages: string[] = [];
@@ -114,6 +126,8 @@ async function runLinuxSmoke(options: { launchError?: string; pageError?: string
   const host = Object.assign(new EventEmitter(), {
     stderr: new EventEmitter(),
     kill: vi.fn(),
+    exitCode: options.closeCode ?? 0,
+    signalCode: null,
   });
   const app = Object.assign(new EventEmitter(), {
     windows: () => [page],
@@ -128,6 +142,7 @@ async function runLinuxSmoke(options: { launchError?: string; pageError?: string
       os: { tmpdir: () => scratch },
       path,
       preserveNativeDiagnostics,
+      closeNativeElectron,
       electron: {
         launch: async () => {
           if (options.launchError) throw new Error(options.launchError);
@@ -206,6 +221,14 @@ describe("native verification failure contracts", () => {
     expect(result.launch).toHaveBeenCalledTimes(1);
     expect(result.output).toContain("Electron host died during synthetic-clean.png[onnx]");
     const dir = fs.readdirSync(result.scratch).find((name) => name !== "artifacts")!;
+    expect(
+      JSON.parse(
+        fs.readFileSync(
+          path.join(result.scratch, dir, "roaming", "wfhelper", "inventory-reload-state.json"),
+          "utf8",
+        ),
+      ),
+    ).toEqual({ inventorySource: "none" });
     const failure = JSON.parse(
       fs.readFileSync(path.join(result.scratch, dir, "failure.json"), "utf8"),
     );
@@ -250,5 +273,20 @@ describe("native verification failure contracts", () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("Linux boot smoke OK");
     expect(fs.readdirSync(result.scratch)).toEqual([]);
+  });
+
+  it("rejects a shutdown crash after successful Linux rendering", async () => {
+    const result = await runLinuxSmoke({ closeCode: 134 });
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("Electron process exit: 134/null");
+  });
+
+  it("rejects native shutdown signals even when close resolves", async () => {
+    await expect(
+      closeNativeElectron({
+        process: () => ({ exitCode: null, signalCode: "SIGABRT", kill: vi.fn() }),
+        close: async () => {},
+      }),
+    ).rejects.toThrow("Electron process exit: null/SIGABRT");
   });
 });

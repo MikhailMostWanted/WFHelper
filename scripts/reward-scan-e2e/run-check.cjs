@@ -9,6 +9,7 @@ const { _electron } = require("@playwright/test");
 
 const { buildRealScreens } = require("./build-screens.cjs");
 const { preserveNativeDiagnostics } = require("../native-artifacts.cjs");
+const { closeNativeElectron } = require("../native-electron.cjs");
 
 const KNOWN_READERS = ["windows", "onnx", "both"];
 
@@ -370,6 +371,12 @@ function parseImageArg(argv) {
   env.LOCALAPPDATA = localAppData;
   env.APPDATA = path.join(workDir, "roaming");
   env.WFHELPER_USER_DATA = path.join(workDir, "roaming", "wfhelper");
+  env.WFHELPER_EE_LOG = path.join(localAppData, "Warframe", "EE.log");
+  fs.mkdirSync(env.WFHELPER_USER_DATA, { recursive: true });
+  fs.writeFileSync(
+    path.join(env.WFHELPER_USER_DATA, "inventory-reload-state.json"),
+    JSON.stringify({ inventorySource: "none" }),
+  );
 
   const app = await _electron.launch({ args: ["--no-sandbox", ROOT], env });
   const host = app.process();
@@ -506,7 +513,9 @@ function parseImageArg(argv) {
   } finally {
     if (hostExit)
       failures.push(`Electron host exited before shutdown: ${JSON.stringify(hostExit)}`);
-    await app.close().catch((err) => failures.push(`Electron shutdown failed: ${String(err)}`));
+    await closeNativeElectron(app).catch((err) =>
+      failures.push(`Electron shutdown failed: ${String(err)}`),
+    );
   }
   // Every fixture being skipped is not a pass; it means the gate never ran.
   if (!singleImage && gatingRuns === 0) failures.push("no gating fixture executed");

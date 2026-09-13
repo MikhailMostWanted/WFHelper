@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { _electron as electron } from "@playwright/test";
 import { preserveNativeDiagnostics } from "./native-artifacts.cjs";
+import { closeNativeElectron } from "./native-electron.cjs";
 
 if (process.platform !== "linux") {
   console.error("ENVIRONMENT: Linux boot smoke requires Linux; application boot unverified");
@@ -47,6 +48,11 @@ async function findMainWindow(app) {
 }
 
 const sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), "wfh-linux-boot-"));
+fs.mkdirSync(path.join(sandboxDir, "user-data"));
+fs.writeFileSync(
+  path.join(sandboxDir, "user-data", "inventory-reload-state.json"),
+  JSON.stringify({ inventorySource: "none" }),
+);
 const messages = [];
 const failures = [];
 const observedWindows = new Set();
@@ -71,6 +77,7 @@ try {
     env: {
       ...process.env,
       WFHELPER_DISABLE_KEYBOARD_HOOK: "1",
+      WFHELPER_EE_LOG: path.join(sandboxDir, "EE.log"),
       WFHELPER_USER_DATA: path.join(sandboxDir, "user-data"),
       APPDATA: path.join(sandboxDir, "roaming"),
       WF_DISABLE_AUTO_UPDATE: "1",
@@ -105,19 +112,10 @@ try {
 } finally {
   closing = true;
   if (app) {
-    let timer;
     try {
-      await Promise.race([
-        app.close(),
-        new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error("Electron close timed out")), 15_000);
-        }),
-      ]);
+      await closeNativeElectron(app);
     } catch (err) {
       failures.push(`Electron shutdown failed: ${String(err)}`);
-      app.process().kill();
-    } finally {
-      clearTimeout(timer);
     }
   }
 }

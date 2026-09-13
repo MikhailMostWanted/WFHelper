@@ -3,31 +3,29 @@
 Use Corepack/pnpm 11 and Node 22.12 or newer. `backend/worker` intentionally uses
 npm. No live account is needed for the automated checks below.
 
-## Pick a lane
+## Choose checks
 
-| Change                   | Checks after editing                                                 | Evidence and limits                                                                                     |
+| Change                   | Checks after editing                                                 | Coverage                                                                                                |
 | ------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Pure renderer/main logic | `pnpm run test <test path>` and relevant typecheck                   | Unit behavior; no Electron or native boundary proof.                                                    |
+| Pure renderer/main logic | `pnpm run test <test path>` and relevant typecheck                   | Unit tests; use E2E for Electron and native APIs.                                                       |
 | Svelte UI                | `pnpm run check`, `pnpm run build`, `pnpm run test:e2e:built <spec>` | Built Electron UI, IPC and layout; use a relevant fixture.                                              |
 | Preload/IPC              | Typecheck, focused sender tests, build and relevant E2E              | Test production bridges, including rejected senders.                                                    |
 | Reward OCR               | Build, `pnpm run test:reward-scan`                                   | Required synthetic/reconstructed/public full frames through production OCR. Every host crash fails.     |
 | Riven OCR                | Build, `pnpm run test:riven-scan`                                    | Exact stat/weapon assertions on one full frame and blank rejection. Expand the corpus for new geometry. |
 | Windows DBWIN            | Build, `pnpm run test:dbwin`                                         | Real Electron worker and native ABI against a decoy game.                                               |
-| Overlay lifecycle        | Build, `pnpm run test:overlay-stress`                                | Sustained native window churn and fixture trigger lifecycle; no live capture proof.                     |
+| Overlay lifecycle        | Build, `pnpm run test:overlay-stress`                                | Repeated native window show/hide and fixture triggers. Live capture needs separate tests.               |
 | Keyboard interception    | Build, `pnpm run test:keyhook --active-desktop`                      | Interactive opt-in. Decoy must own foreground focus before a key is sent.                               |
 | Linux startup            | Build, `xvfb-run -a pnpm run test:linux-boot`                        | X11 application boot; exit 2 means prerequisites missing, not a pass.                                   |
 | Packaged runtime         | `pnpm run test:packaged <executable-or-AppImage>`                    | Fresh profile, packaged UI, sharp and both ONNX models loading. Does not install or update the app.     |
 | Worker                   | `pnpm run backend:typecheck`, `pnpm run backend:test`                | Cloudflare runtime tests. Deployed smoke is separate and uses the network.                              |
 
-`pnpm run test:e2e <spec>` builds first. `test:e2e:built` deliberately reuses the
-existing bundle, so rebuild after production changes. Keep the full pre-push and
-CI gates for cross-cutting changes; do not infer regression freedom from one
-focused lane. Record executed commands and outcomes, not just a green count.
+`pnpm run test:e2e <spec>` builds first. `test:e2e:built` reuses the existing
+bundle, so rebuild after production changes. Run the full pre-push and CI checks
+for cross-cutting changes.
 
-The Windows CI job runs a bounded overlay stress lane (30 churn/12 trigger
+The Windows CI job runs a shorter overlay stress test (30 churn/12 trigger
 iterations); release acceptance runs the full defaults. Keyboard focus and
-compositor acceptance require an interactive disposable session and are not
-silently counted by the hidden lanes.
+compositor checks require an interactive disposable session.
 
 ## Isolation and artifacts
 
@@ -38,15 +36,17 @@ must obtain permission before running that interactive lane.
 
 Always use `WFHELPER_USER_DATA` for an isolated profile. `APPDATA` alone does not
 relocate Electron's profile. The shared E2E harness also isolates APPDATA and LOCALAPPDATA
-and disables the global keyboard hook. A custom launch must do the same.
+and disables the global keyboard hook. Set `WFHELPER_EE_LOG` to a sandbox path
+on every platform, and supply a fixture inventory or persist `inventorySource:
+"none"` in `inventory-reload-state.json` to prevent Downloads auto-discovery.
+A custom launch must do the same.
 Never use a real market account to verify mutations.
 
 The shared harness records all-window console/errors, process output and local
 logs under the test's output directory. Failed checks retain screenshots and
-an explicitly recorded Electron trace; `WFHELPER_KEEP_TRACE=1` keeps passing
+an Electron trace; `WFHELPER_KEEP_TRACE=1` keeps passing
 traces too. Shutdown output and crash dumps are copied before sandbox cleanup.
-Native/package runners print the retained directory on failure. These artifact
-directories contain test profiles, not copies of the user's profile.
+Native/package runners print the retained directory on failure.
 
 Playwright traces can be opened with `pnpm exec playwright show-trace <trace.zip>`.
 The failure upload in CI collects `test-results/`. Reward, Riven and Linux
@@ -59,16 +59,14 @@ private crash dumps locally before sharing.
 `e2e/electronTestHarness.ts` supports inventory, localStorage, userData JSON,
 pre-main test entrypoints and a cold restart that preserves the sandbox.
 `e2e/offlineScenario.ts` provides fixed World deal/loading/unavailable scenarios.
-They execute production parsing and fail undeclared requests at their documented
-boundaries; see `e2e/scenarios/README.md`. They are not a blanket network sandbox.
+They execute production parsing and fail undeclared requests. See
+`e2e/scenarios/README.md` for intercepted transports.
 Market tests use synthetic transport responses through production mutation IPC.
 
-Real reward frames in `scripts/reward-scan-e2e/fixtures/public` have reviewed
-redactions, dimensions and hashes. Missing or changed mandatory fixtures fail.
-Private screenshots remain optional, never silently substitute for CI evidence.
-Retain the distinction between original full frames, reconstructed images and
-synthetic geometry. A hidden screenshot cannot prove DXGI capture, fullscreen
-stacking, global input delivery or the visible Wayland output.
+Required reward fixtures are tracked under `scripts/reward-scan-e2e/fixtures/public`;
+the runner checks their dimensions and hashes. Private screenshots are optional.
+Capture, fullscreen stacking, global input and Wayland output require separate
+interactive tests.
 
 ## Visual review
 
@@ -90,23 +88,23 @@ JavaScript plus a commit/version/dirty-state manifest into `.tmp/debug-symbols/`
 It does not upload anything. Source maps are excluded from packaged artifacts.
 Keep the matching local bundle and maps together; rebuild the package from that
 bundle if diagnosing its minified stack. Normal builds do not produce renderer
-maps. Private remote retention requires a separately configured destination.
+maps.
 
 For user reports, retain version, approximate failure time, inventory source,
 OS, display scale, game window mode and Linux session/compositor when relevant.
 Use the existing opt-in feedback/log and scan-debug paths. Do not collect tokens,
 full inventory exports or the real profile as routine diagnostics.
 
-## Release evidence still required
+## Release checks
 
-Packaged smoke runs before release asset upload on Windows and Linux. It proves
-model/library loading and first-run rendering, not NSIS installation, updater
-download/relaunch, schema migration or rollback. Use a disposable VM/Sandbox for
-installer upgrades with synthetic previous-release state.
+Packaged smoke runs before release asset upload on Windows and Linux. It checks
+model/library loading and first-run rendering. Installation, updates, migration
+and rollback need separate tests. Use a disposable VM/Sandbox for installer
+upgrades with synthetic previous-release state.
 `scripts/installer-acceptance/README.md` describes the prepared Windows Sandbox
-runner for two supplied installers, state preservation and retained evidence.
+runner for two supplied installers, saved-state checks and diagnostic files.
 
 Linux's VM recipe, `scripts/linux-vm-test.sh`, owns a separate EE.log and profile.
 Run its setup and explicit launch commands in the intended disposable session.
 Verify native Wayland and XWayland output, scaling, click-through, portal refusal
-and stream restart there. Windows/Xvfb replay cannot establish those results.
+and stream restart there.

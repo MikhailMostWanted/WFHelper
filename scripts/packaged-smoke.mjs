@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 import { _electron as electron } from "@playwright/test";
+import { closeNativeElectron } from "./native-electron.cjs";
 
 const executable = process.argv[2];
 if (!executable || !fs.existsSync(executable)) {
@@ -19,10 +19,16 @@ const env = {
   LOCALAPPDATA: path.join(sandbox, "local"),
   APPDATA: path.join(sandbox, "roaming"),
   WFHELPER_DISABLE_KEYBOARD_HOOK: "1",
+  WFHELPER_EE_LOG: path.join(sandbox, "EE.log"),
   WF_DISABLE_AUTO_UPDATE: "1",
   APPIMAGE_EXTRACT_AND_RUN: "1",
 };
 delete env.ELECTRON_RUN_AS_NODE;
+fs.mkdirSync(env.WFHELPER_USER_DATA, { recursive: true });
+fs.writeFileSync(
+  path.join(env.WFHELPER_USER_DATA, "inventory-reload-state.json"),
+  JSON.stringify({ inventorySource: "none" }),
+);
 let app;
 let passed = false;
 let runtime;
@@ -82,31 +88,12 @@ try {
   passed = true;
 } finally {
   if (app) {
-    const child = app.process();
-    await Promise.race([
-      app.close(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("packaged app did not close")), 15_000).unref(),
-      ),
-    ])
+    await closeNativeElectron(app)
       .then(() => {
-        assert.equal(
-          child.exitCode,
-          0,
-          `packaged process exit: ${child.exitCode}/${child.signalCode}`,
-        );
         assert.deepEqual(errors, [], "packaged renderer errors during shutdown");
       })
       .catch((error) => {
         passed = false;
-        try {
-          const pid = app.process().pid;
-          if (process.platform === "win32" && pid)
-            execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
-          else app.process().kill("SIGKILL");
-        } catch {
-          // The process can exit between the timeout and termination.
-        }
         console.error(String(error));
       });
   }

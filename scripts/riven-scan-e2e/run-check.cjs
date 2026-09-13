@@ -4,6 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { _electron } = require("@playwright/test");
 const { preserveNativeDiagnostics } = require("../native-artifacts.cjs");
+const { closeNativeElectron } = require("../native-electron.cjs");
 
 const ROOT = path.resolve(__dirname, "../..");
 const FRAME = path.join(ROOT, "assets/setup/overlay-demo-riven.jpg");
@@ -89,14 +90,14 @@ async function main() {
     assert.deepEqual(results.blank.stats, [], "Blank frame produced fabricated stats");
     assert.equal(results.blankWeapon, null, "Blank frame produced a fabricated weapon");
     console.log("PASS weapon: Kuva Sobek; blank frame: no stats or weapon");
-    await app.close();
+    await closeNativeElectron(app);
     app = null;
     passed = true;
   } catch (error) {
     fs.writeFileSync(path.join(workDir, "failure.log"), String(error.stack || error));
     throw error;
   } finally {
-    if (app) await app.close().catch(() => {});
+    if (app) await closeNativeElectron(app).catch(() => {});
     if (passed) fs.rmSync(workDir, { recursive: true, force: true });
     else {
       console.error(`Riven acceptance diagnostics retained at ${workDir}`);
