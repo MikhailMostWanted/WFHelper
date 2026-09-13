@@ -1,4 +1,4 @@
-﻿name: Release
+name: Release
 
 on:
   push:
@@ -129,30 +129,6 @@ jobs:
             Write-Host "Created draft release $env:GITHUB_REF_NAME"
           }
 
-      - name: Remove existing release assets
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $pkg = Get-Content package.json | ConvertFrom-Json
-          $productName = $pkg.build.productName
-          $version = $pkg.version
-          $assets = @(
-            "latest.yml",
-            "$productName-$version-Setup.exe",
-            "$productName-$version-Setup.exe.blockmap"
-          )
-
-          foreach ($asset in $assets) {
-            gh release delete-asset "$env:GITHUB_REF_NAME" "$asset" --yes --repo "$env:GITHUB_REPOSITORY"
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "Deleted existing release asset: $asset"
-            } else {
-              Write-Host "Release asset not present or could not be deleted: $asset"
-              $global:LASTEXITCODE = 0
-            }
-          }
-
       - name: Build Windows installer
         run: |
           pnpm run verify:onnx-models
@@ -166,6 +142,20 @@ jobs:
           VITE_WFM_BACKEND_URL: ${{ secrets.VITE_WFM_BACKEND_URL }}
           VITE_WFM_BACKEND_DIRECT_FALLBACK: ${{ vars.VITE_WFM_BACKEND_DIRECT_FALLBACK }}
           VITE_WFM_BACKEND_BOOTSTRAP_ENABLED: ${{ vars.VITE_WFM_BACKEND_BOOTSTRAP_ENABLED }}
+
+      - name: Verify packaged Windows runtime
+        run: pnpm run test:packaged release/win-unpacked/WFHelper.exe
+
+      - name: Verify sustained overlay lifecycle
+        run: pnpm run test:overlay-stress
+
+      - name: Preserve failed acceptance evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-acceptance
+          path: test-results/
+          if-no-files-found: ignore
 
       - name: Upload release assets
         shell: pwsh
@@ -228,20 +218,6 @@ jobs:
         # node directly: the script has no deps, keep pnpm's run lifecycle out of it
         run: node scripts/validate-release-env.mjs
 
-      - name: Remove existing release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PRODUCT_NAME=$(node -p "require('./package.json').build.productName")
-          VERSION=$(node -p "require('./package.json').version")
-          for asset in "latest-linux.yml" "$PRODUCT_NAME-$VERSION.AppImage"; do
-            if gh release delete-asset "$GITHUB_REF_NAME" "$asset" --yes --repo "$GITHUB_REPOSITORY"; then
-              echo "Deleted existing release asset: $asset"
-            else
-              echo "Release asset not present: $asset"
-            fi
-          done
-
       # wayland-scanner and the protocol XML are build-time only; without them
       # build-layer-shell skips and the AppImage ships with the addon missing.
       - name: Install Wayland build dependencies
@@ -261,6 +237,21 @@ jobs:
           VITE_WFM_BACKEND_URL: ${{ secrets.VITE_WFM_BACKEND_URL }}
           VITE_WFM_BACKEND_DIRECT_FALLBACK: ${{ vars.VITE_WFM_BACKEND_DIRECT_FALLBACK }}
           VITE_WFM_BACKEND_BOOTSTRAP_ENABLED: ${{ vars.VITE_WFM_BACKEND_BOOTSTRAP_ENABLED }}
+
+      - name: Verify packaged Linux runtime
+        run: |
+          pnpm exec playwright install-deps chromium
+          PRODUCT_NAME=$(node -p "require('./package.json').build.productName")
+          VERSION=$(node -p "require('./package.json').version")
+          xvfb-run -a pnpm run test:packaged "release/$PRODUCT_NAME-$VERSION.AppImage"
+
+      - name: Preserve failed acceptance evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-acceptance
+          path: test-results/
+          if-no-files-found: ignore
 
       - name: Upload release assets
         env:

@@ -53,6 +53,7 @@
     "test:overlay-stress": "node scripts/hidden-desktop.mjs node scripts/overlay-stress.mjs",
     "test:e2e": "pnpm run build && pnpm run test:e2e:built",
     "test:e2e:built": "node scripts/hidden-desktop.mjs node node_modules/@playwright/test/cli.js test --config playwright.config.ts",
+    "test:packaged": "node scripts/hidden-desktop.mjs node scripts/packaged-smoke.mjs",
     "test:riven-scan": "node scripts/hidden-desktop.mjs node scripts/riven-scan-e2e/run-check.cjs",
     "backend:dev": "npm --prefix backend/worker run dev",
     "backend:dau": "npm --prefix backend/worker run dau --",
