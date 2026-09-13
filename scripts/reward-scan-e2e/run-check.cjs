@@ -1,12 +1,14 @@
 // Runs synthetic and reconstructed screens through the production scanner.
 // Windows-only after `pnpm run build`; exit 0 means all gating checks passed.
 const { execFileSync } = require("node:child_process");
+const { createHash } = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { _electron } = require("@playwright/test");
 
 const { buildRealScreens } = require("./build-screens.cjs");
+const { preserveNativeDiagnostics } = require("../native-artifacts.cjs");
 
 const KNOWN_READERS = ["windows", "onnx", "both"];
 
@@ -28,26 +30,7 @@ function parseReaderFilter(raw) {
   return new Set(names);
 }
 
-// The host dies partway through a long ONNX+sharp run, so up to three relaunches
-// are a survivable flake. Past the budget it is the process defect this gate
-// exists to catch, and the run fails.
-const MAX_RELAUNCHES = 3;
-const relaunches = [];
-
-function printRelaunchSummary() {
-  console.log(
-    relaunches.length === 0
-      ? "RELAUNCH SUMMARY: 0 Electron host crashes"
-      : `RELAUNCH SUMMARY: ${relaunches.length} Electron host crash(es), budget ${MAX_RELAUNCHES} - ${relaunches.join(", ")}`,
-  );
-}
-
-class RelaunchBudgetExceeded extends Error {}
-class SkipSyntheticScreens extends Error {}
-
 const ROOT = path.resolve(__dirname, "..", "..");
-const GEOMETRY_NOTE =
-  "real 2/3-choice title-rect geometry is unverified (crops show clipped names); needs full real screenshots";
 
 // expected item name per slot index; info screens report but do not gate.
 // expectMeta pins scan meta fields; cardCount>0 with layoutCount 1 is the proof
@@ -151,18 +134,18 @@ const SCREENS = [
     readers: ["onnx", "both"],
     expect: { 0: "Braton Prime Stock", 1: "Trumna Prime Blueprint" },
   },
-  // Real full screenshots - local-only (player names, never committed),
-  // skipped when absent. Windows OCR alone loses bright-art and 25px strips.
+  // Public frames mask identifying pixels outside the reward cards.
+  // Windows OCR alone loses bright-art and 25px strips.
   {
     file: "real-full-2p.png",
-    fixture: true,
+    publicFixture: true,
     readers: ["onnx", "both"],
     expectMeta: { cardCount: 2, layoutCount: 1 },
     expect: { 0: "Khora Prime Systems Blueprint", 1: "Fang Prime Handle" },
   },
   {
     file: "real-full-4p-1080x607.png",
-    fixture: true,
+    publicFixture: true,
     readers: ["onnx", "both"],
     expect: {
       0: "Okina Prime Handle",
@@ -174,7 +157,7 @@ const SCREENS = [
   {
     // fps-counter noise top+bottom + wrapped title; windows-solo reads 2/4
     file: "real-full-4p-fps.png",
-    fixture: true,
+    publicFixture: true,
     readers: ["onnx", "both"],
     expectMeta: { cardCount: 4, layoutCount: 1 },
     expect: {
@@ -194,6 +177,7 @@ const SCREENS = [
   // scans after the game-window crop. Gate the 1-choice layout.
   {
     file: "sim-client-1p-fang.png",
+    optionalSource: "real-full-1p-windowed-fang.png",
     readers: ["onnx", "both"],
     // There is no fixed 1-slot layout, so the counter is what gives this frame
     // a layout at all.
@@ -202,6 +186,7 @@ const SCREENS = [
   },
   {
     file: "sim-client-1p-lavos.png",
+    optionalSource: "real-full-1p-windowed.png",
     readers: ["onnx", "both"],
     expect: { 0: "Lavos Prime Blueprint" },
   },
@@ -220,7 +205,7 @@ const SCREENS = [
     // Only real taller-than-16:9 frame. All four slots hold Forma, so it gates
     // that the y-correction reads at all, not that slots land where they should.
     file: "real-full-4p-16x10.png",
-    fixture: true,
+    publicFixture: true,
     // Windows OCR reads the "2 X" quantity prefix as part of the name here.
     readers: ["onnx", "both"],
     expect: {
@@ -233,6 +218,16 @@ const SCREENS = [
 ];
 
 const FIXTURE_SCREEN_DIR = path.join(__dirname, "fixtures", "screens");
+const PUBLIC_SCREEN_DIR = path.join(__dirname, "fixtures", "public");
+
+function resolveScreenPath(screen, generatedDir) {
+  const dir = screen.publicFixture
+    ? PUBLIC_SCREEN_DIR
+    : screen.fixture
+      ? FIXTURE_SCREEN_DIR
+      : generatedDir;
+  return path.join(dir, screen.file);
+}
 
 async function buildClientCroppedSims(outDir) {
   const sharp = require("sharp");
@@ -309,6 +304,7 @@ function parseImageArg(argv) {
   const readerFilter = parseReaderFilter(process.env.REWARD_SCAN_READERS);
   const singleImage = parseImageArg(process.argv.slice(2));
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "wfh-scan-e2e-"));
+  console.log(`Scan diagnostics (retained on failure): ${workDir}`);
   const screenDir = path.join(workDir, "screens");
   fs.mkdirSync(screenDir);
 
@@ -318,9 +314,7 @@ function parseImageArg(argv) {
     await buildAspectPadSims(screenDir);
     await buildHiDpiSim(screenDir);
   }
-  let syntheticOk = !singleImage;
-  try {
-    if (singleImage) throw new SkipSyntheticScreens();
+  if (!singleImage) {
     execFileSync(
       "powershell",
       [
@@ -334,12 +328,32 @@ function parseImageArg(argv) {
       ],
       { stdio: "pipe" },
     );
-  } catch (err) {
-    if (!(err instanceof SkipSyntheticScreens)) {
-      syntheticOk = false;
-      console.log(
-        `NOTE: synthetic screen generation failed, skipping those checks (${err.message})`,
-      );
+    for (const screen of SCREENS) {
+      const optional =
+        screen.fixture ||
+        (screen.optionalSource &&
+          !fs.existsSync(path.join(FIXTURE_SCREEN_DIR, screen.optionalSource)));
+      if (!optional && !fs.existsSync(resolveScreenPath(screen, screenDir))) {
+        throw new Error(`Required fixture missing: ${screen.file}`);
+      }
+    }
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(PUBLIC_SCREEN_DIR, "manifest.json"), "utf8"),
+    );
+    const required = SCREENS.filter((screen) => screen.publicFixture).map((screen) => screen.file);
+    if (
+      !Array.isArray(manifest.fixtures) ||
+      JSON.stringify(manifest.fixtures.map((fixture) => fixture.file).sort()) !==
+        JSON.stringify([...required].sort())
+    ) {
+      throw new Error("Public fixture manifest does not match the required capture corpus");
+    }
+    for (const fixture of manifest.fixtures) {
+      const hash = createHash("sha256")
+        .update(fs.readFileSync(path.join(PUBLIC_SCREEN_DIR, fixture.file)))
+        .digest("hex");
+      if (hash !== fixture.sha256)
+        throw new Error(`Public fixture checksum mismatch: ${fixture.file}`);
     }
   }
 
@@ -354,12 +368,18 @@ function parseImageArg(argv) {
   delete env.ELECTRON_RUN_AS_NODE;
   env.WFHELPER_DISABLE_KEYBOARD_HOOK = "1";
   env.LOCALAPPDATA = localAppData;
+  env.APPDATA = path.join(workDir, "roaming");
   env.WFHELPER_USER_DATA = path.join(workDir, "roaming", "wfhelper");
 
-  const launchApp = () => _electron.launch({ args: ["--no-sandbox", ROOT], env });
-  // One host cannot survive ~130 ONNX+sharp scans; it dies partway with
-  // "Target page ... has been closed" at a point that moves between runs.
-  let app = await launchApp();
+  const app = await _electron.launch({ args: ["--no-sandbox", ROOT], env });
+  const host = app.process();
+  let hostExit = null;
+  host.once("exit", (code, signal) => {
+    hostExit = { code, signal };
+  });
+  host.stderr?.on("data", (chunk) => {
+    fs.appendFileSync(path.join(workDir, "host-stderr.log"), chunk);
+  });
   const failures = [];
   let gatingRuns = 0;
 
@@ -392,22 +412,16 @@ function parseImageArg(argv) {
       } catch (err) {
         if (!/has been closed|Target closed/i.test(String(err))) throw err;
         const where = `${path.basename(imgPath)}[${reader}]`;
-        relaunches.push(where);
-        console.log(`RELAUNCH: host died before ${where}`);
-        if (relaunches.length > MAX_RELAUNCHES) {
-          throw new RelaunchBudgetExceeded(
-            `Electron host crashed ${relaunches.length} times, over the budget of ${MAX_RELAUNCHES}`,
-          );
-        }
-        await app.close().catch(() => {});
-        app = await launchApp();
-        continue;
+        throw new Error(
+          `Electron host died during ${where}; exit=${JSON.stringify(hostExit)}; diagnostics=${workDir}`,
+          { cause: err },
+        );
       }
       if (result && !result.error && Array.isArray(result.items)) return result;
       if (result?.error) throw new Error(result.error);
       await new Promise((r) => setTimeout(r, 2000));
     }
-    return null;
+    throw new Error(`Scanner never became ready for ${path.basename(imgPath)}[${reader}]`);
   }
 
   try {
@@ -427,13 +441,9 @@ function parseImageArg(argv) {
         }
         if (!(result?.items || []).length) console.log("  no item cleared the match gate");
       }
-      await app.close().catch(() => {});
-      fs.rmSync(workDir, { recursive: true, force: true });
-      process.exit(0);
     }
 
-    for (const screen of SCREENS) {
-      if (screen.synthetic && !syntheticOk) continue;
+    for (const screen of singleImage ? [] : SCREENS) {
       // gating screens must pass through every reader in isolation and combined
       // unless the screen pins its readers (windows band-OCR known-weak cases)
       const declared = screen.readers || (screen.info ? ["both"] : ["windows", "onnx", "both"]);
@@ -444,12 +454,17 @@ function parseImageArg(argv) {
         console.log(`SKIP: ${screen.file} - no reader in REWARD_SCAN_READERS`);
         continue;
       }
-      const screenPath = screen.fixture
-        ? path.join(FIXTURE_SCREEN_DIR, screen.file)
-        : path.join(screenDir, screen.file);
+      const screenPath = resolveScreenPath(screen, screenDir);
       if (!fs.existsSync(screenPath)) {
-        console.log(`SKIP: ${screen.file} - local-only fixture absent`);
-        continue;
+        if (
+          screen.fixture ||
+          (screen.optionalSource &&
+            !fs.existsSync(path.join(FIXTURE_SCREEN_DIR, screen.optionalSource)))
+        ) {
+          console.log(`SKIP: ${screen.file} - optional local-only fixture absent`);
+          continue;
+        }
+        throw new Error(`Required fixture missing: ${screen.file}`);
       }
       for (const reader of readers) {
         if (!screen.info) gatingRuns += 1;
@@ -487,23 +502,38 @@ function parseImageArg(argv) {
       if (screen.info) console.log(`NOTE: ${screen.file} not gating - ${screen.info}`);
     }
   } catch (err) {
-    if (!(err instanceof RelaunchBudgetExceeded)) throw err;
-    failures.push(err.message);
+    failures.push(String(err.stack || err));
   } finally {
-    await app.close().catch(() => {});
+    if (hostExit)
+      failures.push(`Electron host exited before shutdown: ${JSON.stringify(hostExit)}`);
+    await app.close().catch((err) => failures.push(`Electron shutdown failed: ${String(err)}`));
   }
-  printRelaunchSummary();
-  fs.rmSync(workDir, { recursive: true, force: true });
   // Every fixture being skipped is not a pass; it means the gate never ran.
-  if (gatingRuns === 0) failures.push("no gating fixture executed");
+  if (!singleImage && gatingRuns === 0) failures.push("no gating fixture executed");
+  if (failures.length === 0) fs.rmSync(workDir, { recursive: true, force: true });
+  else {
+    fs.writeFileSync(
+      path.join(workDir, "failure.json"),
+      JSON.stringify({ failures, gatingRuns, hostExit }, null, 2),
+    );
+    console.error(`Scan failure diagnostics retained: ${workDir}`);
+    const artifacts = preserveNativeDiagnostics(
+      workDir,
+      "reward-scan",
+      ["failure.json", "host-stderr.log"],
+      process.env.WFHELPER_NATIVE_ARTIFACTS,
+    );
+    console.error(`CI scan diagnostics: ${artifacts}`);
+  }
   console.log(
     failures.length === 0
-      ? `ALL GATING CHECKS PASSED (${gatingRuns} gating screen/reader runs)`
+      ? singleImage
+        ? "IMAGE SCAN COMPLETED"
+        : `ALL GATING CHECKS PASSED (${gatingRuns} gating screen/reader runs)`
       : `FAILURES: ${failures.join(", ")}`,
   );
   process.exit(failures.length === 0 ? 0 : 1);
 })().catch((err) => {
   console.error(err);
-  printRelaunchSummary();
   process.exit(1);
 });
