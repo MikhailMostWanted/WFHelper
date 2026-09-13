@@ -104,9 +104,9 @@ describe("resolveRepOffer", () => {
     const purchase = { ...match("Serration", 20), type: "purchase" as const, orderId: "" };
     // "detected" is auto-close off or signed out: no orders were ever consulted.
     expect(resolveRepOffer(purchase, "detected", enabled)).toBeNull();
-    // A trade moving no platinum is a gift or a barter, not a market purchase.
+    // "match-failed" is the lookup throwing, so nothing was compared either.
+    expect(resolveRepOffer(purchase, "match-failed", enabled)).toBeNull();
     expect(resolveRepOffer({ ...purchase, platinum: 0 }, "no-match", enabled)).toBeNull();
-    // Barter carries neither an order nor a side to credit.
     const barter = { ...purchase, type: "trade" as const };
     expect(resolveRepOffer(barter, "no-match", enabled)).toBeNull();
   });

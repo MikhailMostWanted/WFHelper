@@ -13,8 +13,13 @@ export interface TradeMatchPayload {
   type: TradeType;
 }
 
-/** Listing closed, nothing matched, close rejected, or never checked. */
-export type TradeNotificationStatus = "closed" | "no-match" | "close-failed" | "detected";
+/** Listing closed, nothing matched, close rejected, lookup threw, or never checked. */
+export type TradeNotificationStatus =
+  | "closed"
+  | "no-match"
+  | "match-failed"
+  | "close-failed"
+  | "detected";
 
 /** Toast content for however many listings one trade closed. */
 export function summarizeMatches(
@@ -35,22 +40,19 @@ export interface TradeRepOffer {
   hotkey: string;
 }
 
-/** Whether the trade is one warframe.market can be credited for. A listing of
- *  ours proves it. Buying usually closes no listing, because the WFM way to buy
- *  is whispering somebody else's sell order, so the evidence there is that we
- *  held a live session and compared this trade against our own orders. */
+/** Whether warframe.market can be credited for the trade. A listing of ours
+ *  proves it; buying closes no listing, so there the proof is that we compared
+ *  the trade against our own orders and found none. */
 function repTradeIsAttributable(
   match: TradeMatchPayload,
   status: TradeNotificationStatus,
 ): boolean {
   const settled = status === "closed" || status === "close-failed";
   if (match.orderId) return settled;
-  // A sale that closed nothing is evidence against warframe.market: selling
-  // through it always starts with an order of our own.
+  // Selling through warframe.market always starts with an order of our own.
   if (match.type !== "purchase") return false;
-  // Only "no-match" means the orders were fetched and checked for this trade;
-  // "detected" is the status for never having looked. Plain platinum keeps
-  // gifts and barter out.
+  // "no-match" is the only status that means the orders were fetched and
+  // compared: "detected" never looked and "match-failed" threw.
   return status === "no-match" && match.platinum > 0;
 }
 

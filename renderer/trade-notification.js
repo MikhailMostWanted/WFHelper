@@ -7,6 +7,7 @@
   const STATUS_KEYS = {
     closed: "overlay.trade.listingClosed",
     "no-match": "overlay.trade.noListingMatched",
+    "match-failed": "overlay.trade.noListingMatched",
     "close-failed": "overlay.trade.closingFailed",
     detected: "overlay.trade.tradeFinished",
   };

@@ -101,6 +101,8 @@ export function isNotificationSource(value: unknown): value is NotificationSourc
 const TRADE_STATUS_TITLES: Record<TradeNotificationStatus, string> = {
   closed: "Listing Closed",
   "no-match": "No Listing Matched",
+  // A failed lookup reads the same to the user; only the rep offer tells them apart.
+  "match-failed": "No Listing Matched",
   "close-failed": "Closing Failed",
   detected: "Trade Finished",
 };

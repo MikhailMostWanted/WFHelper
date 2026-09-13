@@ -159,4 +159,20 @@ describe("trade workflow notification routing", () => {
       "trade",
     );
   });
+
+  it("separates a thrown order lookup from a checked no-match", async () => {
+    const { workflow } = await setup({
+      tradeNotificationOverlayEnabled: true,
+      tradeDesktopNotificationsEnabled: true,
+      autoCloseWfmOrders: true,
+    });
+    h.getToken.mockReturnValue("token");
+    h.matchTradeToOrders.mockRejectedValue(new Error("warframe.market unreachable"));
+
+    workflow.handleConfirmedTrade({} as ParsedLogTrade);
+    await flushPromises();
+    await flushPromises();
+
+    expect(h.showTradeNotification.mock.calls[0][1]).toBe("match-failed");
+  });
 });
