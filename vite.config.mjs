@@ -61,7 +61,7 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "renderer/dist"),
     emptyOutDir: true,
-    sourcemap: false,
+    sourcemap: process.env.WFHELPER_SOURCE_MAPS === "1" ? "hidden" : false,
     chunkSizeWarningLimit: CHUNK_SIZE_WARNING_LIMIT_KB,
     rollupOptions: {
       output: {

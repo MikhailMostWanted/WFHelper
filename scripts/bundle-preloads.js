@@ -44,12 +44,16 @@ function bundlePreload(name) {
       external: ["electron"],
       // Keep readable for debugging preload issues
       minify: false,
+      sourcemap: process.env.WFHELPER_SOURCE_MAPS === "1" ? "external" : false,
     });
     validateBundle(tempOut);
     fs.renameSync(tempOut, entry);
+    if (process.env.WFHELPER_SOURCE_MAPS === "1") fs.renameSync(`${tempOut}.map`, `${entry}.map`);
+    else fs.rmSync(`${entry}.map`, { force: true });
   } finally {
     fs.rmSync(tempEntry, { force: true });
     fs.rmSync(tempOut, { force: true });
+    fs.rmSync(`${tempOut}.map`, { force: true });
   }
 }
 

@@ -11,6 +11,7 @@
   "packageManager": "pnpm@11.1.2",
   "scripts": {
     "build": "pnpm run build:main && vite build",
+    "build:debug": "node scripts/build-debug.mjs",
     "start": "pnpm run build && electron .",
     "dev": "pnpm run build:main && concurrently -k \"pnpm:dev:main\" \"pnpm:dev:preloads\" \"pnpm:dev:renderer\" \"pnpm:dev:electron\"",
     "verify:onnx-models": "node scripts/verify-onnx-models.mjs",
@@ -147,6 +148,7 @@
     },
     "files": [
       ".electron-build/**/*",
+      "!.electron-build/**/*.map",
       "native/layer-shell/build/*.node",
       "renderer/**/*",
       "assets/**/*",
