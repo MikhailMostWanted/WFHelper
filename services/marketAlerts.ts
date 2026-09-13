@@ -741,8 +741,9 @@ async function runRule(rule: MarketAlertRule): Promise<void> {
   }
 }
 
-/** Drops the quiet window and the eval spacing so the rule runs on the next
- *  tick. The failure count stays: it paces a broken rule, not a fired one. */
+/** Drops the quiet window and the eval spacing, including any failure backoff,
+ *  so the rule runs on the next tick. Forcing a retry is the whole point: the
+ *  count is kept only to size the next backoff if it fails again. */
 function clearRuleCooldown(id: string): void {
   _cooldownUntil.delete(id);
   _nextEvalAt.delete(id);
