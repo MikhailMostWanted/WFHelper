@@ -7,6 +7,7 @@
   import { dropRarityColour } from "../lib/dropDisplay.js";
   import { fissureTierClass, RELIC_ICON_PATHS } from "../lib/relic.js";
   import { relicGroupForDisplayName } from "../lib/relic/relicInventory.js";
+  import { sortRelicRewards } from "../../config/shared/relicRewardOrder.js";
   import { buildWikiUrl } from "../lib/wikiUrl.js";
   import { tr } from "../lib/i18n.js";
   import type { DropInfo } from "../types/inventory.js";
@@ -105,7 +106,8 @@
   }
 
   function getPopoverRewards(rg: RelicGroup) {
-    return (rg.qualities?.intact ?? Object.values(rg.qualities ?? {})[0])?.rewards ?? [];
+    const quality = rg.qualities?.intact ?? Object.values(rg.qualities ?? {})[0];
+    return sortRelicRewards(quality?.rewards ?? []);
   }
 
   function openDetailedRelic(rg: RelicGroup): void {

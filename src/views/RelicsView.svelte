@@ -39,6 +39,7 @@
   import { isRewardNeeded, type RewardNeedContext } from "../lib/relic/rewardNeed.js";
   import { inventorySafetyContext } from "../stores/inventorySafety.js";
   import { stripQuantityPrefix } from "../../config/shared/quantityPrefix.js";
+  import { sortRelicRewards } from "../../config/shared/relicRewardOrder.js";
   import type { ParsedItem } from "../types/inventory.js";
   import type { RelicGroup, RelicQuality, RelicReward } from "../types/relics.js";
   import type {
@@ -488,13 +489,13 @@
   function previewRewards(group: RelicGroup): RelicReward[] {
     const intactRewards = group.qualities.intact?.rewards || [];
     if (intactRewards.length > 0) {
-      return intactRewards.slice(0, RELIC_PREVIEW_REWARD_LIMIT);
+      return sortRelicRewards(intactRewards).slice(-RELIC_PREVIEW_REWARD_LIMIT);
     }
 
     for (const quality of RELIC_QUALITY_COLUMNS) {
       const rewards = group.qualities[quality]?.rewards || [];
       if (rewards.length > 0) {
-        return rewards.slice(0, RELIC_PREVIEW_REWARD_LIMIT);
+        return sortRelicRewards(rewards).slice(-RELIC_PREVIEW_REWARD_LIMIT);
       }
     }
 

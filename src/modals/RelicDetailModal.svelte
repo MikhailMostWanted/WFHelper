@@ -5,6 +5,7 @@
   import { itemDb, componentOwnership } from "../stores/data.js";
   import { masteryData } from "../stores/mastery.js";
   import { relicOwnedCounts } from "../stores/relics.js";
+  import { sortRelicRewards } from "../../config/shared/relicRewardOrder.js";
   import { itemMarksFor, sharedPartMasteryResolver } from "../lib/parentMastery.js";
   import { fetchPriceBySlug } from "../lib/wfm/wfmPrice.js";
   import { fetchWfmItemMetaBySlug } from "../lib/wfm/wfmItemMeta.js";
@@ -95,7 +96,7 @@
     if (!qData) return;
     currentGroup = g;
     currentQuality = quality;
-    rewards = qData.rewards || [];
+    rewards = sortRelicRewards(qData.rewards || []);
     closeRewardPanel();
     prices = null;
     ducats = null;

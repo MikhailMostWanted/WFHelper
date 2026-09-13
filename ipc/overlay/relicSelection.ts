@@ -375,7 +375,9 @@ function rewardRarityRank(rarity: string | null | undefined): number {
   return REWARD_RARITY_RANK[String(rarity ?? "").toLowerCase()] ?? 3;
 }
 
-/** Rare first: the overlay editor names planner slot n after the rarity it shows. */
+/** Rare first, unlike the in-app card: the overlay editor names planner slot n
+ *  after the rarity it shows and every slot is opt-in, so whoever enables one
+ *  slot wants the rare in it. */
 function sortRewardsByRarity<T extends { rarity?: string | null; chance?: number }>(
   rewards: readonly T[],
 ): T[] {
