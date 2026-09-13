@@ -31,6 +31,22 @@ describe("relic reward order", () => {
     expect(rewards[0].name).toBe("mystery");
   });
 
+  it("reads rare to common for the planner overlay, unknown still last", () => {
+    const rewards = [
+      { name: "common", rarity: "Common", chance: 25 },
+      { name: "mystery", rarity: null, chance: 50 },
+      { name: "rare", rarity: "Rare", chance: 2 },
+      { name: "uncommon", rarity: "Uncommon", chance: 11 },
+    ];
+
+    expect(sortRelicRewards(rewards, "rare-first").map((reward) => reward.name)).toEqual([
+      "rare",
+      "uncommon",
+      "common",
+      "mystery",
+    ]);
+  });
+
   it("keeps the source order for rewards that tie on both keys", () => {
     const rewards = [
       { name: "first", rarity: "Common", chance: 25 },

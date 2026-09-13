@@ -2,6 +2,7 @@ import { normalizeDucats, toFiniteOr, clampNumber } from "../../config/shared/nu
 import { normalizeErrorMessage } from "../../config/shared/errors";
 import { RELIC_RECOMMENDATIONS, RELIC_PLANNER_TRIGGER } from "../../config/shared/ipcChannels";
 import { collectRelicInventoryCounts } from "../../config/shared/relicCounts";
+import { sortRelicRewards } from "../../config/shared/relicRewardOrder";
 import { getWindowsOcrHealth } from "../../services/ocrServer";
 import { rewardOcrOnnxAvailable } from "../../services/rewardOcrOnnx";
 import { normalizeOcrPhrase } from "../../config/shared/ocrPhrase";
@@ -365,29 +366,6 @@ function getCacheFileMtimeMs(fs: typeof import("node:fs"), cacheFilePath: string
   }
 }
 
-const REWARD_RARITY_RANK: Readonly<Record<string, number>> = Object.freeze({
-  rare: 0,
-  uncommon: 1,
-  common: 2,
-});
-
-function rewardRarityRank(rarity: string | null | undefined): number {
-  return REWARD_RARITY_RANK[String(rarity ?? "").toLowerCase()] ?? 3;
-}
-
-/** Rare first, unlike the in-app card: the overlay editor names planner slot n
- *  after the rarity it shows and every slot is opt-in, so whoever enables one
- *  slot wants the rare in it. */
-function sortRewardsByRarity<T extends { rarity?: string | null; chance?: number }>(
-  rewards: readonly T[],
-): T[] {
-  return rewards.slice().sort((a, b) => {
-    const rank = rewardRarityRank(a.rarity) - rewardRarityRank(b.rarity);
-    if (rank !== 0) return rank;
-    return (b.chance ?? 0) - (a.chance ?? 0);
-  });
-}
-
 function pickBestOwnedQuality(
   group: RelicGroup,
   ownedRow: OwnedCountRow,
@@ -446,7 +424,7 @@ function pickBestOwnedQuality(
       platEv,
       ducatEv,
       vaulted: Boolean(group.vaulted),
-      rewards: sortRewardsByRarity(normalizedRewards)
+      rewards: sortRelicRewards(normalizedRewards, "rare-first")
         .slice(0, 6)
         .map((reward) => ({
           uniqueName: reward.uniqueName || null,
