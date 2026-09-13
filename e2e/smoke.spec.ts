@@ -46,6 +46,7 @@ test.describe("Electron Smoke", () => {
     delete launchEnv.ELECTRON_RUN_AS_NODE;
     launchEnv.WFHELPER_DISABLE_KEYBOARD_HOOK = "1";
     launchEnv.LOCALAPPDATA = localAppData;
+    launchEnv.APPDATA = path.join(sandboxDir, "roaming");
     launchEnv.WFHELPER_USER_DATA = path.join(sandboxDir, "user-data");
 
     app = await electron.launch({ args: ["--no-sandbox", "--lang=en-US", "."], env: launchEnv });

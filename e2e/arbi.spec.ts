@@ -89,6 +89,7 @@ describeArbi("Arbitration schedule + post-run overlay", () => {
     delete env.ELECTRON_RUN_AS_NODE;
     env.WFHELPER_DISABLE_KEYBOARD_HOOK = "1";
     env.LOCALAPPDATA = localAppData;
+    env.APPDATA = path.join(sandboxDir, "roaming");
     env.WFHELPER_USER_DATA = userData;
 
     app = await electron.launch({ args: ["--no-sandbox", "--lang=en-US", "."], env });
