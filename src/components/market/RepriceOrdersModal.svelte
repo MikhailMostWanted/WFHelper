@@ -112,9 +112,12 @@
     return new Set(shownRows.map((row) => row.rowId));
   }
 
+  // The selection becomes the filtered rows, unlike the sell queue where ticks
+  // are the user's own. Every listing starts selected here, so an additive
+  // button could never narrow a run down to what the filter is showing.
   function selectShown(): void {
     const ids = shownIds();
-    rows = rows.map((row) => (ids.has(row.rowId) ? { ...row, selected: true } : row));
+    rows = rows.map((row) => ({ ...row, selected: ids.has(row.rowId) }));
   }
 
   function clearSelection(): void {
@@ -313,13 +316,13 @@
           })}
         </span>
         <button class="btn-secondary btn-sm" data-reprice-select-all onclick={selectShown}>
-          {$tr("common.selectAll")}
+          {$tr("common.selectMatching", { count: shownRows.length })}
         </button>
         <button class="btn-secondary btn-sm" data-reprice-select-none onclick={clearSelection}>
-          {$tr("common.none")}
+          {$tr("common.selectNoneCount", { count: selectedCount })}
         </button>
         <button class="btn-secondary btn-sm" data-reprice-select-invert onclick={invertShown}>
-          {$tr("common.invert")}
+          {$tr("common.selectInvert", { count: shownRows.length })}
         </button>
       </div>
     </div>

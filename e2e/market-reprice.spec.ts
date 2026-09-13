@@ -142,6 +142,16 @@ test.describe("Market reprice (fixture mode)", () => {
     await expect(box(2)).toBeChecked();
 
     await modal.locator("[data-reprice-select-all]").click();
+    for (const index of [0, 1, 2]) await expect(box(index)).toBeChecked();
+
+    // Narrowing without clearing first: every listing starts selected, so this
+    // has to replace the selection or Apply would still send the hidden rows.
+    await modal.locator("[data-reprice-min-plat]").fill("12");
+    await modal.locator("[data-reprice-select-all]").click();
+    await modal.locator("[data-reprice-min-plat]").fill("");
+    await expect(box(0)).not.toBeChecked();
+    await expect(box(1)).not.toBeChecked();
+    await expect(box(2)).toBeChecked();
   });
 });
 

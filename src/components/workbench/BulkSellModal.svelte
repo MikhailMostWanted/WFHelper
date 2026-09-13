@@ -753,7 +753,7 @@
           data-workbench-select-all
           onclick={() => selectFiltered(() => true)}
         >
-          {t("workbench.selectMatching", { count: filteredRows.length })}
+          {t("common.selectMatching", { count: filteredRows.length })}
         </button>
         <button
           type="button"
@@ -762,7 +762,7 @@
           data-workbench-select-none
           onclick={clearSelection}
         >
-          {t("workbench.selectNone", { count: selectedCount })}
+          {t("common.selectNoneCount", { count: selectedCount })}
         </button>
         <button
           type="button"
@@ -771,7 +771,7 @@
           data-workbench-select-invert
           onclick={() => selectFiltered((row) => !row.selected)}
         >
-          {t("workbench.selectInvert", { count: filteredRows.length })}
+          {t("common.selectInvert", { count: filteredRows.length })}
         </button>
       </div>
 
