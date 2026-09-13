@@ -9,6 +9,7 @@ import { fallbackNameFromUniqueName, sanitizeDisplayName } from "../config/share
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { normalizeDucats } from "../config/shared/numeric";
 import { normalizeWfmSlug } from "../config/shared/wfm";
+import type { MarketAcquisition } from "../config/shared/marketAcquisition";
 import { WIKI_ITEM_ART } from "../config/shared/wikiItemArt";
 import { WIKI_MOD_ART, WIKI_MOD_ART_BY_NAME } from "../config/shared/wikiModArt";
 import { isLocalizingNames, localizeName } from "./gameLocale";
@@ -174,7 +175,7 @@ function buildComponentAliasUniqueNames(uniqueName: string = ""): string[] {
   return [];
 }
 
-interface ItemEntry {
+interface ItemEntry extends MarketAcquisition {
   name: string;
   category: string;
   imageUrl: string | null;
@@ -197,12 +198,6 @@ interface ItemEntry {
   drops?: DropEntry[];
   isBuildComponent?: boolean;
   componentOf?: string;
-  /** DE offers this item's blueprint in the in-game Market. */
-  marketBuyable?: true;
-  /** Market credit price of that blueprint; absent when DE lists none. */
-  marketCredits?: number;
-  /** The blueprint is a clan dojo research project. */
-  dojoResearch?: true;
 }
 
 let itemsByUniqueName: Record<string, ItemEntry> = {};

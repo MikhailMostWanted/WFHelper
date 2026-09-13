@@ -1,4 +1,5 @@
 import type { MasteryStatus } from "../../config/shared/masteryTypes.js";
+import type { MarketAcquisition } from "../../config/shared/marketAcquisition.js";
 export type { MasteryStatus };
 export type PartType = "normal" | "prime";
 
@@ -133,7 +134,7 @@ export type InventoryGroup =
   | "equipment"
   | "misc";
 
-export interface ParsedItem {
+export interface ParsedItem extends MarketAcquisition {
   /** English. Every by-name lookup and market slug is built from this. */
   name: string;
   /** Active game language, absent when it matches `name`. Render this. */
@@ -160,12 +161,6 @@ export interface ParsedItem {
   currentlyOwned?: boolean;
   /** Owned modular build that grants no mastery until it is gilded. */
   needsGilding?: boolean;
-  /** DE offers this item's blueprint in the in-game Market for credits. */
-  marketBuyable?: true;
-  /** Market credit price of that blueprint; absent when DE lists none. */
-  marketCredits?: number;
-  /** The blueprint is a clan dojo research project, which no inventory can confirm. */
-  dojoResearch?: true;
   /** Stamped by attachPartMasteryFlags: the build this row belongs to is mastered. */
   parentMastered?: boolean;
   /** That build is in the inventory now. Only set on parts and set rows. */

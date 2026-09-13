@@ -6,6 +6,7 @@ import type { ComponentEntry } from "./types/gameData";
 import { MAX_ITEM_RANK } from "../config/game/constants";
 import { ownedComponentCount } from "../config/shared/componentNames";
 import { aggregateComponentOwnership } from "../config/shared/componentOwnership";
+import type { MarketAcquisition } from "../config/shared/marketAcquisition";
 import { sanitizeDisplayName } from "../config/shared/displayName";
 import { EQUIPMENT_COLLECTIONS, MODULAR_COLLECTIONS } from "../config/shared/gearCollections";
 import { withoutFoundryPending } from "../config/shared/foundryPending";
@@ -776,7 +777,7 @@ function extractOvercapFeatureRank(entry: InventoryMasteryEntry, maxRank: number
   return rank;
 }
 
-interface MasterableItem {
+interface MasterableItem extends MarketAcquisition {
   name: string;
   uniqueName: string;
   category: string;
@@ -788,12 +789,6 @@ interface MasterableItem {
   keywords: string[];
   debugReason: string;
   components: ComponentEntry[];
-  /** DE offers this item's blueprint in the in-game Market for credits. */
-  marketBuyable?: true;
-  /** Market credit price of that blueprint; absent when DE lists none. */
-  marketCredits?: number;
-  /** The blueprint is a clan dojo research project. */
-  dojoResearch?: true;
 }
 
 const SUIT_MASTERY_CATEGORIES = new Set(["Warframes", "Companions", "Necramech"]);
