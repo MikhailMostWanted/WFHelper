@@ -5,13 +5,13 @@
   import { relicDb, relicOwnedCounts } from "../stores/relics.js";
   import { activeItem, activeComponent, activeRelic } from "../stores/modals.js";
   import { dropRarityColour } from "../lib/dropDisplay.js";
-  import { fissureTierClass, RELIC_ICON_PATHS } from "../lib/relic.js";
-  import { relicGroupForDisplayName } from "../lib/relic/relicInventory.js";
+  import { fissureTierClass, RELIC_ICON_PATHS, RELIC_QUALITY_SHORT_KEY } from "../lib/relic.js";
+  import { ownedRelicQualities, relicGroupForDisplayName } from "../lib/relic/relicInventory.js";
   import { sortRelicRewards } from "../../config/shared/relicRewardOrder.js";
   import { buildWikiUrl } from "../lib/wikiUrl.js";
   import { tr } from "../lib/i18n.js";
   import type { DropInfo } from "../types/inventory.js";
-  import type { OwnedCounts, RelicGroup } from "../types/relics.js";
+  import type { RelicGroup } from "../types/relics.js";
 
   export let drops: DropInfo[];
   /** Empty means "use the default heading", which has to stay translatable. */
@@ -84,15 +84,6 @@
     openRelicKey = openRelicKey === key ? null : key;
   }
 
-  // The counts come in as an argument: the popover outlives an inventory push, and
-  // a template call is untracked, so reading the store here would freeze the badge
-  // at whatever ownership held when the row was expanded.
-  function isOwned(groupKey: string, counts: OwnedCounts): boolean {
-    const owned = counts[groupKey];
-    if (!owned) return false;
-    return owned.intact + owned.exceptional + owned.flawless + owned.radiant > 0;
-  }
-
   function relicFallbackIcon(rg: RelicGroup): string {
     return RELIC_ICON_PATHS[fissureTierClass(rg.tier)] || RELIC_ICON_PATHS.default;
   }
@@ -132,6 +123,7 @@
       {#each showAll ? dedupedDrops : dedupedDrops.slice(0, initialLimit) as d}
         {@const rg = relicGroupForDisplayName($relicDb, d.location)}
         {#if rg}
+          {@const ownedHere = ownedRelicQualities($relicOwnedCounts, rg.key)}
           <button
             type="button"
             class="flex w-full items-center justify-between gap-2 px-2 -mx-2 py-1.5 rounded-md cursor-pointer text-left text-sm text-text-secondary border-b border-dashed border-border-subtle last:border-b-0 hover:bg-surface-hover hover:text-text-primary transition-colors {openRelicKey ===
@@ -141,7 +133,21 @@
             on:click={(e) => toggleRelic(e, rg.key)}
             on:keydown={(e) => handleKeydown(e, rg.key)}
           >
-            <span class="text-text-primary">{rg.name} {$tr("drops.relicSuffix")}</span>
+            <span class="flex min-w-0 flex-wrap items-center gap-1.5">
+              <span class="text-text-primary">{rg.name} {$tr("drops.relicSuffix")}</span>
+              <span
+                class="vault-badge vault-badge--inline"
+                class:vault-badge--open={!rg.vaulted}
+                data-relic-vault={rg.vaulted ? "vaulted" : "unvaulted"}
+                title={rg.vaulted ? $tr("common.vaulted") : $tr("common.unvaulted")}
+                >{rg.vaulted ? "V" : "U"}</span
+              >
+              {#each ownedHere as entry (entry.quality)}
+                <span class="relic-owned-chip" data-relic-owned={entry.quality}
+                  >{$tr(RELIC_QUALITY_SHORT_KEY[entry.quality])} {entry.count}</span
+                >
+              {/each}
+            </span>
             <span class="flex items-center gap-2 shrink-0">
               {#if d.chance}<span class="text-accent text-xs">{d.chance.toFixed(1)}%</span>{/if}
               {#if d.rarity}<span class="text-text-muted">({d.rarity})</span>{/if}
@@ -153,7 +159,6 @@
 
           {#if openRelicKey === rg.key}
             {@const rewards = getPopoverRewards(rg)}
-            {@const owned = isOwned(rg.key, $relicOwnedCounts)}
             <div
               class="my-2 rounded-lg border border-border-strong bg-bg-raised px-3 py-2.5 shadow-[var(--ui-panel-shadow)]"
             >
@@ -168,12 +173,20 @@
                   <span class="font-display text-sm font-semibold text-text-primary truncate"
                     >{rg.name}</span
                   >
-                  <span
-                    class="font-display text-xs font-bold tracking-wider px-1.5 py-0.5 rounded w-fit {owned
-                      ? 'bg-success/15 text-success'
-                      : 'bg-danger/20 text-danger'}"
-                  >
-                    {owned ? $tr("common.owned") : $tr("common.vaulted")}
+                  <span class="flex flex-wrap items-center gap-1.5">
+                    <span
+                      class="font-display text-xs font-bold tracking-wider px-1.5 py-0.5 rounded w-fit {rg.vaulted
+                        ? 'bg-danger/20 text-danger'
+                        : 'bg-info/15 text-info'}"
+                      data-relic-popover-vault={rg.vaulted ? "vaulted" : "unvaulted"}
+                    >
+                      {rg.vaulted ? $tr("common.vaulted") : $tr("common.unvaulted")}
+                    </span>
+                    {#each ownedHere as entry (entry.quality)}
+                      <span class="relic-owned-chip"
+                        >{$tr(RELIC_QUALITY_SHORT_KEY[entry.quality])} {entry.count}</span
+                      >
+                    {/each}
                   </span>
                 </div>
                 <button
@@ -238,6 +251,7 @@
       {#if !showAll && dedupedDrops.length > initialLimit}
         <button
           class="block w-full cursor-pointer border-0 bg-transparent py-1.5 text-left font-display text-xs text-accent opacity-85 hover:opacity-100 hover:underline"
+          data-drops-show-all
           on:click={() => (showAll = true)}
           >{$tr("drops.viewAllSources", { count: dedupedDrops.length })}</button
         >

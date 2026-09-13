@@ -2,6 +2,7 @@
 
 export {
   RELIC_ICON_PATHS,
+  RELIC_QUALITY_SHORT_KEY,
   RELIC_TIER_ORDER,
   QUALITY_MODES,
   fissureTierClass,

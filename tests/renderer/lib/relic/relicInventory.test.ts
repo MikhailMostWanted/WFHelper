@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { relicGroupForDisplayName } from "../../../../src/lib/relic/relicInventory.js";
-import type { RelicDatabase, RelicGroup } from "../../../../src/types/relics.js";
+import {
+  ownedRelicQualities,
+  relicGroupForDisplayName,
+} from "../../../../src/lib/relic/relicInventory.js";
+import type { OwnedCounts, RelicDatabase, RelicGroup } from "../../../../src/types/relics.js";
 
 function makeGroup(tier: string, code: string): RelicGroup {
   return {
@@ -53,5 +56,25 @@ describe("relicGroupForDisplayName", () => {
     expect(relicGroupForDisplayName(db, "Relic")).toBeNull();
     expect(relicGroupForDisplayName(db, "")).toBeNull();
     expect(relicGroupForDisplayName(null, "Lith A1 Relic")).toBeNull();
+  });
+});
+
+describe("owned relic refinements", () => {
+  const counts: OwnedCounts = {
+    "Lith A1": { intact: 3, exceptional: 0, flawless: 0, radiant: 2 },
+    "Meso B2": { intact: 0, exceptional: 0, flawless: 0, radiant: 0 },
+  };
+
+  it("lists only the refinements held, in the game's tier order", () => {
+    expect(ownedRelicQualities(counts, "Lith A1")).toEqual([
+      { quality: "intact", count: 3 },
+      { quality: "radiant", count: 2 },
+    ]);
+  });
+
+  it("says nothing for a relic held at no refinement or never seen", () => {
+    expect(ownedRelicQualities(counts, "Meso B2")).toEqual([]);
+    expect(ownedRelicQualities(counts, "Axi Z9")).toEqual([]);
+    expect(ownedRelicQualities({}, "Lith A1")).toEqual([]);
   });
 });

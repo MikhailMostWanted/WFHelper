@@ -1,6 +1,23 @@
 import { collectRelicInventoryCounts } from "../../../config/shared/relicCounts.js";
+import { QUALITY_MODES } from "./relicConstants.js";
 import type { RawInventoryData } from "../../types/inventory.js";
-import type { OwnedCounts, RelicDatabase, RelicGroup } from "../../types/relics.js";
+import type { OwnedCounts, RelicDatabase, RelicGroup, RelicQuality } from "../../types/relics.js";
+
+/** The refinements of one relic the player holds, in the game's tier order and
+ *  with the empty ones dropped. Counts come in as an argument: a template call
+ *  in a legacy component is untracked, so reading the store inside would leave
+ *  the row showing whatever ownership held when it was first drawn. */
+export function ownedRelicQualities(
+  counts: OwnedCounts,
+  groupKey: string,
+): Array<{ quality: RelicQuality; count: number }> {
+  const owned = counts[groupKey];
+  if (!owned) return [];
+  return QUALITY_MODES.filter((quality) => owned[quality] > 0).map((quality) => ({
+    quality,
+    count: owned[quality],
+  }));
+}
 
 /** Group for a projection uniqueName of any refinement; null when unknown or
  *  the relic database has not loaded yet. */

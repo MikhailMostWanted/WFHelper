@@ -3,7 +3,12 @@
   import { itemLabel } from "../../lib/itemLabel.js";
   import ItemImage from "../ItemImage.svelte";
   import MarketMetricStrip from "../MarketMetricStrip.svelte";
-  import { fissureTierClass, QUALITY_MODES, RELIC_ICON_PATHS } from "../../lib/relic.js";
+  import {
+    fissureTierClass,
+    QUALITY_MODES,
+    RELIC_ICON_PATHS,
+    RELIC_QUALITY_SHORT_KEY,
+  } from "../../lib/relic.js";
   import { itemMarksFor, sharedPartMasteryResolver } from "../../lib/parentMastery.js";
   import { itemDb } from "../../stores/data.js";
   import { masteryData } from "../../stores/mastery.js";
@@ -37,12 +42,6 @@
     exceptional: "relics.quality.exceptional",
     flawless: "relics.quality.flawless",
     radiant: "relics.quality.radiant",
-  };
-  const RELIC_QUALITY_SHORT_KEY: Record<RelicQuality, MessageKey> = {
-    intact: "relics.qualityShort.intact",
-    exceptional: "relics.qualityShort.exceptional",
-    flawless: "relics.qualityShort.flawless",
-    radiant: "relics.qualityShort.radiant",
   };
   $: RELIC_QUALITY_LABEL = {
     intact: $tr(RELIC_QUALITY_LABEL_KEY.intact),
