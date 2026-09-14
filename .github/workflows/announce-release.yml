@@ -14,6 +14,8 @@ jobs:
   notify-discord:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Announce the release on Discord
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -23,59 +25,13 @@ jobs:
           BODY: ${{ github.event.release.body }}
           # Repo variable (not a secret): Discord role id to ping. Empty = no ping.
           ROLE_ID: ${{ vars.DISCORD_RELEASE_ROLE_ID }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
-            echo "::error::DISCORD_WEBHOOK_URL secret is missing/empty - Discord announcement NOT sent."
-            exit 1
-          fi
-          dry_run=false
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            dry_run=true
-            # Long synthetic body so the dry run exercises the truncation branch.
-            TITLE="dry run"
-            URL="https://github.com/${{ github.repository }}/releases"
+          if [ "$DRY_RUN" = true ]; then
+            # Long synthetic body so the dry run exercises the multi-message split.
+            export TITLE="dry run"
+            export URL="https://github.com/${{ github.repository }}/releases"
             BODY=$(for i in $(seq 1 300); do echo "- synthetic changelog line $i"; done)
+            export BODY
           fi
-          title="$TITLE"
-          [ -z "$title" ] && title="$TAG"
-          # jq escapes + truncates by codepoint; allowed_mentions keeps notes from pinging.
-          # Plain content spans the full chat width (embeds cap at ~520px) but
-          # only allows 2000 chars; cut back to a line break so the post never
-          # ends mid-bullet.
-          payload=$(jq -n \
-            --arg title "$title" \
-            --arg url "$URL" \
-            --arg body "$BODY" \
-            --arg role "$ROLE_ID" \
-            '
-            ($body
-              | if length == 0 then "A new version of WFHelper is available - see the release for details."
-                elif length > 1700 then
-                  (.[0:1700] | (rindex("\n") // 1700) as $cut | .[0:$cut])
-                  + "\n\n**[Full changelog →](" + $url + ")**"
-                else . end) as $desc
-            | {
-                username: "WFHelper Releases",
-                content: ("## [WFHelper " + $title + "](" + $url + ") is out 🎉"
-                  + (if $role == "" then "" else " <@&" + $role + ">" end)
-                  + "\n" + $desc
-                  + "\n-# [Release notes](" + $url + ") · Download at wfhelper.com"),
-                allowed_mentions: (if $role == "" then { parse: [] } else { roles: [$role] } end)
-              }')
-          chars=$(printf '%s' "$payload" | jq -r '.content | length')
-          if [ "$chars" -gt 2000 ]; then
-            echo "::error::Message content is $chars chars; Discord rejects over 2000."
-            exit 1
-          fi
-          if [ "$dry_run" = true ]; then
-            echo "Webhook secret is set (non-empty). Dry run - nothing posted."
-            if [ -n "$ROLE_ID" ]; then
-              echo "Release role ping configured (id ends ...${ROLE_ID: -4})."
-            else
-              echo "No release role ping configured (DISCORD_RELEASE_ROLE_ID unset)."
-            fi
-            echo "Payload built OK; message content $chars chars."
-            exit 0
-          fi
-          curl -sS -f -X POST -H "Content-Type: application/json" \
-            -d "$payload" "$DISCORD_WEBHOOK_URL"
+          node scripts/announce-release.mjs
