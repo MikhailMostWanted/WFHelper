@@ -66,8 +66,11 @@ function verifyLibvips(imgRoot, bindingRoot, platform, arch) {
     throw new Error(`Packaged build has no libvips shared object for ${platform}-${arch}`);
   }
 
-  const declared = readJson(path.join(bindingRoot, "package.json"));
-  const wanted = declared && declared.dependencies && declared.dependencies[`@img/${name}`];
+  const declared = readJson(path.join(bindingRoot, "package.json")) || {};
+  // The sharp binding pins libvips under optionalDependencies, not dependencies.
+  const wanted =
+    (declared.dependencies || {})[`@img/${name}`] ||
+    (declared.optionalDependencies || {})[`@img/${name}`];
   if (typeof wanted !== "string") {
     throw new Error(
       `Packaged @img/sharp-${platform}-${arch} declares no @img/${name} version to check against`,
