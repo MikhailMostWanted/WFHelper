@@ -1700,7 +1700,7 @@
   "dailies.groupVendors": "Händler",
   "dailies.resetsIn": "Reset in {time}",
   "dailies.groupProgress": "{done} von {total} erledigt",
-  "dailies.customize": "Anpassen",
+  "common.customize": "Anpassen",
   "dailies.customizeDone": "Bearbeitung beenden",
   "dailies.addPlaceholder": "Name der neuen Aufgabe",
   "dailies.addTask": "Aufgabe hinzufügen",

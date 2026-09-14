@@ -106,8 +106,8 @@ async function rewardWindowCount(harness: ElectronTestHarness): Promise<number> 
 async function openSettingsEditor(harness: ElectronTestHarness): Promise<Frame> {
   const { page } = harness;
   await page.locator('#sidebar [data-view="settings"]').click();
-  await page.locator('[data-tour-tab="overlay"]').click();
-  await page.locator("[data-reward-editor-open]").click();
+  await page.locator('[data-tour-tab="customization"]').click();
+  await page.locator('[data-overlay-editor-open="reward"]').click();
   await expect(page.locator("[data-reward-editor-scale]")).toBeVisible();
   const overlay = await editorFrame(page);
   await expect(overlay.locator(".reward-slot.has-item")).toHaveCount(4);

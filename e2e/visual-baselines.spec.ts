@@ -46,10 +46,9 @@ test("Settings, feedback and overlay previews keep their reviewed appearance", a
     });
     await page.locator("[data-feedback-cancel]").click();
     await setLayoutViewport(page, 1280, 1000);
-    await page.locator('[data-tour-tab="overlay"]').click();
+    await page.locator('[data-tour-tab="customization"]').click();
     for (const kind of ["rivenLeft", "arbiSummary", "tradeNotification"]) {
-      await page.locator("[data-overlay-editor-kind]").selectOption(kind);
-      await page.locator("[data-overlay-editor-open]").click();
+      await page.locator(`[data-overlay-editor-open="${kind}"]`).click();
       const preview = page.locator("[data-reward-editor-frame]");
       const frame = await (await preview.elementHandle())?.contentFrame();
       if (!frame) throw new Error(`${kind} preview did not mount`);

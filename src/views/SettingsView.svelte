@@ -961,6 +961,22 @@
       </div>
     {:else if settingsTab === "customization"}
       <div class="settings-tab-grid settings-masonry py-3">
+        <SettingsSection title={$tr("overlayEditor.title")}>
+          <div class="mt-2.5 grid gap-1">
+            {#each OVERLAY_LAYOUT_KINDS as kind (kind)}
+              <SettingsRow label={$tr(getOverlayDescriptor(kind).titleKey)} as="div">
+                <button
+                  class="btn-secondary btn-sm"
+                  data-overlay-editor-open={kind}
+                  on:click={() => {
+                    editorKind = kind;
+                    rewardEditorOpen = true;
+                  }}>{$tr("common.customize")}</button
+                >
+              </SettingsRow>
+            {/each}
+          </div>
+        </SettingsSection>
         {#key customizationRevision}
           <SidebarTabsSection />
         {/key}
@@ -1107,28 +1123,6 @@
                 </div>
               </SettingsRow>
             {/each}
-
-            <SettingsRow label={$tr("overlayEditor.title")} as="div">
-              <select
-                class="shared-filter-select"
-                bind:value={editorKind}
-                data-overlay-editor-kind
-                aria-label={$tr("overlayEditor.title")}
-              >
-                {#each OVERLAY_LAYOUT_KINDS as kind}<option value={kind}
-                    >{$tr(getOverlayDescriptor(kind).titleKey)}</option
-                  >{/each}
-              </select>
-              <button
-                class="btn-secondary btn-sm"
-                data-reward-editor-open
-                data-overlay-editor-open
-                on:click={() => (rewardEditorOpen = true)}
-                >{$tr("overlayEditor.customizeNamed", {
-                  name: $tr(getOverlayDescriptor(editorKind).titleKey),
-                })}</button
-              >
-            </SettingsRow>
 
             <SettingsRow label={$tr("settings.hotkeyFallback")}>
               <input type="checkbox" bind:checked={form.hotkeyEnabled} on:change={autoSave} />

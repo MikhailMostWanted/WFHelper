@@ -1717,7 +1717,7 @@
   "dailies.groupVendors": "Vendors",
   "dailies.resetsIn": "Resets in {time}",
   "dailies.groupProgress": "{done} of {total} done",
-  "dailies.customize": "Customize",
+  "common.customize": "Customize",
   "dailies.customizeDone": "Done editing",
   "dailies.addPlaceholder": "New task name",
   "dailies.addTask": "Add task",

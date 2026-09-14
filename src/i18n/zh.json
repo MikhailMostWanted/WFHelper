@@ -1699,7 +1699,7 @@
   "dailies.groupVendors": "商人",
   "dailies.resetsIn": "{time} 后重置",
   "dailies.groupProgress": "已完成 {done}/{total}",
-  "dailies.customize": "自定义",
+  "common.customize": "自定义",
   "dailies.customizeDone": "完成编辑",
   "dailies.addPlaceholder": "新任务名称",
   "dailies.addTask": "添加任务",

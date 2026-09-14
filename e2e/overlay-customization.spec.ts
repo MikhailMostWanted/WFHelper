@@ -6,6 +6,7 @@ import { test, expect, type Frame, type Locator, type Page } from "@playwright/t
 import type { ArbiRunRecord } from "../config/shared/arbiTypes";
 import {
   getOverlayDescriptor,
+  OVERLAY_LAYOUT_KINDS,
   normalizeOverlayLayout,
   type OverlayEditState,
   type OverlayLayout,
@@ -159,15 +160,10 @@ async function windowIds(
   );
 }
 
-// Settings picks the overlay in a select; the setup wizard offers one button per panel of
-// the placement step on screen, so the caller walks the wizard to that step first.
-async function openEditor(page: Page, kind: OverlayLayoutKind, via = "settings"): Promise<Frame> {
-  if (via === "settings") {
-    await page.locator("[data-overlay-editor-kind]").selectOption(kind);
-    await page.locator("[data-overlay-editor-open]").click();
-  } else {
-    await page.locator(`[data-overlay-editor-open="${kind}"]`).click();
-  }
+// Settings lists one button per overlay; the setup wizard offers one per panel of the
+// placement step on screen, so the caller walks the wizard to that step first.
+async function openEditor(page: Page, kind: OverlayLayoutKind): Promise<Frame> {
+  await page.locator(`[data-overlay-editor-open="${kind}"]`).click();
   await expect(page.locator(`[data-overlay-editor="${kind}"]`)).toBeVisible();
   const element = await page.locator("[data-reward-editor-frame]").elementHandle();
   const frame = await element?.contentFrame();
@@ -275,7 +271,12 @@ test("all overlay previews edit individual fields and preserve separate saved la
     const warmPlanner = await overlayWindow(harness, "mode=planner");
     await expect.poll(async () => (await readState(warmPlanner)).kind).toBe("planner");
     await page.locator('#sidebar [data-view="settings"]').click();
-    await page.locator('[data-tour-tab="overlay"]').click();
+    await page.locator('[data-tour-tab="customization"]').click();
+    await expect(page.locator("[data-overlay-editor-open]")).toHaveCount(
+      OVERLAY_LAYOUT_KINDS.length,
+    );
+    await page.locator('[data-overlay-editor-open="tradeNotification"]').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: test.info().outputPath("customization-tab.png") });
     const settingsPath = path.join(harness.sandboxDir, "user-data", "overlay-settings.json");
 
     for (const { kind, field } of CASES) {
@@ -399,7 +400,7 @@ test("all overlay previews edit individual fields and preserve separate saved la
     await expect(page.locator('[data-overlay-editor-open="reward"]')).toBeVisible();
     for (const kind of ["planner", "rivenRight"] as const) {
       await page.locator("[data-setup-overlay-next]").click();
-      const frame = await openEditor(page, kind, "setup");
+      const frame = await openEditor(page, kind);
       expect((await readState(frame)).layout).toEqual(layouts[kind]);
       await page.locator("[data-reward-editor-cancel]").click();
       await expect(page.locator("[data-overlay-editor]")).toHaveCount(0);

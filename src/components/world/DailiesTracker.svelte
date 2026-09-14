@@ -709,7 +709,7 @@
         aria-pressed={editing}
         onclick={() => (editing = !editing)}
       >
-        {editing ? $tr("dailies.customizeDone") : $tr("dailies.customize")}
+        {editing ? $tr("dailies.customizeDone") : $tr("common.customize")}
       </button>
     </div>
   </div>
