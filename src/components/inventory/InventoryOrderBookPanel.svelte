@@ -338,9 +338,8 @@
 
   function buildWhisper(entry: OrderBookEntry, side: OrderSide): string {
     if (!item) return "";
-    const quantitySuffix = entry.quantity > 1 ? ` x${entry.quantity}` : "";
     const rankSuffix = isRankedListingItem ? ` (Rank ${entry.rank ?? 0})` : "";
-    const itemText = `${item.name}${rankSuffix}${quantitySuffix}`;
+    const itemText = `${item.name}${rankSuffix}`;
     if (side === "sell") {
       return $tr("common.whisperBuy", {
         user: entry.userName,

@@ -434,10 +434,9 @@
   // The translator arrives as a parameter so the tooltip follows the locale.
   function buildWhisper(entry: OrderBookEntry, t: Translator): string {
     if (!selected) return "";
-    const quantitySuffix = entry.quantity > 1 ? ` x${entry.quantity}` : "";
     const rankSuffix = ranked && entry.rank != null ? ` (Rank ${entry.rank})` : "";
     const variantSuffix = subtype === "atragraph" ? " (Atragraph)" : "";
-    const itemText = `${selected.name}${variantSuffix}${rankSuffix}${quantitySuffix}`;
+    const itemText = `${selected.name}${variantSuffix}${rankSuffix}`;
     if (side === "sell") {
       return t("common.whisperBuy", {
         user: entry.userName,
