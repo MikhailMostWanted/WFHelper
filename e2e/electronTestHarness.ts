@@ -221,7 +221,9 @@ export async function evaluateInMain<R, A>(
   arg?: A,
 ): Promise<R> {
   let lastError: unknown;
-  const attempts = 4;
+  // Ten tries over five seconds: a loaded CI runner can spend that long between
+  // the first window and a stable main context.
+  const attempts = 10;
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       return (await app.evaluate(fn as never, arg as never)) as R;
