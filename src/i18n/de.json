@@ -29,7 +29,7 @@
   "feedback.screenshotHint": "PNG, JPEG oder WebP, bis zu 1 MiB. Prüfe das Bild vor dem Senden auf persönliche Informationen.",
   "feedback.screenshotInvalid": "Wähle ein gültiges PNG-, JPEG- oder WebP-Bild mit höchstens 1 MiB.",
   "feedback.screenshotPreview": "Vorschau des angehängten Screenshots",
-  "feedback.destination": "Sende einen Fehlerbericht oder Funktionswunsch an den privaten WFHelper-Feedback-Kanal auf Discord.",
+  "feedback.destination": "Sende einen Fehlerbericht oder Funktionswunsch an das WFHelper-Team auf Discord.",
   "feedback.send": "Feedback senden",
   "feedback.sending": "Feedback wird gesendet...",
   "feedback.sentTitle": "Feedback gesendet",

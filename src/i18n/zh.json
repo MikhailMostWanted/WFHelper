@@ -33,7 +33,7 @@
   "feedback.screenshotHint": "支持 PNG、JPEG 或 WebP，最大 1 MiB。发送前请检查是否包含个人信息。",
   "feedback.screenshotInvalid": "请选择不超过 1 MiB 的有效 PNG、JPEG 或 WebP 图片。",
   "feedback.screenshotPreview": "所附截图预览",
-  "feedback.destination": "将问题报告或功能建议发送到 Discord 上的 WFHelper 私密反馈频道。",
+  "feedback.destination": "将问题报告或功能建议发送给 Discord 上的 WFHelper 团队。",
   "feedback.send": "发送反馈",
   "feedback.sending": "正在发送反馈...",
   "feedback.sentTitle": "反馈已发送",
