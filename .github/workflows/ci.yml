@@ -148,18 +148,48 @@ jobs:
       - name: Riven scan regression (Electron host)
         run: pnpm run test:riven-scan
 
-      # A retry that goes green still hides a broken test. Flaky fails the job.
-      - name: E2E smoke tests (Windows)
-        run: pnpm run test:e2e:built --fail-on-flaky-tests
-
       - name: Bounded overlay lifecycle stress
         run: pnpm run test:overlay-stress --iterations 30 --trigger-iterations 12
+
+  # The Playwright suite boots Electron per spec and took 21 minutes on one
+  # runner; three shards bring it under 8. Actions minutes are free on a public repo.
+  e2e-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: |
+          pnpm run verify:onnx-models
+          pnpm run build
+
+      # A retry that goes green still hides a broken test. Flaky fails the job.
+      - name: E2E smoke tests (shard ${{ matrix.shard }} of 3)
+        run: pnpm run test:e2e:built --fail-on-flaky-tests --shard=${{ matrix.shard }}/3
 
       # Failure snapshots (error-context.md, traces) for post-mortems.
       - name: Upload Playwright results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-results
+          name: playwright-results-shard-${{ matrix.shard }}
           path: test-results/
           if-no-files-found: ignore

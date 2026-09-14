@@ -7,7 +7,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   fullyParallel: false,
   // File-level only, so tests keep sharing their beforeAll app; each spec gets its
-  // own mkdtemp sandbox. Two on CI: the runner has 4 vCPUs and every test boots Electron.
-  workers: process.env.CI ? 2 : 4,
+  // own mkdtemp sandbox. Four matches the CI runner's vCPUs; CI also shards the files.
+  workers: 4,
   reporter: [["list"]],
 });
