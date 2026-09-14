@@ -21,10 +21,10 @@
 </script>
 
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { onMount } from "svelte";
   import { invoke, on, send } from "../lib/ipc.js";
   import { itemLabel } from "../lib/itemLabel.js";
-  import { SvelteMap, SvelteSet } from "svelte/reactivity";
+  import { SvelteMap } from "svelte/reactivity";
   import EditLayoutBar from "../components/layout/EditLayoutBar.svelte";
   import LayoutGrid from "../components/layout/LayoutGrid.svelte";
 
@@ -44,7 +44,7 @@
   import {
     buildMasteryRoadmap,
     estimateMasteryPurchaseCost,
-    missingMasteryComponents,
+    componentMarketSlug,
   } from "../lib/masteryRoadmap.js";
   import {
     buildMasteryPlan,
@@ -60,7 +60,6 @@
     unpinMasteryItems,
   } from "../stores/masteryPins.js";
   import { addToast } from "../stores/toasts.js";
-  import { getLookupByName } from "../lib/inventoryMarket.js";
   import { setRootOf } from "../lib/inventory/fullSets.js";
   import { parseOwnedRelics } from "../lib/relic.js";
   import { activeItem, activeComponent } from "../stores/modals.js";
@@ -80,7 +79,6 @@
   } from "../lib/persistence.js";
   import { applySharedFiltersAndSort } from "../lib/filters.js";
   import { getCachedPriceState } from "../lib/wfm/priceCache.js";
-  import { fetchPriceBySlug } from "../lib/wfm/wfmPrice.js";
   import { sharedFilters } from "../stores/filters.js";
   import { relicDb } from "../stores/relics.js";
   import ItemImage from "../components/ItemImage.svelte";
@@ -419,7 +417,6 @@
     wfmLookup: typeof $wfmItems,
     foundry: ReturnType<typeof buildFoundryIndex>,
     subsumed: Set<string>,
-    _priceRevision: number,
   ) {
     if (!data) return [];
     return data.items.map((item) => {
@@ -449,7 +446,7 @@
         !owned && components.length > 0 && components.every((comp) => comp.owned === true);
       const rootPrice = wfm?.url_name ? (getCachedPriceState(wfm.url_name)?.median ?? null) : null;
       const estimatedCost = estimateMasteryPurchaseCost(rootPrice, components, (component) => {
-        const slug = componentMarketSlug(component, wfmLookup);
+        const slug = componentMarketSlug(item.name, component, wfmLookup);
         return slug ? (getCachedPriceState(slug)?.median ?? null) : null;
       });
       return {
@@ -481,64 +478,7 @@
     $wfmItems,
     foundryIndex,
     subsumedFamilies,
-    roadmapPriceRevision,
   );
-
-  function componentMarketSlug(
-    component: { name: string; uniqueName?: string },
-    wfmLookup: typeof $wfmItems,
-  ): string | null {
-    const byUnique = component.uniqueName
-      ? wfmLookup[component.uniqueName.toLowerCase()] || null
-      : null;
-    const marketItem = byUnique || getLookupByName(component.name, wfmLookup);
-    return marketItem?.url_name || null;
-  }
-
-  // The startup snapshot rarely carries part prices, so the roadmap fetches the
-  // set and the missing parts of unowned items itself and recomputes as they land.
-  let roadmapPriceRevision = 0;
-  let roadmapPricesActive = true;
-  let roadmapPriceDraining = false;
-  const roadmapPriceRequested = new SvelteSet<string>();
-  const roadmapPriceQueue: string[] = [];
-
-  async function drainRoadmapPrices(): Promise<void> {
-    if (roadmapPriceDraining) return;
-    roadmapPriceDraining = true;
-    try {
-      while (roadmapPricesActive && roadmapPriceQueue.length > 0) {
-        const batch = roadmapPriceQueue.splice(0, 12);
-        await Promise.all(
-          batch.map((slug) => fetchPriceBySlug(slug, { priority: "low" }).catch(() => null)),
-        );
-        roadmapPriceRevision += 1;
-      }
-    } finally {
-      roadmapPriceDraining = false;
-    }
-  }
-
-  function queueRoadmapPrice(slug: string | null): void {
-    if (!slug || roadmapPriceRequested.has(slug) || getCachedPriceState(slug)) return;
-    roadmapPriceRequested.add(slug);
-    roadmapPriceQueue.push(slug);
-  }
-
-  $: {
-    for (const item of hydratedMasteryItems) {
-      if (item.owned || item.components.length === 0) continue;
-      queueRoadmapPrice(item.wfm?.url_name || null);
-      for (const entry of missingMasteryComponents(item.components)) {
-        queueRoadmapPrice(componentMarketSlug(entry.component, $wfmItems));
-      }
-    }
-    if (roadmapPriceQueue.length > 0) void drainRoadmapPrices();
-  }
-
-  onDestroy(() => {
-    roadmapPricesActive = false;
-  });
   $: filtered = applySharedFiltersAndSort(
     hydratedMasteryItems
       .filter((item) => catFilter === "all" || item.category === catFilter)

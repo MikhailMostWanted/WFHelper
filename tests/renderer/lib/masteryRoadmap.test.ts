@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildMasteryRoadmap,
+  componentMarketSlug,
   estimateMasteryPurchaseCost,
   type MasteryRoadmapSourceItem,
 } from "../../../src/lib/masteryRoadmap.js";
@@ -417,6 +418,34 @@ describe("estimateMasteryPurchaseCost", () => {
         (component) => prices.get(component.name) ?? null,
       ),
     ).toBe(10);
+  });
+
+  it("finds a part's market slug through the parent name or a uniqueName alias", () => {
+    const lookup = {
+      "odonata prime wings blueprint": {
+        url_name: "odonata_prime_wings_blueprint",
+        item_name: "Odonata Prime Wings Blueprint",
+      },
+      "braton prime barrel": { url_name: "braton_prime_barrel", item_name: "Braton Prime Barrel" },
+      "/lotus/types/recipes/weapons/akbroncoprimelinkblueprint": {
+        url_name: "akbronco_prime_link",
+        item_name: "Akbronco Prime Link",
+      },
+    };
+    expect(componentMarketSlug("Odonata Prime", { name: "Wings" }, lookup)).toBe(
+      "odonata_prime_wings_blueprint",
+    );
+    expect(componentMarketSlug("Braton Prime", { name: "Braton Prime Barrel" }, lookup)).toBe(
+      "braton_prime_barrel",
+    );
+    expect(
+      componentMarketSlug(
+        "Akbronco Prime",
+        { name: "Link", uniqueName: "/Lotus/Types/Recipes/Weapons/AkbroncoPrimeLink" },
+        lookup,
+      ),
+    ).toBe("akbronco_prime_link");
+    expect(componentMarketSlug("Nekros", { name: "Neuroptics" }, lookup)).toBeNull();
   });
 
   it("gives no estimate when a missing component has no price", () => {

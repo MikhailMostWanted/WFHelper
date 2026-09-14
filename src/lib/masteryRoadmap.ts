@@ -1,6 +1,8 @@
 import { componentUniqueNameAliases } from "../../config/shared/componentNames.js";
+import { getLookupByName } from "./inventoryMarket.js";
 import type { ComponentInfo, ParsedItem } from "../types/inventory.js";
 import type { FoundryState } from "../types/filters.js";
+import type { WfmItemsLookup } from "../types/ipc.js";
 import type { OwnedCounts, RelicDatabase, RelicQuality, RelicReward } from "../types/relics.js";
 
 type MasteryRoadmapAccess =
@@ -42,7 +44,33 @@ export interface MasteryRoadmapRecommendation extends MasteryRoadmapSourceItem {
   relevantRelicCount: number;
 }
 
-export function missingMasteryComponents(components: ComponentInfo[]): MissingMasteryComponent[] {
+// A set lists its part as ...Component while the market keys ...Blueprint, and a
+// part named "Wings" is listed as "Odonata Prime Wings Blueprint": try every
+// spelling the catalog can use before calling the part unpriced.
+export function componentMarketSlug(
+  itemName: string,
+  component: Pick<ComponentInfo, "name" | "uniqueName">,
+  lookup: WfmItemsLookup,
+): string | null {
+  if (component.uniqueName) {
+    for (const alias of componentUniqueNameAliases(component.uniqueName)) {
+      const hit = lookup[alias.toLowerCase()];
+      if (hit?.url_name) return hit.url_name;
+    }
+  }
+  const partName = component.name.trim();
+  const parent = itemName.trim();
+  const fullName = partName.toLowerCase().startsWith(parent.toLowerCase())
+    ? partName
+    : `${parent} ${partName}`;
+  for (const candidate of [fullName, partName]) {
+    const hit = getLookupByName(candidate, lookup);
+    if (hit?.url_name) return hit.url_name;
+  }
+  return null;
+}
+
+function missingMasteryComponents(components: ComponentInfo[]): MissingMasteryComponent[] {
   return components
     .map((component) => {
       const required = Math.max(1, component.itemCount ?? 1);
