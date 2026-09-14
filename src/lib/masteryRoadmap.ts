@@ -42,7 +42,7 @@ export interface MasteryRoadmapRecommendation extends MasteryRoadmapSourceItem {
   relevantRelicCount: number;
 }
 
-function missingMasteryComponents(components: ComponentInfo[]): MissingMasteryComponent[] {
+export function missingMasteryComponents(components: ComponentInfo[]): MissingMasteryComponent[] {
   return components
     .map((component) => {
       const required = Math.max(1, component.itemCount ?? 1);
@@ -63,10 +63,12 @@ export function estimateMasteryPurchaseCost(
   const missing = missingMasteryComponents(components);
   if (missing.length === 0) return null;
 
+  // An unpriced part means no estimate: quoting the full set for one missing
+  // part reads as the part's price (issue #47).
   let componentTotal = 0;
   for (const entry of missing) {
     const price = componentPrice(entry.component);
-    if (price == null || !Number.isFinite(price) || price <= 0) return rootPrice;
+    if (price == null || !Number.isFinite(price) || price <= 0) return null;
     componentTotal += price * entry.count;
   }
 

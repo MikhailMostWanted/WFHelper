@@ -419,10 +419,10 @@ describe("estimateMasteryPurchaseCost", () => {
     ).toBe(10);
   });
 
-  it("falls back to the set price when a missing component has no price", () => {
-    expect(estimateMasteryPurchaseCost(25, [{ name: "Unknown", owned: false }], () => null)).toBe(
-      25,
-    );
+  it("gives no estimate when a missing component has no price", () => {
+    expect(
+      estimateMasteryPurchaseCost(25, [{ name: "Unknown", owned: false }], () => null),
+    ).toBeNull();
   });
 
   it("prices only missing copies when another copy is building", () => {
