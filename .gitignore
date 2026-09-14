@@ -16,7 +16,6 @@ env/
 *.log
 !tests/fixtures/**/*.log
 .tmp/
-docs/
 .icon-mirror/
 
 # Wiki card-art tooling: run locally to rebuild the mirror, not part of the app.
