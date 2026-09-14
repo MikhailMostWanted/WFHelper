@@ -99,6 +99,35 @@ describe("stats import limits", () => {
     expect(parseAlecaFrameTrades(exported)).toEqual(exported.trades);
   });
 
+  it("keeps AlecaFrame ids stable when a newer export adds rows on top", () => {
+    const sobek = {
+      ts: "2026-02-07T07:47:27.146Z",
+      type: 0,
+      totalPlat: 1500,
+      user: "ZeusPrime22",
+      tx: [{ name: "/AF_Special/Riven/Sobek/Visi-toxican", cnt: 1 }],
+    };
+    const older = { trades: [sobek, { ...sobek, ts: "2026-02-05T02:01:01.714Z", totalPlat: 300 }] };
+    const newer = {
+      trades: [{ ...sobek, ts: "2026-02-09T10:00:00.000Z", user: "Nova" }, ...older.trades],
+    };
+
+    const before = parseAlecaFrameTrades(older).map((trade) => trade.id);
+    expect(before[0]).toBe("af-2026-02-07T07:47:27.146Z-1500-ZeusPrime22");
+    expect(
+      parseAlecaFrameTrades(newer)
+        .map((trade) => trade.id)
+        .slice(1),
+    ).toEqual(before);
+  });
+
+  it("keeps two rows on one stamp apart inside a single export", () => {
+    const row = { ts: "2026-02-07T07:47:27.146Z", type: 0, totalPlat: 10, user: "Kestrel" };
+    const ids = parseAlecaFrameTrades({ trades: [row, row] }).map((trade) => trade.id);
+    expect(new Set(ids).size).toBe(2);
+    expect(ids[0]).toBe("af-2026-02-07T07:47:27.146Z-10-Kestrel");
+  });
+
   it("stops parsing trades at the import limit", () => {
     const trades = Array.from({ length: MAX_TRADE_IMPORT_ROWS + 1 }, (_, index) => ({
       ts: `2026-01-01T00:00:${index}Z`,

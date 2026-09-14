@@ -82,6 +82,54 @@ describe("tradeTracker", () => {
     expect(module.getTradeLog()[0].partner).toBe("Kestrel");
   });
 
+  it("skips an imported trade the ledger already holds under a positional id", async () => {
+    const module = await tracker();
+    const date = `${YEAR}-02-07T07:47:27.146Z`;
+    const sobek = {
+      id: `af-${date}-1500-ZeusPrime22-23`,
+      date,
+      type: "sale",
+      platChange: 1500,
+      partner: "ZeusPrime22",
+      items: [
+        {
+          internalName: "/AF_Special/Riven/Sobek/Visi-toxican",
+          displayName: "Sobek Visi-toxican",
+          count: 1,
+          direction: "given",
+        },
+      ],
+    };
+    expect(module.importTradeLog([sobek])).toBe(1);
+
+    const stable = { ...sobek, id: `af-${date}-1500-ZeusPrime22` };
+    const later = { ...stable, id: "af-later", date: `${YEAR}-02-08T07:47:27.146Z` };
+    expect(module.importTradeLog([stable, stable, later])).toBe(1);
+    expect(module.getTradeLog().map((event) => event.id)).toEqual(["af-later", sobek.id]);
+  });
+
+  it("treats a 0p swap filed as a sale and as a trade as one row", async () => {
+    const module = await tracker();
+    const date = `${YEAR}-02-04T04:17:54.344Z`;
+    const items = [
+      { internalName: "", displayName: "Sobek Cronican", count: 1, direction: "given" },
+      { internalName: "", displayName: "Lohk", count: 1, direction: "received" },
+    ];
+    const swap = {
+      id: `af-${date}-0-Ainikki`,
+      date,
+      type: "sale",
+      platChange: 0,
+      partner: "Ainikki",
+      items,
+    };
+    expect(module.importTradeLog([swap])).toBe(1);
+    expect(module.importTradeLog([{ ...swap, id: `af-${date}-0-Ainikki-38`, type: "trade" }])).toBe(
+      0,
+    );
+    expect(module.getTradeLog()).toHaveLength(1);
+  });
+
   it("suppresses the file-poll re-delivery but records an identical later trade", async () => {
     vi.useFakeTimers();
     try {

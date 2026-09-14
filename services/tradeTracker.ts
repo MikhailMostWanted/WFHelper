@@ -284,11 +284,38 @@ export function markTradeWfmClosed(tradeId: string): void {
   }
 }
 
-/** Import external trades by id and return the number added. */
+/** The trade as the game saw it: stamp, platinum, partner and items. The type
+ *  stays out because an earlier importer filed a 0p swap as a sale. */
+function contentSignature(event: TradeEvent): string {
+  const stamp = Date.parse(event.date);
+  return [
+    Number.isFinite(stamp) ? new Date(stamp).toISOString() : event.date,
+    event.platChange,
+    (event.partner ?? "").toLowerCase(),
+    ...event.items.map((i) => `${i.direction}:${i.displayName.toLowerCase()}:${i.count}`).sort(),
+  ].join("|");
+}
+
+/** Import an AlecaFrame export and return the number added. Its ids once
+ *  carried the row's position in the file, so a trade the ledger already holds
+ *  under such an id is recognised by content; the id check alone cannot see it. */
 export function importTradeLog(events: unknown[]): number {
-  // addLedgerEvents caps, sanitizes and dedups over the archives too, so a
+  const known = new Set<string>();
+  for (const event of selectLedgerEvents({}, _tradeLog).events) {
+    known.add(contentSignature(event));
+  }
+  const fresh: TradeEvent[] = [];
+  for (const raw of events.slice(0, MAX_TRADE_IMPORT_ROWS)) {
+    const event = sanitizeTradeEvent(raw);
+    if (!event) continue;
+    const signature = contentSignature(event);
+    if (known.has(signature)) continue;
+    known.add(signature);
+    fresh.push(event);
+  }
+  // addLedgerEvents caps, sanitizes and dedups by id over the archives too, so a
   // second import of the same export cannot resurrect rotated-out rows.
-  return addLedgerEvents(events).applied;
+  return addLedgerEvents(fresh).applied;
 }
 
 /** The live log, newest first: this year plus any row whose archive write failed. */

@@ -97,7 +97,10 @@ export function parseAlecaFrameTrades(parsed: unknown): TradeEvent[] {
   if (rawTrades.length === 0) return [];
 
   const importedTrades: TradeEvent[] = [];
-  let tradeIdx = 0;
+  // Ids come from the trade itself, never from its position in the file: a
+  // newer export adds rows on top, so a positional id moved on every re-import
+  // and the same trade landed in the ledger again under a fresh id.
+  const seenIds = new Map<string, number>();
   for (const entry of rawTrades.slice(0, MAX_TRADE_IMPORT_ROWS)) {
     if (!entry || typeof entry !== "object") continue;
     const t = entry as Record<string, unknown>;
@@ -143,7 +146,12 @@ export function parseAlecaFrameTrades(parsed: unknown): TradeEvent[] {
     pushItems(t.tx, "given");
     pushItems(t.rx, "received");
 
-    const id = `af-${ts}-${totalPlat}-${partner}-${tradeIdx++}`;
+    const base = `af-${ts}-${totalPlat}-${partner}`;
+    const repeat = seenIds.get(base) ?? 0;
+    seenIds.set(base, repeat + 1);
+    // Two rows on the same stamp with the same plat and partner stay distinct
+    // rows; the ledger decides on content whether they are the same trade.
+    const id = repeat === 0 ? base : `${base}#${repeat + 1}`;
     importedTrades.push({
       id,
       date: ts,
