@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DocsLink from "../DocsLink.svelte";
   import {
     OVERLAY_WINDOW_KEYS,
     type OverlayWindowKey,
@@ -319,9 +320,12 @@
         <h2 class="m-0 font-display text-base font-bold tracking-[0.02em]">
           {placementTitle}
         </h2>
-        <span class="shrink-0 text-xs text-text-muted"
-          >{overlayStepIndex + 1} / {overlayPlacementSteps.length}</span
-        >
+        <div class="flex shrink-0 items-center gap-2">
+          <span class="text-xs text-text-muted"
+            >{overlayStepIndex + 1} / {overlayPlacementSteps.length}</span
+          >
+          <DocsLink page="setup" />
+        </div>
       </div>
       <p class="m-0 text-sm leading-snug text-text-secondary">{placementText}</p>
       <p class="m-0 mt-1.5 text-xs leading-snug text-text-muted">

@@ -2537,5 +2537,8 @@
   "market.priceAverage48h": "~{plat} Platinum (48h-Durchschnittsverkaufspreis)",
   "pt.recordedPlayer": "1 erfasster Spieler",
   "pt.recordedRosterHint": "Vergleiche gruppieren Läufe nach erfassten Spielern. Vor der Aufzeichnung geladene Spieler können fehlen.",
-  "market.averageSale48h": "48h-Durchschnittsverkaufspreis"
+  "market.averageSale48h": "48h-Durchschnittsverkaufspreis",
+  "common.documentation": "Dokumentation",
+  "common.pageHelp": "Hilfe zu {page}",
+  "settings.creditHelp": "Hilfe"
 }

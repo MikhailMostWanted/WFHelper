@@ -18,6 +18,7 @@
   import type { HelperDownloadProgress, HelperStatus } from "../types/ipc.js";
   import OverlayPlacementStep from "../components/setup/OverlayPlacementStep.svelte";
   import ConfigureStep from "../components/setup/ConfigureStep.svelte";
+  import DocsLink from "../components/DocsLink.svelte";
 
   type Step = "configure" | "inventory" | "downloading" | "done" | "overlays" | "error";
   type HelperInventoryStatus = "checking" | "found" | "not_found" | "error";
@@ -403,6 +404,7 @@
 
       <div class="flex flex-1 flex-col px-6 pb-5 pt-7">
         <div class="setup-content flex-1">
+          <div class="float-right ml-3"><DocsLink page="setup" /></div>
           {#if step === "configure"}
             <ConfigureStep />
           {:else if step === "inventory"}

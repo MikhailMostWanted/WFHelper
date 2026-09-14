@@ -2554,5 +2554,8 @@
   "market.priceAverage48h": "~{plat} platinum (48h average sale price)",
   "pt.recordedPlayer": "1 recorded player",
   "pt.recordedRosterHint": "Comparisons group runs by recorded players. Players loaded before capture may be missing.",
-  "market.averageSale48h": "48h average sale price"
+  "market.averageSale48h": "48h average sale price",
+  "common.documentation": "Documentation",
+  "common.pageHelp": "{page} help",
+  "settings.creditHelp": "Help"
 }
