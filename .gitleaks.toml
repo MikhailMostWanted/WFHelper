@@ -19,6 +19,9 @@ regexes = [
   # localStorage key names (wf_<feature>_v<n>) sit next to STORAGE_KEY constants and
   # trip the generic-api-key rule on entropy alone.
   '''^wf_[a-z0-9_]+_v[0-9]+$''',
+  # Translation message keys (namespace.camelCase) next to a messageKey field trip
+  # the same rule.
+  '''^[a-z]+\.[a-zA-Z0-9]+$''',
 ]
 
 # Intentionally-empty env template that ships in the repo.
