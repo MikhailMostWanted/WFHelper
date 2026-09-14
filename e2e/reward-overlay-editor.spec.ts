@@ -408,6 +408,7 @@ test("preview variants and choice counts preserve a saved layout until it is edi
     await expect(overlay.locator(".reward-slot.has-item")).toHaveCount(1);
     expect((await readState(overlay)).layout).toEqual(rewardLayout);
     await page.locator("[data-reward-editor-save]").click();
+    await expect(page.locator("[data-reward-editor]")).toHaveCount(0);
     const saved = JSON.parse(
       fs.readFileSync(path.join(harness.sandboxDir, "user-data", "overlay-settings.json"), "utf8"),
     ) as { rewardLayout: RewardOverlayLayout };
@@ -457,6 +458,7 @@ test("acknowledged drag steps keep the original preview node and pointer capture
     await page.mouse.up();
     await expect(overlay.locator("body")).toHaveAttribute("data-preview-configurations", "0");
     await page.locator("[data-reward-editor-save]").click();
+    await expect(page.locator("[data-reward-editor]")).toHaveCount(0);
     const saved = JSON.parse(
       fs.readFileSync(path.join(harness.sandboxDir, "user-data", "overlay-settings.json"), "utf8"),
     ) as { rewardLayout: RewardOverlayLayout };
