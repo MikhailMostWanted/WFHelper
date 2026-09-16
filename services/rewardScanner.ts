@@ -13,6 +13,10 @@ import {
 import type { SortedItem } from "./rewardScannerMatch";
 import type { RewardReader } from "./rewardScannerSlotScan";
 import { REFERENCE_WARFRAME_UI_SCALE } from "../config/runtime/overlaySettings";
+import {
+  runRussianRewardOcrStructuredBuffer,
+  shouldUseRussianRewardOcr,
+} from "./rewardRussianOcr";
 
 export { captureSourceMeta } from "./screenCapture";
 export { resetFrameDedup };
@@ -26,7 +30,11 @@ const REWARD_SCAN_SETTINGS: RewardScanSettings = Object.freeze({
   ocrTimeoutMs: 15_000,
 });
 
-const { runOCR, runOCRBuffer, runOCRStructuredBuffer } = createRewardOcrRunner({
+const {
+  runOCR,
+  runOCRBuffer,
+  runOCRStructuredBuffer: runDefaultOCRStructuredBuffer,
+} = createRewardOcrRunner({
   log,
   getRequestedEngine: () => "windows",
   ocrScriptPath: SCANNER_TUNING.paths.ocrScript,
@@ -56,6 +64,17 @@ export function detectRelicSelectionEra(
   return detectRelicSelectionEraWithOcr(options, eraOcr, REWARD_SCAN_SETTINGS);
 }
 
+async function runRewardOCRStructuredBuffer(imageBuffer: Buffer, timeoutMs: number) {
+  if (shouldUseRussianRewardOcr()) {
+    try {
+      return await runRussianRewardOcrStructuredBuffer(imageBuffer, timeoutMs, sortedItems);
+    } catch (error) {
+      log.warn("[RewardScanner] Russian OCR failed, falling back to default OCR:", error);
+    }
+  }
+  return runDefaultOCRStructuredBuffer(imageBuffer, timeoutMs);
+}
+
 export async function scanRewardsDetailed(
   preCapture?: PreCaptureResult | null,
   scanOptions?: { reader?: RewardReader; warframeUiScale?: number },
@@ -68,6 +87,8 @@ export async function scanRewardsDetailed(
     return null;
   }
 
+  const russianReader = shouldUseRussianRewardOcr();
+
   return runRewardScanPipeline({
     preCapture,
     sortedItems,
@@ -75,8 +96,14 @@ export async function scanRewardsDetailed(
       ...REWARD_SCAN_SETTINGS,
       warframeUiScale: scanOptions?.warframeUiScale ?? REFERENCE_WARFRAME_UI_SCALE,
     },
-    runOCRStructuredBuffer,
-    // Windows OCR does not exist off-Windows; pin the cross-platform onnx reader.
-    reader: process.platform === "win32" ? scanOptions?.reader : "onnx",
+    runOCRStructuredBuffer: runRewardOCRStructuredBuffer,
+    // The bundled ONNX recognizer is Latin-oriented. On a Russian client use
+    // the language-aware Windows system OCR path only.
+    reader:
+      process.platform === "win32"
+        ? russianReader
+          ? "windows"
+          : scanOptions?.reader
+        : "onnx",
   });
 }
