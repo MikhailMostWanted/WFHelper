@@ -1,12 +1,13 @@
 import { getGameLocale } from "./gameLocale";
 import * as itemDatabase from "./itemDatabase";
+import type { StructuredOcrResult } from "./ocrServer";
 import type { SortedItem } from "./rewardScannerMatch";
 import { levenshteinDistance } from "./rewardScannerUtils";
-import type { StructuredOcrResult } from "./ocrServer";
 
 const RUSSIAN_LOCALE = "ru";
 const MIN_FUZZY_CONFIDENCE = 0.7;
 const MIN_FUZZY_MARGIN = 0.045;
+const MIN_PARTIAL_NAME_RATIO = 0.6;
 
 type SystemOcrModule = {
   recognize: (
@@ -35,7 +36,10 @@ export function shouldUseRussianRewardOcr(): boolean {
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Russian OCR timed out after ${timeoutMs}ms`)), timeoutMs);
+    const timer = setTimeout(
+      () => reject(new Error(`Russian OCR timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
     promise.then(
       (value) => {
         clearTimeout(timer);
@@ -88,9 +92,15 @@ function localizedCandidates(items: SortedItem[]): LocalizedCandidate[] {
   return out.sort((a, b) => b.normalized.length - a.normalized.length);
 }
 
+function isUsefulPartialRead(text: string, candidate: string): boolean {
+  if (!text || !candidate) return false;
+  const wordCount = text.split(" ").filter(Boolean).length;
+  return wordCount >= 2 && text.length >= candidate.length * MIN_PARTIAL_NAME_RATIO;
+}
+
 /**
  * The existing reward matcher intentionally stays English/canonical because it
- * is also the join key for warframe.market.  On a Russian client we OCR the
+ * is also the join key for warframe.market. On a Russian client we OCR the
  * official DE Russian name, resolve that name here, then feed the canonical
  * English reward name into the unchanged matcher.
  */
@@ -103,7 +113,8 @@ export function canonicalizeRussianRewardText(text: string, items: SortedItem[])
     if (
       normalizedText === candidate.normalized ||
       normalizedText.includes(candidate.normalized) ||
-      candidate.normalized.includes(normalizedText)
+      (candidate.normalized.includes(normalizedText) &&
+        isUsefulPartialRead(normalizedText, candidate.normalized))
     ) {
       return candidate.canonical;
     }
@@ -111,11 +122,9 @@ export function canonicalizeRussianRewardText(text: string, items: SortedItem[])
 
   let best: { candidate: LocalizedCandidate; score: number } | null = null;
   let secondScore = 0;
-  const textParts = [normalizedText, ...normalizedText.split(/\r?\n/).map(normalizeRussian)].filter(Boolean);
 
   for (const candidate of candidates) {
-    let score = 0;
-    for (const part of textParts) score = Math.max(score, similarity(part, candidate.normalized));
+    const score = similarity(normalizedText, candidate.normalized);
     if (!best || score > best.score) {
       secondScore = best?.score ?? secondScore;
       best = { candidate, score };
@@ -143,7 +152,10 @@ export async function runRussianRewardOcrStructuredBuffer(
   const ocr = getSystemOcr();
   if (!ocr) throw new Error("@napi-rs/system-ocr is unavailable");
 
-  const result = await withTimeout(ocr.recognize(imageBuffer, undefined, [RUSSIAN_LOCALE]), timeoutMs);
+  const result = await withTimeout(
+    ocr.recognize(imageBuffer, undefined, [RUSSIAN_LOCALE]),
+    timeoutMs,
+  );
   const rawText = String(result?.text || "").trim();
   const text = canonicalizeRussianRewardText(rawText, items);
   const words = text.split(/\s+/).filter(Boolean);
