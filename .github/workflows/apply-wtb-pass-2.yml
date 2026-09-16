@@ -1,0 +1,88 @@
+name: Apply WTB pass 2
+
+on:
+  push:
+    branches:
+      - feat/russian-ui-ocr
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == '[chore] - rerun wtb pass'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/russian-ui-ocr
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply instant market pricing changes
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          source = Path('.github/workflows/apply-wtb-pass.yml').read_text()
+          start_marker = "          python <<'PY'\n"
+          end_marker = "          PY\n\n      - name: Format touched files and Russian catalogue"
+          if start_marker not in source or end_marker not in source:
+              raise SystemExit('could not locate embedded WTB patch')
+          body = source.split(start_marker, 1)[1].split(end_marker, 1)[0]
+          Path('/tmp/apply_wtb.py').write_text(textwrap.dedent(body))
+          PY
+          python /tmp/apply_wtb.py
+
+      - name: Format touched files and Russian catalogue
+        run: >-
+          pnpm exec prettier --write
+          src/stores/hydration/hydrationCacheHelpers.ts
+          src/stores/hydration/hydrationHelpers.ts
+          src/stores/hydration/hydrateItemMetrics.ts
+          src/lib/inventoryMarket.ts
+          src/lib/inventoryMarketSide.ts
+          src/views/InventoryView.svelte
+          src/components/inventory/InventoryHeader.svelte
+          src/components/market/MarketBrowseView.svelte
+          tests/renderer/lib/instantMarketPricing.test.ts
+          src/i18n/ru/part*.json
+          src/i18n/ru.ts
+          src/lib/i18n.ts
+          ipc/overlayI18n.ts
+          tests/main/russianI18n.test.ts
+
+      - name: Verify formatting
+        run: pnpm exec prettier --check .
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Focused tests
+        run: >-
+          pnpm exec vitest run
+          tests/renderer/lib/instantMarketPricing.test.ts
+          tests/renderer/lib/wfm/orderSummaryCache.test.ts
+          tests/renderer/lib/inventoryMarket.test.ts
+          tests/main/russianI18n.test.ts
+
+      - name: Remove patch workflows and commit
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-wtb-pass.yml .github/workflows/apply-wtb-pass-2.yml .github/workflows/format-russian-pass.yml
+          git config user.name "MikhailMostWanted"
+          git config user.email "159386897+MikhailMostWanted@users.noreply.github.com"
+          git add -A
+          git status --short
+          git commit -m "[feat] - add instant market pricing"
+          git push origin HEAD:feat/russian-ui-ocr
