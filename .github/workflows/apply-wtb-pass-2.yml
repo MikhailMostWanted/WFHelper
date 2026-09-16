@@ -40,7 +40,13 @@ jobs:
           if start_marker not in source or end_marker not in source:
               raise SystemExit('could not locate embedded WTB patch')
           body = source.split(start_marker, 1)[1].split(end_marker, 1)[0]
-          Path('/tmp/apply_wtb.py').write_text(textwrap.dedent(body))
+          body = textwrap.dedent(body)
+          body = body.replace(
+              "ranked_anchor = '''    if (\n    needs.price &&\n    needs.orders &&\n    isRankedListingItem &&\n    item.tradable === true &&\n    rankedMaxRank != null'''",
+              "ranked_anchor = '''    if (\n      needs.price &&\n      needs.orders &&\n      isRankedListingItem &&\n      item.tradable === true &&\n      rankedMaxRank != null'''",
+              1,
+          )
+          Path('/tmp/apply_wtb.py').write_text(body)
           PY
           python /tmp/apply_wtb.py
 
