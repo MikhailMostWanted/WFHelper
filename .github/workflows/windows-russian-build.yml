@@ -33,7 +33,10 @@ jobs:
         run: pnpm exec vitest run tests/main/rewardRussianOcr.test.ts
 
       - name: Build Windows installer
-        run: pnpm run dist:win
+        run: |
+          pnpm run verify:onnx-models
+          pnpm run build
+          pnpm exec electron-builder --win nsis --publish never
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
