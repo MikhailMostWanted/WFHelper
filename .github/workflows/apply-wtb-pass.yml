@@ -1,0 +1,505 @@
+name: Apply WTB pass
+
+on:
+  push:
+    branches:
+      - feat/russian-ui-ocr
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == '[chore] - apply wtb pass'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/russian-ui-ocr
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply instant market pricing changes
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, got {count}\n--- needle ---\n{old}")
+              p.write_text(text.replace(old, new, 1))
+
+          # Cache helpers already support null internally; expose that distinction to callers.
+          replace_once(
+              "src/stores/hydration/hydrationCacheHelpers.ts",
+              '''export function getCachedRankOrderSummary(
+            slugInput: string | null | undefined,
+            rank: number,
+          ): {''',
+              '''export function getCachedRankOrderSummary(
+            slugInput: string | null | undefined,
+            rank: number | null,
+          ): {''',
+          )
+
+          replace_once(
+              "src/stores/hydration/hydrationHelpers.ts",
+              '''export function orderRetryKey(itemKey: string, rank: number): string {
+            return `${itemKey}:order:r${rank}`;
+          }''',
+              '''export function orderRetryKey(itemKey: string, rank: number | null): string {
+            return rank == null ? `${itemKey}:order:rankless` : `${itemKey}:order:r${rank}`;
+          }''',
+          )
+
+          replace_once(
+              "src/stores/hydration/hydrationHelpers.ts",
+              '''  if (!isRankedGroup(item.inventoryGroup)) return true;
+
+            const hasPricePair''',
+              '''  if (!isRankedGroup(item.inventoryGroup)) {
+              if (!needs.orders || item.tradable !== true || item.inventoryGroup === "relics") return true;
+              return metric?.hasOrdersR0 === true;
+            }
+
+            const hasPricePair''',
+          )
+
+          replace_once(
+              "src/lib/inventoryMarket.ts",
+              '''  const needsOrdersForTab = isRankedGroup(activeTab) || activeTab === "everything";''',
+              '''  const needsOrdersForTab =
+              activeTab !== "resources" && activeTab !== "pets" && activeTab !== "relics";''',
+          )
+
+          replace_once(
+              "src/lib/inventoryMarket.ts",
+              '''    const cachedOrdersR0 = isRankedListingItem
+                ? getCachedRankOrderSummary(item.marketSlug, 0)
+                : null;''',
+              '''    const cachedOrdersR0 = getCachedRankOrderSummary(
+                item.marketSlug,
+                isRankedListingItem ? 0 : null,
+              );''',
+          )
+
+          replace_once(
+              "src/lib/inventoryMarket.ts",
+              '''      wtsR0: isRankedListingItem ? (metricWtsR0 ?? cachedOrdersR0?.wts ?? null) : null,
+                wtbR0: isRankedListingItem ? (metricWtbR0 ?? cachedOrdersR0?.wtb ?? null) : null,''',
+              '''      wtsR0: metricWtsR0 ?? cachedOrdersR0?.wts ?? null,
+                wtbR0: metricWtbR0 ?? cachedOrdersR0?.wtb ?? null,''',
+          )
+
+          ranked_anchor = '''    if (
+              needs.price &&
+              needs.orders &&
+              isRankedListingItem &&
+              item.tradable === true &&
+              rankedMaxRank != null'''
+          rankless_block = '''    // Rankless tradables (Prime parts, sets and regular market items) use a
+            // distinct null-rank cache entry. Never coerce this to rank 0: rank 0 is a
+            // real listing variant for mods and arcanes.
+            if (
+              needs.price &&
+              needs.orders &&
+              !isRankedListingItem &&
+              item.tradable === true &&
+              relicSubtype == null
+            ) {
+              const ordersSlug = normalizeWfmSlug(slug || item.marketSlug);
+              const retryKey = orderRetryKey(key, null);
+              let shouldRefresh = !hasOrdersR0;
+
+              if (ordersSlug) {
+                const cached = getCachedRankOrderSummary(ordersSlug, null);
+                if (cached) {
+                  wtsR0 = cached.wts;
+                  wtbR0 = cached.wtb;
+                  hasOrdersR0 = true;
+                  shouldRefresh = !cached.fresh;
+                }
+              }
+
+              if (
+                ordersSlug &&
+                allowNetworkFetch &&
+                shouldRefresh &&
+                !ctx.hasOrderRetryCooldown(retryKey)
+              ) {
+                const result = await fetchOrderSummaryBySlug(ordersSlug);
+                if (result.status === "ok") {
+                  wtsR0 = finiteMetricNumber(result.data.wts);
+                  wtbR0 = finiteMetricNumber(result.data.wtb);
+                  hasOrdersR0 = true;
+                  if (wtsR0 == null && wtbR0 == null) {
+                    setCachedOrderSummaryNoData(ordersSlug, null, {
+                      sourceTimestamp: result.data.timestamp,
+                    });
+                  } else {
+                    setCachedOrderSummary(ordersSlug, null, {
+                      wts: wtsR0,
+                      wtb: wtbR0,
+                      sourceTimestamp: result.data.timestamp,
+                    });
+                  }
+                  ctx.clearOrderRetryCooldown(retryKey);
+                } else if (result.status === "not_found") {
+                  wtsR0 = null;
+                  wtbR0 = null;
+                  hasOrdersR0 = true;
+                  setCachedOrderSummaryNoData(ordersSlug, null);
+                  ctx.clearOrderRetryCooldown(retryKey);
+                } else {
+                  ctx.setOrderRetryCooldown(retryKey, ORDER_TRANSIENT_RETRY_MS);
+                }
+              }
+            }
+
+          '''
+          replace_once(
+              "src/stores/hydration/hydrateItemMetrics.ts",
+              ranked_anchor,
+              rankless_block + ranked_anchor,
+          )
+
+          Path("src/lib/inventoryMarketSide.ts").write_text('''import type { InventoryGroup } from "../types/inventory.js";
+
+          export type InventoryMarketSide = "wtb" | "wts";
+
+          export interface InventoryMarketPriceItem {
+            inventoryGroup: InventoryGroup;
+            rank: number;
+            maxRank: number;
+            platinum: number | null;
+            wtsR0: number | null;
+            wtbR0: number | null;
+            wtsRmax: number | null;
+            wtbRmax: number | null;
+          }
+
+          /**
+           * Price represented by the currently selected market side.
+           * Relics keep their subtype-aware price because a rankless summary cache cannot
+           * distinguish Intact/Exceptional/Flawless/Radiant listings by slug alone.
+           */
+          export function inventoryMarketPrice(
+            item: InventoryMarketPriceItem,
+            side: InventoryMarketSide,
+          ): number | null {
+            if (item.inventoryGroup === "relics") return item.platinum;
+
+            const maxed = item.maxRank > 0 && item.rank >= item.maxRank;
+            if (maxed) {
+              return side === "wtb" ? item.wtbRmax : item.wtsRmax;
+            }
+            return side === "wtb" ? item.wtbR0 : item.wtsR0;
+          }
+          ''')
+
+          replace_once(
+              "src/views/InventoryView.svelte",
+              '''  import { isRankedGroup } from "../../config/shared/numeric.js";''',
+              '''  import { isRankedGroup } from "../../config/shared/numeric.js";
+            import {
+              inventoryMarketPrice,
+              type InventoryMarketSide,
+            } from "../lib/inventoryMarketSide.js";''',
+          )
+
+          replace_once(
+              "src/views/InventoryView.svelte",
+              '''  const FULL_SETS_HIDDEN_KEY = "wf_inventory_full_sets_hidden_categories";''',
+              '''  const FULL_SETS_HIDDEN_KEY = "wf_inventory_full_sets_hidden_categories";
+            const MARKET_PRICE_SIDE_KEY = "wf_inventory_market_price_side";''',
+          )
+
+          replace_once(
+              "src/views/InventoryView.svelte",
+              '''  function parseKeyList(raw: string | null): string[] {''',
+              '''  function restoreMarketPriceSide(): InventoryMarketSide {
+              return readStorage(MARKET_PRICE_SIDE_KEY) === "wts" ? "wts" : "wtb";
+            }
+
+            function parseKeyList(raw: string | null): string[] {''',
+          )
+
+          replace_once(
+              "src/views/InventoryView.svelte",
+              '''  let filter: InventoryFilterTab = restoreFilterTab();''',
+              '''  let filter: InventoryFilterTab = restoreFilterTab();
+            let marketPriceSide: InventoryMarketSide = restoreMarketPriceSide();''',
+          )
+
+          replace_once(
+              "src/views/InventoryView.svelte",
+              '''  function applyListSort(patch: { sortBy: SharedSortKey; sortDirection: SortDirection }): void {
+              updateSharedFilters("inventory", patch);
+            }''',
+              '''  function applyListSort(patch: { sortBy: SharedSortKey; sortDirection: SortDirection }): void {
+              updateSharedFilters("inventory", patch);
+            }
+
+            function setMarketPriceSide(side: InventoryMarketSide): void {
+              marketPriceSide = side;
+              writeStorage(MARKET_PRICE_SIDE_KEY, side);
+            }''',
+          )
+
+          replace_once(
+              "src/views/InventoryView.svelte",
+              '''  $: tabItems = buildInventoryViewItems(tabBaseItems, $hydrationMetrics);
+            $: relicSearchKeywordIndex''',
+              '''  $: tabItems = buildInventoryViewItems(tabBaseItems, $hydrationMetrics);
+            // Keep 48h averages in hydration/valueInventoryItems. Only the rows handed to
+            // the inventory UI replace platinum with the selected live order side.
+            $: marketPricedTabItems = tabItems.map((item) => ({
+              ...item,
+              platinum: inventoryMarketPrice(item, marketPriceSide),
+            }));
+            $: relicSearchKeywordIndex''',
+          )
+
+          replace_once(
+              "src/views/InventoryView.svelte",
+              '''      ? tabItems
+                : tabItems.map((item) => {''',
+              '''      ? marketPricedTabItems
+                : marketPricedTabItems.map((item) => {''',
+          )
+
+          replace_once(
+              "src/views/InventoryView.svelte",
+              '''    sortOptions={tabSortOptions}
+              advancedCount={activeAdvancedCount}''',
+              '''    sortOptions={tabSortOptions}
+              {marketPriceSide}
+              onMarketPriceSideChange={setMarketPriceSide}
+              advancedCount={activeAdvancedCount}''',
+          )
+
+          replace_once(
+              "src/components/inventory/InventoryHeader.svelte",
+              '''  export let onToggleSelectionMode: () => void = () => {};''',
+              '''  export let onToggleSelectionMode: () => void = () => {};
+            export let marketPriceSide: "wtb" | "wts" = "wtb";
+            export let onMarketPriceSideChange: (side: "wtb" | "wts") => void = () => {};''',
+          )
+
+          replace_once(
+              "src/components/inventory/InventoryHeader.svelte",
+              '''      {#if basicFiltersEnabled}
+                <SharedFilterBar''',
+              '''      <div
+                class="inline-flex min-h-8 overflow-hidden rounded border border-border"
+                role="group"
+                aria-label={$tr("common.platinum")}
+              >
+                <button
+                  type="button"
+                  class="filter-tab min-h-8 rounded-none border-0 px-2 py-0 text-xs"
+                  class:active={marketPriceSide === "wtb"}
+                  aria-pressed={marketPriceSide === "wtb"}
+                  title={$tr("orderbook.bestWtb")}
+                  on:click={() => onMarketPriceSideChange("wtb")}>WTB</button
+                >
+                <button
+                  type="button"
+                  class="filter-tab min-h-8 rounded-none border-0 border-l border-border px-2 py-0 text-xs"
+                  class:active={marketPriceSide === "wts"}
+                  aria-pressed={marketPriceSide === "wts"}
+                  title={$tr("orderbook.bestWts")}
+                  on:click={() => onMarketPriceSideChange("wts")}>WTS</button
+                >
+              </div>
+              {#if basicFiltersEnabled}
+                <SharedFilterBar''',
+          )
+
+          replace_once(
+              "src/components/market/MarketBrowseView.svelte",
+              '''  $: suggestions = buildSuggestions(catalog, query);''',
+              '''  $: suggestions = buildSuggestions(catalog, query, $itemDb);''',
+          )
+
+          replace_once(
+              "src/components/market/MarketBrowseView.svelte",
+              '''  function buildSuggestions(items: BrowseItem[], rawQuery: string): BrowseItem[] {
+              const needle = rawQuery.trim().toLowerCase();
+              if (needle.length < 2) return [];
+              const starts: BrowseItem[] = [];
+              const contains: BrowseItem[] = [];
+              for (const item of items) {
+                const hay = item.name.toLowerCase();
+                if (hay.startsWith(needle)) starts.push(item);
+                else if (hay.includes(needle)) contains.push(item);
+              }
+              return [...starts, ...contains].slice(0, MAX_SUGGESTIONS);
+            }''',
+              '''  function buildSuggestions(
+              items: BrowseItem[],
+              rawQuery: string,
+              db: typeof $itemDb,
+            ): BrowseItem[] {
+              const needle = rawQuery.trim().toLowerCase();
+              if (needle.length < 2) return [];
+              const starts: BrowseItem[] = [];
+              const contains: BrowseItem[] = [];
+              for (const item of items) {
+                const englishName = item.name.toLowerCase();
+                const localizedName = catalogLabel(item, db).toLowerCase();
+                if (englishName.startsWith(needle) || localizedName.startsWith(needle)) {
+                  starts.push(item);
+                } else if (englishName.includes(needle) || localizedName.includes(needle)) {
+                  contains.push(item);
+                }
+              }
+              return [...starts, ...contains].slice(0, MAX_SUGGESTIONS);
+            }''',
+          )
+
+          replace_once(
+              "src/components/market/MarketBrowseView.svelte",
+              '''    query = item.name;''',
+              '''    query = catalogLabel(item, $itemDb);''',
+          )
+
+          p = Path("src/components/market/MarketBrowseView.svelte")
+          text = p.read_text()
+          if text.count('>{$translate("browse.sellers")}</button') != 1:
+              raise SystemExit("MarketBrowseView: sellers toggle match failed")
+          if text.count('>{$translate("browse.buyers")}</button') != 1:
+              raise SystemExit("MarketBrowseView: buyers toggle match failed")
+          text = text.replace('>{$translate("browse.sellers")}</button', '>WTS</button', 1)
+          text = text.replace('>{$translate("browse.buyers")}</button', '>WTB</button', 1)
+          p.write_text(text)
+
+          Path("tests/renderer/lib/instantMarketPricing.test.ts").write_text('''import { beforeEach, describe, expect, it } from "vitest";
+
+          import {
+            clearOrderSummaryCache,
+            getCachedOrderSummaryState,
+            setCachedOrderSummary,
+          } from "../../../src/lib/wfm/orderSummaryCache.js";
+          import { inventoryMarketPrice } from "../../../src/lib/inventoryMarketSide.js";
+
+          describe("instant inventory market pricing", () => {
+            beforeEach(() => clearOrderSummaryCache());
+
+            it("keeps rankless orders separate from real rank zero", () => {
+              setCachedOrderSummary("braton_prime_receiver", null, { wts: 8, wtb: 5 });
+
+              expect(getCachedOrderSummaryState("braton_prime_receiver", null)?.wtb).toBe(5);
+              expect(getCachedOrderSummaryState("braton_prime_receiver", 0)).toBeNull();
+            });
+
+            it("selects live WTB or WTS for rankless tradables", () => {
+              const item = {
+                inventoryGroup: "all_parts" as const,
+                rank: 0,
+                maxRank: 0,
+                platinum: 11,
+                wtsR0: 9,
+                wtbR0: 6,
+                wtsRmax: null,
+                wtbRmax: null,
+              };
+
+              expect(inventoryMarketPrice(item, "wtb")).toBe(6);
+              expect(inventoryMarketPrice(item, "wts")).toBe(9);
+            });
+
+            it("uses max-rank orders for a maxed ranked item", () => {
+              const item = {
+                inventoryGroup: "mods" as const,
+                rank: 10,
+                maxRank: 10,
+                platinum: 75,
+                wtsR0: 18,
+                wtbR0: 12,
+                wtsRmax: 92,
+                wtbRmax: 70,
+              };
+
+              expect(inventoryMarketPrice(item, "wtb")).toBe(70);
+              expect(inventoryMarketPrice(item, "wts")).toBe(92);
+            });
+
+            it("keeps subtype-aware relic pricing untouched", () => {
+              const item = {
+                inventoryGroup: "relics" as const,
+                rank: 0,
+                maxRank: 0,
+                platinum: 4,
+                wtsR0: null,
+                wtbR0: null,
+                wtsRmax: null,
+                wtbRmax: null,
+              };
+
+              expect(inventoryMarketPrice(item, "wtb")).toBe(4);
+              expect(inventoryMarketPrice(item, "wts")).toBe(4);
+            });
+          });
+          ''')
+
+          old_formatter = Path(".github/workflows/format-russian-pass.yml")
+          if old_formatter.exists():
+              old_formatter.unlink()
+          PY
+
+      - name: Format touched files and Russian catalogue
+        run: >-
+          pnpm exec prettier --write
+          src/stores/hydration/hydrationCacheHelpers.ts
+          src/stores/hydration/hydrationHelpers.ts
+          src/stores/hydration/hydrateItemMetrics.ts
+          src/lib/inventoryMarket.ts
+          src/lib/inventoryMarketSide.ts
+          src/views/InventoryView.svelte
+          src/components/inventory/InventoryHeader.svelte
+          src/components/market/MarketBrowseView.svelte
+          tests/renderer/lib/instantMarketPricing.test.ts
+          src/i18n/ru/part*.json
+          src/i18n/ru.ts
+          src/lib/i18n.ts
+          ipc/overlayI18n.ts
+          tests/main/russianI18n.test.ts
+
+      - name: Verify formatting
+        run: pnpm exec prettier --check .
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Focused tests
+        run: >-
+          pnpm exec vitest run
+          tests/renderer/lib/instantMarketPricing.test.ts
+          tests/renderer/lib/wfm/orderSummaryCache.test.ts
+          tests/renderer/lib/inventoryMarket.test.ts
+          tests/main/russianI18n.test.ts
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "MikhailMostWanted"
+          git config user.email "159386897+MikhailMostWanted@users.noreply.github.com"
+          git add -A
+          git status --short
+          git commit -m "[feat] - add instant market pricing"
+          git push origin HEAD:feat/russian-ui-ocr
