@@ -127,7 +127,18 @@ jobs:
           tests/main/russianI18n.test.ts
 
       - name: Backend tests
-        run: pnpm run backend:test
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run backend:test 2>&1 | tee backend-test.log
+
+      - name: Upload backend test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-log
+          path: backend-test.log
+          if-no-files-found: error
 
       - name: Deadcode check
         run: pnpm run audit:deadcode
