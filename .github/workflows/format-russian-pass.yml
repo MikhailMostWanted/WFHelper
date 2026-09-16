@@ -50,5 +50,5 @@ jobs:
             echo "No formatting changes needed"
             exit 0
           fi
-          git commit -m "style: format Russian localization pass"
+          git commit -m "[style] - format russian localization pass"
           git push origin HEAD:feat/russian-ui-ocr
