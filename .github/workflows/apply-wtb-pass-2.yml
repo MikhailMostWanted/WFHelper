@@ -72,34 +72,33 @@ jobs:
 
           p = Path('tests/main/wfmCacheKeys.test.ts')
           text = p.read_text()
-          old = '''    expect(rendererOrderSummaryCacheKey("serration", 10)).toBe("serration:r10");'''
-          new = '''    expect(rendererOrderSummaryCacheKey("serration", null)).toBe("serration");
-            expect(rendererOrderSummaryCacheKey("serration", 10)).toBe("serration:r10");'''
-          if text.count(old) != 1:
+
+          anchor = '    expect(rendererOrderSummaryCacheKey("serration", 10)).toBe("serration:r10");'
+          if text.count(anchor) != 1:
               raise SystemExit('wfmCacheKeys test: renderer summary anchor failed')
-          text = text.replace(old, new, 1)
+          text = text.replace(
+              anchor,
+              '    expect(rendererOrderSummaryCacheKey("serration", null)).toBe("serration");\n' + anchor,
+              1,
+          )
 
-          old = '''    const workerPrice = workerPriceCacheKey("serration", 10);
-            const workerSummary = workerOrderSummaryCacheKey("serration", 10);'''
-          new = '''    const workerPrice = workerPriceCacheKey("serration", 10);
-            const workerSummary = workerOrderSummaryCacheKey("serration", 10);
-            const workerRanklessSummary = workerOrderSummaryCacheKey("serration", null);'''
-          if text.count(old) != 1:
+          anchor = '    const workerSummary = workerOrderSummaryCacheKey("serration", 10);'
+          if text.count(anchor) != 1:
               raise SystemExit('wfmCacheKeys test: worker summary anchor failed')
-          text = text.replace(old, new, 1)
+          text = text.replace(
+              anchor,
+              anchor + '\n    const workerRanklessSummary = workerOrderSummaryCacheKey("serration", null);',
+              1,
+          )
 
-          old = '''    expect(snapshotCacheKeyFromWorkerKey(workerSummary)).toBe(
-              rendererOrderSummaryCacheKey("serration", 10),
-            );'''
-          new = '''    expect(snapshotCacheKeyFromWorkerKey(workerSummary)).toBe(
-              rendererOrderSummaryCacheKey("serration", 10),
-            );
-            expect(snapshotCacheKeyFromWorkerKey(workerRanklessSummary)).toBe(
+          anchor = '    expect(snapshotCacheKeyFromWorkerKey(workerOrdersCacheKey("serration", 10))).toBeNull();'
+          if text.count(anchor) != 1:
+              raise SystemExit('wfmCacheKeys test: snapshot insertion anchor failed')
+          rankless_assertion = '''    expect(snapshotCacheKeyFromWorkerKey(workerRanklessSummary)).toBe(
               rendererOrderSummaryCacheKey("serration", null),
             );'''
-          if text.count(old) != 1:
-              raise SystemExit('wfmCacheKeys test: snapshot summary anchor failed')
-          p.write_text(text.replace(old, new, 1))
+          text = text.replace(anchor, rankless_assertion + '\n' + anchor, 1)
+          p.write_text(text)
           PY
 
       - name: Format repository
