@@ -1,0 +1,54 @@
+name: Format Russian pass
+
+on:
+  push:
+    branches:
+      - feat/russian-ui-ocr
+    paths:
+      - .github/workflows/format-russian-pass.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/russian-ui-ocr
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format changed Russian pass files
+        run: >-
+          pnpm exec prettier --write
+          src/i18n/ru/part05.json
+          src/i18n/ru/part06.json
+          src/i18n/ru/part07.json
+          src/i18n/ru/part08.json
+          src/i18n/ru/part09.json
+          src/i18n/ru/part10.json
+          src/i18n/ru/part11.json
+          src/i18n/ru/part12.json
+          src/i18n/ru/part13.json
+          src/i18n/ru/part14.json
+          src/i18n/ru/part15.json
+          services/rewardRussianOcr.ts
+          services/rewardScanner.ts
+          tests/main/rewardRussianOcr.test.ts
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/i18n/ru services/rewardRussianOcr.ts services/rewardScanner.ts tests/main/rewardRussianOcr.test.ts
+          if git diff --cached --quiet; then
+            echo "No formatting changes needed"
+            exit 0
+          fi
+          git commit -m "style: format Russian localization pass"
+          git push origin HEAD:feat/russian-ui-ocr
