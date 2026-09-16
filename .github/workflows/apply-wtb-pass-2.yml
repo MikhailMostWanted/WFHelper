@@ -126,6 +126,9 @@ jobs:
           tests/main/wfmCacheKeys.test.ts
           tests/main/russianI18n.test.ts
 
+      - name: Backend tests
+        run: pnpm run backend:test
+
       - name: Deadcode check
         run: pnpm run audit:deadcode
 
