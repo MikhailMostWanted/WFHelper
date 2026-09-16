@@ -55,6 +55,53 @@ jobs:
           PY
           python /tmp/apply_wtb.py
 
+          python <<'PY'
+          from pathlib import Path
+
+          p = Path('config/shared/wfmCacheKeys.ts')
+          text = p.read_text()
+          old = '''export function rendererOrderSummaryCacheKey(slug: string, rank: number | null): string | null {
+            return rank == null ? null : `${slug}:r${rank}`;
+          }'''
+          new = '''export function rendererOrderSummaryCacheKey(slug: string, rank: number | null): string {
+            return rank == null ? slug : `${slug}:r${rank}`;
+          }'''
+          if text.count(old) != 1:
+              raise SystemExit('wfmCacheKeys: rankless renderer summary key anchor failed')
+          p.write_text(text.replace(old, new, 1))
+
+          p = Path('tests/main/wfmCacheKeys.test.ts')
+          text = p.read_text()
+          old = '''    expect(rendererOrderSummaryCacheKey("serration", 10)).toBe("serration:r10");'''
+          new = '''    expect(rendererOrderSummaryCacheKey("serration", null)).toBe("serration");
+            expect(rendererOrderSummaryCacheKey("serration", 10)).toBe("serration:r10");'''
+          if text.count(old) != 1:
+              raise SystemExit('wfmCacheKeys test: renderer summary anchor failed')
+          text = text.replace(old, new, 1)
+
+          old = '''    const workerPrice = workerPriceCacheKey("serration", 10);
+            const workerSummary = workerOrderSummaryCacheKey("serration", 10);'''
+          new = '''    const workerPrice = workerPriceCacheKey("serration", 10);
+            const workerSummary = workerOrderSummaryCacheKey("serration", 10);
+            const workerRanklessSummary = workerOrderSummaryCacheKey("serration", null);'''
+          if text.count(old) != 1:
+              raise SystemExit('wfmCacheKeys test: worker summary anchor failed')
+          text = text.replace(old, new, 1)
+
+          old = '''    expect(snapshotCacheKeyFromWorkerKey(workerSummary)).toBe(
+              rendererOrderSummaryCacheKey("serration", 10),
+            );'''
+          new = '''    expect(snapshotCacheKeyFromWorkerKey(workerSummary)).toBe(
+              rendererOrderSummaryCacheKey("serration", 10),
+            );
+            expect(snapshotCacheKeyFromWorkerKey(workerRanklessSummary)).toBe(
+              rendererOrderSummaryCacheKey("serration", null),
+            );'''
+          if text.count(old) != 1:
+              raise SystemExit('wfmCacheKeys test: snapshot summary anchor failed')
+          p.write_text(text.replace(old, new, 1))
+          PY
+
       - name: Format repository
         run: pnpm exec prettier --write .
 
@@ -70,6 +117,7 @@ jobs:
           tests/renderer/lib/instantMarketPricing.test.ts
           tests/renderer/lib/wfm/orderSummaryCache.test.ts
           tests/renderer/lib/inventoryMarket.test.ts
+          tests/main/wfmCacheKeys.test.ts
           tests/main/russianI18n.test.ts
 
       - name: Remove patch workflows and commit
