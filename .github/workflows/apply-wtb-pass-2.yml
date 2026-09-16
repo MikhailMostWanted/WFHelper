@@ -46,6 +46,11 @@ jobs:
               "ranked_anchor = '''    if (\n      needs.price &&\n      needs.orders &&\n      isRankedListingItem &&\n      item.tradable === true &&\n      rankedMaxRank != null'''",
               1,
           )
+          body = body.replace(
+              "'''      {#if basicFiltersEnabled}\n      <SharedFilterBar''',",
+              "'''      {#if basicFiltersEnabled}\n        <SharedFilterBar''',",
+              1,
+          )
           Path('/tmp/apply_wtb.py').write_text(body)
           PY
           python /tmp/apply_wtb.py
