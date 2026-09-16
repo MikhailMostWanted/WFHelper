@@ -1,0 +1,22 @@
+{
+  "world.openDailies": "Открыть ежедневные и еженедельные задачи",
+  "world.nightwaveShop": "Предложения за кредиты Ночной Волны",
+  "world.nightwavePermanent": "Постоянные предложения",
+  "world.nightwaveRotatingUnavailable": "Ротируемый ассортимент этой недели здесь недоступен.",
+  "world.nightwaveShopUnavailable": "Постоянные предложения для этого сезона не подтверждены.",
+  "world.nightwaveCredCost": "{count} кредитов Ночной Волны",
+  "world.nightwaveSectionEach": "по {count}",
+  "world.nightwaveUnknownCost": "Цена не подтверждена",
+  "world.nightwaveAlways": "Доступно всегда",
+  "world.nightwaveVerifiedAt": "Проверено {date}",
+  "world.nightwaveFromWiki": "Предложения из Вики, проверено {date}",
+  "baro.refreshIn": "Обновление через {seconds} с",
+  "pt.analytics.fastestFiltered": "Самый быстрый среди отфильтрованных",
+  "market.priceAverage48h": "~{plat} платины (средняя цена продажи за 48 ч)",
+  "pt.recordedPlayer": "Записан 1 игрок",
+  "pt.recordedRosterHint": "Сравнения группируют забеги по записанным игрокам. Игроки, загрузившиеся до начала захвата, могут отсутствовать.",
+  "market.averageSale48h": "Средняя цена продажи за 48 ч",
+  "common.documentation": "Документация",
+  "common.pageHelp": "Справка: {page}",
+  "settings.creditHelp": "Справка"
+}
