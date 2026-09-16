@@ -55,23 +55,8 @@ jobs:
           PY
           python /tmp/apply_wtb.py
 
-      - name: Format touched files and Russian catalogue
-        run: >-
-          pnpm exec prettier --write
-          src/stores/hydration/hydrationCacheHelpers.ts
-          src/stores/hydration/hydrationHelpers.ts
-          src/stores/hydration/hydrateItemMetrics.ts
-          src/lib/inventoryMarket.ts
-          src/lib/inventoryMarketSide.ts
-          src/views/InventoryView.svelte
-          src/components/inventory/InventoryHeader.svelte
-          src/components/market/MarketBrowseView.svelte
-          tests/renderer/lib/instantMarketPricing.test.ts
-          src/i18n/ru/part*.json
-          src/i18n/ru.ts
-          src/lib/i18n.ts
-          ipc/overlayI18n.ts
-          tests/main/russianI18n.test.ts
+      - name: Format repository
+        run: pnpm exec prettier --write .
 
       - name: Verify formatting
         run: pnpm exec prettier --check .
