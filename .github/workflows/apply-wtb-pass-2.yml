@@ -146,10 +146,9 @@ jobs:
       - name: Deadcode check
         run: pnpm run audit:deadcode
 
-      - name: Remove patch workflows and commit
+      - name: Commit product changes
         shell: bash
         run: |
-          rm -f .github/workflows/apply-wtb-pass.yml .github/workflows/apply-wtb-pass-2.yml .github/workflows/format-russian-pass.yml
           git config user.name "MikhailMostWanted"
           git config user.email "159386897+MikhailMostWanted@users.noreply.github.com"
           git add -A
