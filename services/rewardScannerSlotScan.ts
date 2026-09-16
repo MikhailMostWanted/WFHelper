@@ -265,11 +265,11 @@ async function ocrRewardRegion(
   }
 }
 
-/** Drop 1-character OCR noise tokens but preserve text from every client language. */
+/** Drop 1-char OCR noise tokens but keep "&" (for "Cobra & Crane Prime ..."). */
 function cleanRewardOcrText(text: string): string {
   return String(text || "")
     .split(/\s+/)
-    .filter((word) => word === "&" || word.replace(/[^\p{L}\p{N}]/gu, "").length > 1)
+    .filter((w) => w === "&" || w.replace(/[^a-z0-9]/gi, "").length > 1)
     .join(" ")
     .trim();
 }
@@ -378,26 +378,21 @@ async function readSlotTitle(
 
   if (rankedCandidates.length === 0 && bestRejected) {
     log.info(
-      `[RewardScanner] Slot ${displayIndex + 1} near miss: ${bestRejected.item.name} ` +
-        `confidence=${bestRejected.confidence.toFixed(2)} mode=${bestRejected.mode}`,
+      `[RewardScanner] Slot ${displayIndex + 1} best candidate below gate: ` +
+        `"${bestRejected.item.name}" (${bestRejected.mode} ${bestRejected.confidence.toFixed(3)})`,
     );
   }
-
-  rankedCandidates.sort((a, b) => b.score - a.score);
-  // A crop can produce the same item through joined/whole/ONNX reads. Keep the
-  // best candidate per reward so global assignment sees alternatives, not clones.
-  const seenNames = new Set<string>();
-  const candidates = rankedCandidates.filter((candidate) => {
-    if (seenNames.has(candidate.item.name)) return false;
-    seenNames.add(candidate.item.name);
-    return true;
-  });
+  // A clipped component name can be an exact base Blueprint match in the other reader.
+  rankedCandidates.sort(
+    (a, b) =>
+      b.score - a.score ||
+      b.confidence - a.confidence ||
+      (a.mode === "exact" && b.mode === "exact" ? b.item.name.length - a.item.name.length : 0),
+  );
 
   return {
-    candidates,
-    nearMiss: bestRejected?.confidence && bestRejected.confidence >= NEAR_GATE_CONFIDENCE
-      ? bestRejected
-      : null,
+    candidates: rankedCandidates,
+    nearMiss: bestRejected,
     stripPng: cropPng,
     windowsText: wholeClean || joined,
     onnxText: onnxClean,
@@ -405,138 +400,224 @@ async function readSlotTitle(
   };
 }
 
-function evaluateLayoutRun(run: LayoutRun, expectedCount: number): SlotScanResult | null {
-  if (run.collected.length === 0) return null;
-  let collected = [...run.collected];
-  if (collected.length < run.slotLimit) {
-    const rescued = collectNearMissSlots(run, collected);
-    if (rescued.length > 0) collected = [...collected, ...rescued];
-  }
-  return buildLayoutResult(run, collected, expectedCount, "slot-layout");
-}
-
-/** Try each geometry interpretation independently; the strongest coherent one wins. */
-async function scanBySlotLayout(
-  image: NativeImage,
-  sortedItems: SortedItem[],
+export async function scanRewardSlotsFallback(
+  screenshot: {
+    image: NativeImage;
+    sourceType?: string | null;
+    sourceName?: string | null;
+    sourceId?: string | null;
+    sourceDisplayId?: string | null;
+  },
   expectedCount: number,
-  maxBudgetMs: number,
+  totalBudgetMs: number,
   startedAt: number,
   options: {
-    runOCRStructuredBuffer: StructuredOcrBufferRunner;
-    ocrTimeoutMs: number;
-    reader: RewardReader;
-    stats?: SlotScanStats;
-  },
-): Promise<SlotScanResult | null> {
-  const layoutCandidates = detectRewardSlotLayoutCandidates(image);
-  if (options.stats) {
-    options.stats.layoutCount = layoutCandidates.length;
-    options.stats.cardCount = Math.max(0, ...layoutCandidates.map((layout) => layout.cardCount));
-  }
-  if (layoutCandidates.length === 0) return null;
-
-  // Full line-visible layout first; half-layout first would consume the OCR
-  // budget on a crop that chops the two-line 4-player reward names.
-  const orderedCandidates = [...layoutCandidates].sort((a, b) => {
-    if (b.cardCount !== a.cardCount) return b.cardCount - a.cardCount;
-    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
-    return b.rects.length - a.rects.length;
-  });
-
-  const runs: LayoutRun[] = [];
-  for (const layout of orderedCandidates) {
-    if (Date.now() - startedAt >= maxBudgetMs) break;
-    const slotLimit = Math.min(MAX_REWARD_SLOTS, layout.rects.length);
-    if (slotLimit === 0) continue;
-    const remainingBudget = maxBudgetMs - (Date.now() - startedAt);
-    if (remainingBudget <= 0) break;
-    const slotResults = await Promise.all(
-      layout.rects.slice(0, slotLimit).map((rect, index) =>
-        readSlotTitle(image, rect, index, remainingBudget, startedAt, {
-          sortedItems,
-          ocrTimeoutMs: options.ocrTimeoutMs,
-          runOCRStructuredBuffer: options.runOCRStructuredBuffer,
-          reader: options.reader,
-          stats: options.stats,
-        }),
-      ),
-    );
-    const collected: CollectedSlot[] = [];
-    const nearMisses: (SlotCandidate | null)[] = new Array(slotLimit).fill(null);
-    for (let i = 0; i < slotResults.length; i++) {
-      const candidates = slotResults[i]?.candidates || [];
-      if (candidates.length > 0) collected.push({ index: i, candidate: candidates[0] });
-      nearMisses[i] = slotResults[i]?.nearMiss || null;
-    }
-    runs.push({
-      rects: layout.rects.slice(0, slotLimit),
-      collected,
-      nearMisses,
-      slotLimit,
-      layoutCount: layout.rects.length,
-      layoutConfidence: layout.confidence,
-    });
-
-    if (collected.length === slotLimit) break;
-  }
-
-  if (runs.length === 0) return null;
-
-  const evaluated = runs
-    .map((run) => ({ run, result: evaluateLayoutRun(run, expectedCount) }))
-    .filter((entry): entry is { run: LayoutRun; result: SlotScanResult } => Boolean(entry.result));
-  if (evaluated.length === 0) return null;
-
-  evaluated.sort((a, b) => b.result.score - a.result.score);
-  const best = evaluated[0];
-  if (best.result.matchedSlots >= best.result.slotCount) return best.result;
-
-  const donors = collectDonorSlots(best.run, runs);
-  if (donors.length === 0) return best.result;
-  const filled = [...best.run.collected, ...donors];
-  return buildLayoutResult(best.run, filled, expectedCount, "slot-layout-donor");
-}
-
-export async function scanRewardSlots(
-  image: NativeImage,
-  sortedItems: SortedItem[],
-  options: {
-    expectedCount?: number;
-    maxBudgetMs: number;
+    sortedItems: SortedItem[];
     ocrTimeoutMs: number;
     runOCRStructuredBuffer: StructuredOcrBufferRunner;
     reader?: RewardReader;
+    warframeUiScale?: number;
     stats?: SlotScanStats;
-    debugImage?: NativeImage | null;
   },
 ): Promise<SlotScanResult | null> {
-  const expectedCount = Math.max(1, Math.min(MAX_REWARD_SLOTS, options.expectedCount || MAX_REWARD_SLOTS));
-  const startedAt = Date.now();
-  const result = await scanBySlotLayout(
-    image,
-    sortedItems,
-    expectedCount,
-    options.maxBudgetMs,
-    startedAt,
-    {
-      runOCRStructuredBuffer: options.runOCRStructuredBuffer,
-      ocrTimeoutMs: options.ocrTimeoutMs,
-      reader: options.reader ?? "both",
-      stats: options.stats,
-    },
-  );
-  if (result) return result;
+  await yieldToEventLoop();
+  const stats = options.stats;
+  const layoutStartedAt = Date.now();
+  const layouts = detectRewardSlotLayoutCandidates(screenshot?.image, options.warframeUiScale)
+    .filter((layout) => hasConfidentSlotLayout(layout))
+    .slice(0, 6);
+  if (stats) {
+    stats.layoutCount = layouts.length;
+    stats.cardCount = layouts[0]?.counted ? layouts[0].count : 0;
+    stats.layoutMs = Date.now() - layoutStartedAt;
+  }
+  if (layouts.length === 0) return null;
 
-  if (options.debugImage) {
-    try {
-      await dumpRewardScanDebug(options.debugImage, [], {
-        reason: "slot-scan-no-match",
-        expectedCount,
-      });
-    } catch (error) {
-      log.warn("[RewardScanner] Failed to dump reward scan debug:", error);
+  // Fixed layouts overlap (the 1- and 3-card layouts share their centre card),
+  // so read each distinct title rect once for the whole scan.
+  const readCache = new Map<string, Promise<SlotRead | null>>();
+  const readSlot = (rect: SlotRect, displayIndex: number): Promise<SlotRead | null> => {
+    const key = [rect.x, rect.y, rect.width, rect.height].map((v) => v.toFixed(4)).join(":");
+    const cached = readCache.get(key);
+    if (cached) return cached;
+    const pending = readSlotTitle(screenshot.image, rect, displayIndex, totalBudgetMs, startedAt, {
+      sortedItems: options.sortedItems,
+      ocrTimeoutMs: options.ocrTimeoutMs,
+      runOCRStructuredBuffer: options.runOCRStructuredBuffer,
+      reader: options.reader || "both",
+      stats,
+    });
+    readCache.set(key, pending);
+    return pending;
+  };
+
+  let bestResult: SlotScanResult | null = null;
+  let bestRun: LayoutRun | null = null;
+  let bestDebugSlots: ScanDebugSlot[] = [];
+  let fallbackDebugSlots: ScanDebugSlot[] = [];
+  // Widest layout tried, so a scan that ships fewer cards than the screen showed
+  // can dump the crops that were rejected instead of the ones that won.
+  let widestCount = 0;
+  let widestDebugSlots: ScanDebugSlot[] = [];
+  let widestNearMisses = 0;
+  let widestMatched = 0;
+  const runs: LayoutRun[] = [];
+
+  for (const layout of layouts) {
+    if (stats) stats.layoutsTried += 1;
+    const slotLimit = Math.min(layout.count, MAX_REWARD_SLOTS);
+    const slotResults = await Promise.all(
+      layout.slots.slice(0, slotLimit).map(async (slot, i) => {
+        const read = await readSlot(slot.titleRect, i);
+        if (!read) return null;
+        return {
+          index: i,
+          candidates: read.candidates,
+          debug: {
+            index: i,
+            stripPng: read.stripPng,
+            windowsText: read.windowsText,
+            onnxText: read.onnxText,
+            diverged: read.diverged,
+          } satisfies SlotDebugInfo,
+          nearMiss: read.candidates.length === 0 ? read.nearMiss : null,
+        };
+      }),
+    );
+
+    const collected = slotResults
+      .map((entry, index) => ({
+        index,
+        candidate: entry?.candidates?.[0] || null,
+      }))
+      .filter((entry): entry is CollectedSlot => !!entry.candidate);
+
+    if (layout.count > widestCount) {
+      widestCount = layout.count;
+      widestDebugSlots = toScanDebugSlots(slotResults);
+      widestMatched = collected.length;
+      // A padding slot echoing noise off a neighbouring card is not a near miss
+      // worth a bundle; only a candidate that nearly cleared the gate is.
+      widestNearMisses = slotResults.filter(
+        (entry) => entry?.nearMiss && entry.nearMiss.confidence >= NEAR_GATE_CONFIDENCE,
+      ).length;
+    }
+
+    if (!collected.length) {
+      // layouts are confidence-sorted - the first zero-hit one best shows a no-match scan
+      if (fallbackDebugSlots.length === 0) fallbackDebugSlots = toScanDebugSlots(slotResults);
+      continue;
+    }
+
+    const run: LayoutRun = {
+      rects: layout.slots.slice(0, slotLimit).map((slot) => slot.titleRect),
+      collected,
+      nearMisses: slotResults.map((entry) =>
+        entry && entry.candidates.length === 0 ? entry.nearMiss : null,
+      ),
+      slotLimit,
+      layoutCount: layout.count,
+      layoutConfidence: layout.confidence,
+    };
+    runs.push(run);
+    const result = buildLayoutResult(run, collected, expectedCount, "slot-primary");
+
+    log.info(
+      `[RewardScanner] Slot layout candidate ${layout.count}: ` +
+        `hits=${result.matchedSlots}/${slotLimit} exact=${result.exactCount} ` +
+        `avg=${result.avgConfidence.toFixed(3)} score=${result.score.toFixed(2)} ` +
+        `items=${result.items.map((item) => item.name).join(" | ")}`,
+    );
+
+    // Structure beats averages: filling more slots wins outright, because the
+    // score averages per-slot quality and a weaker-but-correct card drags it down.
+    if (
+      !bestResult ||
+      result.matchedSlots > bestResult.matchedSlots ||
+      (result.matchedSlots === bestResult.matchedSlots &&
+        (result.score > bestResult.score ||
+          (Math.abs(result.score - bestResult.score) < 12 &&
+            result.emptySlots < bestResult.emptySlots)))
+    ) {
+      bestResult = result;
+      bestRun = run;
+      bestDebugSlots = toScanDebugSlots(slotResults);
+    }
+
+    // All slots exact - smaller layouts can't beat this, skip their OCR (~650ms).
+    if (
+      result.matchedSlots >= 2 &&
+      result.matchedSlots === slotLimit &&
+      result.exactCount === result.matchedSlots &&
+      result.emptySlots === 0
+    ) {
+      log.info(
+        `[RewardScanner] Slot layout ${layout.count} is a clean sweep - skipping smaller layouts`,
+      );
+      break;
     }
   }
-  return null;
+
+  // A losing layout may have matched exactly the cards the winner missed
+  // (seen on 21:9). Fill the winner's empty slots from those hits.
+  let bestCollected = bestRun ? bestRun.collected : [];
+  if (bestResult && bestRun && bestResult.emptySlots > 0 && runs.length > 1) {
+    const donors = collectDonorSlots(bestRun, runs);
+    if (donors.length > 0) {
+      bestCollected = [...bestCollected, ...donors].sort((a, b) => a.index - b.index);
+      bestResult = buildLayoutResult(bestRun, bestCollected, expectedCount, "slot-merged");
+      log.info(
+        `[RewardScanner] Slot merge: +${donors.length} from losing layouts: ` +
+          donors.map((entry) => `${entry.index + 1}:${entry.candidate.item.name}`).join(" | "),
+      );
+    }
+  }
+
+  // A near-gate read beats a hole; the duplicate guard keeps wrong names out.
+  if (bestResult && bestRun && bestResult.emptySlots > 0 && bestResult.exactCount >= 1) {
+    const rescued = collectNearMissSlots(bestRun, bestCollected);
+    if (rescued.length > 0) {
+      bestCollected = [...bestCollected, ...rescued].sort((a, b) => a.index - b.index);
+      bestResult = buildLayoutResult(bestRun, bestCollected, expectedCount, "slot-rescued");
+      log.info(
+        `[RewardScanner] Slot rescue: +${rescued.length} near-gate: ` +
+          rescued
+            .map(
+              (e) =>
+                `${e.index + 1}:${e.candidate.item.name} (${e.candidate.confidence.toFixed(3)})`,
+            )
+            .join(" | "),
+      );
+    }
+  }
+
+  if (bestResult) {
+    const anyDiverge = bestDebugSlots.some((slot) => slot.diverged);
+    // Dump the wider crops only when that layout resolved fewer cards than the
+    // narrow winner and threw away a near-gate read; without both, a healthy
+    // 2-card scan inside a spurious 4-slot layout spends a bundle.
+    const shrunk =
+      bestResult.slotCount < widestCount &&
+      widestMatched < bestResult.matchedSlots &&
+      widestNearMisses > 0;
+    if (bestResult.emptySlots > 0 || anyDiverge || shrunk) {
+      dumpRewardScanDebug(
+        shrunk ? "smaller-layout" : bestResult.emptySlots > 0 ? "empty-slots" : "reader-diverge",
+        shrunk && widestDebugSlots.length > 0 ? widestDebugSlots : bestDebugSlots,
+        {
+          reader: options.reader || "both",
+          layoutCount: bestResult.slotCount,
+          matchedSlots: bestResult.matchedSlots,
+          items: bestResult.items.map((item) => item.name),
+        },
+      );
+    }
+  } else if (fallbackDebugSlots.length > 0) {
+    dumpRewardScanDebug("no-layout-hits", fallbackDebugSlots, {
+      reader: options.reader || "both",
+      layoutCount: layouts[0]?.count ?? 0,
+    });
+  }
+
+  return bestResult;
 }
