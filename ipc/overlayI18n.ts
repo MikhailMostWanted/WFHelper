@@ -1,6 +1,6 @@
 import de from "../src/i18n/de.json";
 import en from "../src/i18n/en.json";
-import ru from "../src/i18n/ru.json";
+import ru from "../src/i18n/ru.js";
 import zh from "../src/i18n/zh.json";
 
 type MessageKey = keyof typeof en;
