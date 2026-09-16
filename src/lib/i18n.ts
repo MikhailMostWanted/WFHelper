@@ -22,7 +22,7 @@ const LOCALE_STORAGE_KEY = "app-language";
 // Every other locale is its own chunk and only the active one is ever fetched.
 const LOADERS: Record<Exclude<LocaleCode, "en">, () => Promise<LocaleDictionary>> = {
   de: () => import("../i18n/de.json").then((module) => module.default),
-  ru: () => import("../i18n/ru.json").then((module) => module.default),
+  ru: () => import("../i18n/ru.js").then((module) => module.default),
   zh: () => import("../i18n/zh.json").then((module) => module.default),
 };
 
