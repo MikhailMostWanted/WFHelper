@@ -49,6 +49,73 @@ async function scan(ocrByCrop: Record<string, string>) {
   });
 }
 
+describe("scanRewardSlotsFallback Windows OCR strategy", () => {
+  it("uses one Windows OCR read per slot in whole mode", async () => {
+    h.layouts = [{ count: 1, confidence: 0.9, slots: [slot(0)] }];
+    h.matches = { "forma blueprint": match("Forma Blueprint") };
+    const runOCRStructuredBuffer = vi.fn(async () => ({ text: "forma blueprint" }));
+    const stats = {
+      layoutCount: 0,
+      cardCount: 0,
+      layoutMs: 0,
+      ocrMs: 0,
+      ocrReads: 0,
+      layoutsTried: 0,
+    };
+
+    const result = await scanRewardSlotsFallback(
+      { image: {} as never },
+      4,
+      60_000,
+      Date.now(),
+      {
+        sortedItems: [],
+        ocrTimeoutMs: 1000,
+        runOCRStructuredBuffer,
+        reader: "windows",
+        windowsOcrMode: "whole",
+        stats,
+      },
+    );
+
+    expect(result?.items.map((item) => item.name)).toEqual(["Forma Blueprint"]);
+    expect(runOCRStructuredBuffer).toHaveBeenCalledTimes(1);
+    expect(stats.ocrReads).toBe(1);
+  });
+
+  it("keeps the three-band Windows OCR strategy as the default", async () => {
+    h.layouts = [{ count: 1, confidence: 0.9, slots: [slot(0)] }];
+    h.matches = { "forma blueprint": match("Forma Blueprint") };
+    const runOCRStructuredBuffer = vi.fn(async () => ({ text: "forma blueprint" }));
+    const stats = {
+      layoutCount: 0,
+      cardCount: 0,
+      layoutMs: 0,
+      ocrMs: 0,
+      ocrReads: 0,
+      layoutsTried: 0,
+    };
+
+    const result = await scanRewardSlotsFallback(
+      { image: {} as never },
+      4,
+      60_000,
+      Date.now(),
+      {
+        sortedItems: [],
+        ocrTimeoutMs: 1000,
+        runOCRStructuredBuffer,
+        reader: "windows",
+        stats,
+      },
+    );
+
+    expect(result?.items.map((item) => item.name)).toEqual(["Forma Blueprint"]);
+    expect(runOCRStructuredBuffer).toHaveBeenCalledTimes(3);
+    expect(stats.ocrReads).toBe(3);
+  });
+});
+
 describe("scanRewardSlotsFallback layout merge", () => {
   it("fills the winner's empty slots from losing layout hits at the same x", async () => {
     h.layouts = [
