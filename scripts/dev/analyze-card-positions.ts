@@ -43,7 +43,7 @@ async function analyze(file: string) {
     const bx1 = Math.floor((b + 1) * binW);
     const vals = xBrightness.slice(bx0, bx1);
     const avg = vals.reduce((a, v) => a + v, 0) / vals.length;
-    const pct = (((bx0 + bx1) / 2 / w) * 100).toFixed(0).padStart(3);
+    const pct = ((bx0 + bx1) / 2 / w * 100).toFixed(0).padStart(3);
     const bar = "█".repeat(Math.round(avg / 10));
     console.log(`    ${pct}% (${(bx0 + bx1) >> 1}px): ${avg.toFixed(0).padStart(4)} ${bar}`);
   }
@@ -61,32 +61,27 @@ async function analyze(file: string) {
       inDark = false;
       const x1 = x;
       if (x1 - darkStart > 80) {
-        const regionAvg =
-          xBrightness.slice(darkStart, x1).reduce((a, v) => a + v, 0) / (x1 - darkStart);
+        const regionAvg = xBrightness.slice(darkStart, x1).reduce((a, v) => a + v, 0) / (x1 - darkStart);
         regions.push({ x0: darkStart, x1, avgBr: regionAvg });
       }
     }
   }
 
-  console.log(
-    `\n  Dark regions (potential card areas) at y=${((y0 / h) * 100).toFixed(0)}%-${((y1 / h) * 100).toFixed(0)}%:`,
-  );
+  console.log(`\n  Dark regions (potential card areas) at y=${(y0/h*100).toFixed(0)}%-${(y1/h*100).toFixed(0)}%:`);
   for (const r of regions) {
-    console.log(
-      `    x=${r.x0}-${r.x1} (${((r.x0 / w) * 100).toFixed(1)}%-${((r.x1 / w) * 100).toFixed(1)}%) width=${r.x1 - r.x0}px avgBr=${r.avgBr.toFixed(1)}`,
-    );
+    console.log(`    x=${r.x0}-${r.x1} (${(r.x0/w*100).toFixed(1)}%-${(r.x1/w*100).toFixed(1)}%) width=${r.x1-r.x0}px avgBr=${r.avgBr.toFixed(1)}`);
   }
 
   // Save individual card crops for visual inspection
   const cropTests = [
-    { label: "debug-left", x: 0.22, y: 0.35, w: 0.25, h: 0.45 },
+    { label: "debug-left",   x: 0.22, y: 0.35, w: 0.25, h: 0.45 },
     { label: "debug-center", x: 0.34, y: 0.35, w: 0.28, h: 0.45 },
     { label: "debug-right1", x: 0.44, y: 0.35, w: 0.28, h: 0.45 },
-    { label: "debug-right2", x: 0.5, y: 0.35, w: 0.3, h: 0.45 },
+    { label: "debug-right2", x: 0.50, y: 0.35, w: 0.30, h: 0.45 },
     { label: "debug-right3", x: 0.55, y: 0.35, w: 0.25, h: 0.45 },
-    { label: "debug-full", x: 0.2, y: 0.3, w: 0.65, h: 0.5 },
+    { label: "debug-full",   x: 0.20, y: 0.30, w: 0.65, h: 0.50 },
     // Current production crop
-    { label: "prod-roll", x: 0.26, y: 0.28, w: 0.21, h: 0.52 },
+    { label: "prod-roll",    x: 0.26, y: 0.28, w: 0.21, h: 0.52 },
   ];
 
   const base = file.replace(/\.\w+$/, "");
@@ -96,10 +91,10 @@ async function analyze(file: string) {
     const cw = Math.floor(w * c.w);
     const cHgt = Math.floor(h * c.h);
     const outPath = path.join(OUT_DIR, `${base}-${c.label}.png`);
-    await sharp(imgPath).extract({ left: cx, top: cy, width: cw, height: cHgt }).toFile(outPath);
-    console.log(
-      `  Saved ${c.label}: x=${cx}(${(c.x * 100).toFixed(0)}%) y=${cy} w=${cw} h=${cHgt} -> ${path.basename(outPath)}`,
-    );
+    await sharp(imgPath)
+      .extract({ left: cx, top: cy, width: cw, height: cHgt })
+      .toFile(outPath);
+    console.log(`  Saved ${c.label}: x=${cx}(${(c.x*100).toFixed(0)}%) y=${cy} w=${cw} h=${cHgt} -> ${path.basename(outPath)}`);
   }
 }
 
