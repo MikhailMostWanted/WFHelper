@@ -251,7 +251,7 @@ function renderSlot(index) {
   }
 
   slotEl.classList.add("has-item");
-  nameEl.textContent = item.name;
+  nameEl.textContent = item.displayName || item.name;
   nameEl.className = "slot-name";
   rarityEl.textContent = rarityLabel(item.rarity);
   rarityEl.className = `slot-rarity ${rarityClass(item.rarity)}`;
@@ -313,7 +313,7 @@ function updateBestPick() {
   if (bestIndex >= 0) {
     slotElement(bestIndex).classList.add("best-slot");
     const name = document.createElement("span");
-    name.textContent = `${slotState[bestIndex].item.name} - `;
+    name.textContent = `${slotState[bestIndex].item.displayName || slotState[bestIndex].item.name} - `;
     bestEl.appendChild(name);
     appendCurrencyValue(
       bestEl,
@@ -549,7 +549,7 @@ function renderPlannerCards() {
       const name = document.createElement("span");
       name.className = "plan-reward-name reward-field-hidden";
       name.dataset.rewardField = `reward${index}Name`;
-      name.textContent = reward.name || "-";
+      name.textContent = reward.displayName || reward.name || "-";
       name.title = name.textContent;
       const chance = document.createElement("span");
       chance.className = "plan-reward-chance reward-field-hidden";

@@ -79,7 +79,7 @@ function localizeMatchedRewards(items: SortedItem[]): SortedItem[] {
     const uniqueName = typeof item?.uniqueName === "string" ? item.uniqueName : null;
     if (!canonical || !uniqueName) return item;
     const displayName = itemDatabase.localizedNameFields(uniqueName, canonical).displayName;
-    return displayName ? { ...item, canonicalName: canonical, name: displayName } : item;
+    return displayName ? { ...item, displayName } : item;
   });
 }
 
