@@ -63,20 +63,14 @@ describe("scanRewardSlotsFallback Windows OCR strategy", () => {
       layoutsTried: 0,
     };
 
-    const result = await scanRewardSlotsFallback(
-      { image: {} as never },
-      4,
-      60_000,
-      Date.now(),
-      {
-        sortedItems: [],
-        ocrTimeoutMs: 1000,
-        runOCRStructuredBuffer,
-        reader: "windows",
-        windowsOcrMode: "whole",
-        stats,
-      },
-    );
+    const result = await scanRewardSlotsFallback({ image: {} as never }, 4, 60_000, Date.now(), {
+      sortedItems: [],
+      ocrTimeoutMs: 1000,
+      runOCRStructuredBuffer,
+      reader: "windows",
+      windowsOcrMode: "whole",
+      stats,
+    });
 
     expect(result?.items.map((item) => item.name)).toEqual(["Forma Blueprint"]);
     expect(runOCRStructuredBuffer).toHaveBeenCalledTimes(1);
@@ -96,19 +90,13 @@ describe("scanRewardSlotsFallback Windows OCR strategy", () => {
       layoutsTried: 0,
     };
 
-    const result = await scanRewardSlotsFallback(
-      { image: {} as never },
-      4,
-      60_000,
-      Date.now(),
-      {
-        sortedItems: [],
-        ocrTimeoutMs: 1000,
-        runOCRStructuredBuffer,
-        reader: "windows",
-        stats,
-      },
-    );
+    const result = await scanRewardSlotsFallback({ image: {} as never }, 4, 60_000, Date.now(), {
+      sortedItems: [],
+      ocrTimeoutMs: 1000,
+      runOCRStructuredBuffer,
+      reader: "windows",
+      stats,
+    });
 
     expect(result?.items.map((item) => item.name)).toEqual(["Forma Blueprint"]);
     expect(runOCRStructuredBuffer).toHaveBeenCalledTimes(3);
