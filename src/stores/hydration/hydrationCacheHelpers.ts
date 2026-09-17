@@ -29,7 +29,7 @@ export function hasCachedRankPair(item: InventoryBaseItem): boolean {
 
 export function getCachedRankOrderSummary(
   slugInput: string | null | undefined,
-  rank: number,
+  rank: number | null,
 ): {
   wts: number | null;
   wtb: number | null;

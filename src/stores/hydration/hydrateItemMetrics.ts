@@ -411,6 +411,65 @@ export async function hydrateItemMetrics(
       }
     }
 
+    // Rankless tradables (Prime parts, sets and regular market items) use a
+    // distinct null-rank cache entry. Never coerce this to rank 0: rank 0 is a
+    // real listing variant for mods and arcanes.
+    if (
+      needs.price &&
+      needs.orders &&
+      !isRankedListingItem &&
+      item.tradable === true &&
+      relicSubtype == null
+    ) {
+      const ordersSlug = normalizeWfmSlug(slug || item.marketSlug);
+      const retryKey = orderRetryKey(key, null);
+      let shouldRefresh = !hasOrdersR0;
+
+      if (ordersSlug) {
+        const cached = getCachedRankOrderSummary(ordersSlug, null);
+        if (cached) {
+          wtsR0 = cached.wts;
+          wtbR0 = cached.wtb;
+          hasOrdersR0 = true;
+          shouldRefresh = !cached.fresh;
+        }
+      }
+
+      if (
+        ordersSlug &&
+        allowNetworkFetch &&
+        shouldRefresh &&
+        !ctx.hasOrderRetryCooldown(retryKey)
+      ) {
+        const result = await fetchOrderSummaryBySlug(ordersSlug);
+        if (result.status === "ok") {
+          wtsR0 = finiteMetricNumber(result.data.wts);
+          wtbR0 = finiteMetricNumber(result.data.wtb);
+          hasOrdersR0 = true;
+          if (wtsR0 == null && wtbR0 == null) {
+            setCachedOrderSummaryNoData(ordersSlug, null, {
+              sourceTimestamp: result.data.timestamp,
+            });
+          } else {
+            setCachedOrderSummary(ordersSlug, null, {
+              wts: wtsR0,
+              wtb: wtbR0,
+              sourceTimestamp: result.data.timestamp,
+            });
+          }
+          ctx.clearOrderRetryCooldown(retryKey);
+        } else if (result.status === "not_found") {
+          wtsR0 = null;
+          wtbR0 = null;
+          hasOrdersR0 = true;
+          setCachedOrderSummaryNoData(ordersSlug, null);
+          ctx.clearOrderRetryCooldown(retryKey);
+        } else {
+          ctx.setOrderRetryCooldown(retryKey, ORDER_TRANSIENT_RETRY_MS);
+        }
+      }
+    }
+
     if (
       needs.price &&
       needs.orders &&

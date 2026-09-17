@@ -33,8 +33,8 @@ export function priceRetryKey(itemKey: string, rank: number | null): string {
   return rank == null ? itemKey : `${itemKey}:r${rank}`;
 }
 
-export function orderRetryKey(itemKey: string, rank: number): string {
-  return `${itemKey}:order:r${rank}`;
+export function orderRetryKey(itemKey: string, rank: number | null): string {
+  return rank == null ? `${itemKey}:order:rankless` : `${itemKey}:order:r${rank}`;
 }
 
 export function itemPriceRank(metric: ItemMetrics | undefined): number | null {
@@ -66,7 +66,10 @@ export function hasRankPairCoverage(
   item: InventoryBaseItem,
   needs: { orders?: boolean },
 ): boolean {
-  if (!isRankedGroup(item.inventoryGroup)) return true;
+  if (!isRankedGroup(item.inventoryGroup)) {
+    if (!needs.orders || item.tradable !== true || item.inventoryGroup === "relics") return true;
+    return metric?.hasOrdersR0 === true;
+  }
 
   const hasPricePair = metric?.hasPriceR0 === true && metric?.hasPriceRmax === true;
   if (!hasPricePair) return false;

@@ -302,6 +302,7 @@ async function readSlotTitle(
     ocrTimeoutMs: number;
     runOCRStructuredBuffer: StructuredOcrBufferRunner;
     reader: RewardReader;
+    windowsOcrMode?: "bands" | "whole";
     stats?: SlotScanStats;
   },
 ): Promise<SlotRead | null> {
@@ -322,23 +323,31 @@ async function readSlotTitle(
   const reader = options.reader;
   const useWindows = reader !== "onnx";
   const useOnnx = reader !== "windows" && rewardOcrOnnxAvailable();
+  const windowsOcrMode = options.windowsOcrMode || "bands";
 
   const ocrStartedAt = Date.now();
   // Names wrap to two lines in 3/4-player layouts: OCR overlapping bands plus
   // the whole crop; both readers feed one pool, the ranking arbitrates.
   const [regionTexts, onnxRead] = await Promise.all([
     useWindows
-      ? Promise.all([
-          ocrRewardRegion(cropPng, 0, 0.58, options, timeout),
-          ocrRewardRegion(cropPng, 0.42, 0.58, options, timeout),
-          ocrRewardRegion(cropPng, 0, 1, options, timeout),
-        ])
+      ? windowsOcrMode === "whole"
+        ? Promise.all([
+            Promise.resolve(""),
+            Promise.resolve(""),
+            ocrRewardRegion(cropPng, 0, 1, options, timeout),
+          ])
+        : Promise.all([
+            ocrRewardRegion(cropPng, 0, 0.58, options, timeout),
+            ocrRewardRegion(cropPng, 0.42, 0.58, options, timeout),
+            ocrRewardRegion(cropPng, 0, 1, options, timeout),
+          ])
       : Promise.resolve(["", "", ""]),
     useOnnx ? recognizeRewardStripOnnx(cropPng) : Promise.resolve(null),
   ]);
   if (options.stats) {
     options.stats.ocrMs += Date.now() - ocrStartedAt;
-    options.stats.ocrReads += (useWindows ? 3 : 0) + (useOnnx ? 1 : 0);
+    options.stats.ocrReads +=
+      (useWindows ? (windowsOcrMode === "whole" ? 1 : 3) : 0) + (useOnnx ? 1 : 0);
   }
 
   const joined = joinRewardLines(regionTexts[0], regionTexts[1]);
@@ -416,6 +425,7 @@ export async function scanRewardSlotsFallback(
     ocrTimeoutMs: number;
     runOCRStructuredBuffer: StructuredOcrBufferRunner;
     reader?: RewardReader;
+    windowsOcrMode?: "bands" | "whole";
     warframeUiScale?: number;
     stats?: SlotScanStats;
   },
@@ -445,6 +455,7 @@ export async function scanRewardSlotsFallback(
       ocrTimeoutMs: options.ocrTimeoutMs,
       runOCRStructuredBuffer: options.runOCRStructuredBuffer,
       reader: options.reader || "both",
+      windowsOcrMode: options.windowsOcrMode,
       stats,
     });
     readCache.set(key, pending);
