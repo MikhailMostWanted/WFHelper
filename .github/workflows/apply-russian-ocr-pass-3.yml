@@ -1,0 +1,144 @@
+name: Apply Russian OCR pass 3
+
+on:
+  push:
+    branches:
+      - feat/russian-ui-ocr
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == '[chore] - run russian ocr pass 3'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/russian-ui-ocr
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply Russian OCR single-pass optimization
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              text = p.read_text()
+              if text.count(old) != 1:
+                  raise SystemExit(f'{label}: expected one anchor, got {text.count(old)}')
+              p.write_text(text.replace(old, new, 1))
+
+          # Pipeline: carry a Windows OCR region strategy down to the slot reader.
+          replace_once(
+              'services/rewardScannerPipeline.ts',
+              '''  runOCRStructuredBuffer: StructuredOcrBufferRunner;\n  reader?: RewardReader;\n}''',
+              '''  runOCRStructuredBuffer: StructuredOcrBufferRunner;\n  reader?: RewardReader;\n  windowsOcrMode?: "bands" | "whole";\n}''',
+              'pipeline options',
+          )
+          replace_once(
+              'services/rewardScannerPipeline.ts',
+              '''  runOCRStructuredBuffer,\n  reader,\n}: RewardScanPipelineOptions)''',
+              '''  runOCRStructuredBuffer,\n  reader,\n  windowsOcrMode,\n}: RewardScanPipelineOptions)''',
+              'pipeline destructure',
+          )
+          replace_once(
+              'services/rewardScannerPipeline.ts',
+              '''      runOCRStructuredBuffer,\n      reader,\n      warframeUiScale: settings.warframeUiScale,''',
+              '''      runOCRStructuredBuffer,\n      reader,\n      windowsOcrMode,\n      warframeUiScale: settings.warframeUiScale,''',
+              'pipeline slot options',
+          )
+
+          # Slot scanner: whole mode performs one Windows OCR instead of top/bottom/whole.
+          replace_once(
+              'services/rewardScannerSlotScan.ts',
+              '''    runOCRStructuredBuffer: StructuredOcrBufferRunner;\n    reader: RewardReader;\n    stats?: SlotScanStats;''',
+              '''    runOCRStructuredBuffer: StructuredOcrBufferRunner;\n    reader: RewardReader;\n    windowsOcrMode?: "bands" | "whole";\n    stats?: SlotScanStats;''',
+              'slot title options',
+          )
+          replace_once(
+              'services/rewardScannerSlotScan.ts',
+              '''  const useWindows = reader !== "onnx";\n  const useOnnx = reader !== "windows" && rewardOcrOnnxAvailable();\n\n  const ocrStartedAt = Date.now();''',
+              '''  const useWindows = reader !== "onnx";\n  const useOnnx = reader !== "windows" && rewardOcrOnnxAvailable();\n  const windowsOcrMode = options.windowsOcrMode || "bands";\n\n  const ocrStartedAt = Date.now();''',
+              'slot OCR mode',
+          )
+          replace_once(
+              'services/rewardScannerSlotScan.ts',
+              '''    useWindows\n      ? Promise.all([\n          ocrRewardRegion(cropPng, 0, 0.58, options, timeout),\n          ocrRewardRegion(cropPng, 0.42, 0.58, options, timeout),\n          ocrRewardRegion(cropPng, 0, 1, options, timeout),\n        ])\n      : Promise.resolve(["", "", ""]),''',
+              '''    useWindows\n      ? windowsOcrMode === "whole"\n        ? Promise.all([\n            Promise.resolve(""),\n            Promise.resolve(""),\n            ocrRewardRegion(cropPng, 0, 1, options, timeout),\n          ])\n        : Promise.all([\n            ocrRewardRegion(cropPng, 0, 0.58, options, timeout),\n            ocrRewardRegion(cropPng, 0.42, 0.58, options, timeout),\n            ocrRewardRegion(cropPng, 0, 1, options, timeout),\n          ])\n      : Promise.resolve(["", "", ""]),''',
+              'slot OCR regions',
+          )
+          replace_once(
+              'services/rewardScannerSlotScan.ts',
+              '''    options.stats.ocrReads += (useWindows ? 3 : 0) + (useOnnx ? 1 : 0);''',
+              '''    options.stats.ocrReads +=\n      (useWindows ? (windowsOcrMode === "whole" ? 1 : 3) : 0) + (useOnnx ? 1 : 0);''',
+              'slot OCR stats',
+          )
+          replace_once(
+              'services/rewardScannerSlotScan.ts',
+              '''    runOCRStructuredBuffer: StructuredOcrBufferRunner;\n    reader?: RewardReader;\n    warframeUiScale?: number;''',
+              '''    runOCRStructuredBuffer: StructuredOcrBufferRunner;\n    reader?: RewardReader;\n    windowsOcrMode?: "bands" | "whole";\n    warframeUiScale?: number;''',
+              'fallback options',
+          )
+          replace_once(
+              'services/rewardScannerSlotScan.ts',
+              '''      runOCRStructuredBuffer: options.runOCRStructuredBuffer,\n      reader: options.reader || "both",\n      stats,''',
+              '''      runOCRStructuredBuffer: options.runOCRStructuredBuffer,\n      reader: options.reader || "both",\n      windowsOcrMode: options.windowsOcrMode,\n      stats,''',
+              'slot title call',
+          )
+
+          # Russian Windows OCR is language-aware and multiline, so one whole-title read is enough.
+          replace_once(
+              'services/rewardScanner.ts',
+              '''    reader:\n      process.platform === "win32" ? (russianReader ? "windows" : scanOptions?.reader) : "onnx",\n  });''',
+              '''    reader:\n      process.platform === "win32" ? (russianReader ? "windows" : scanOptions?.reader) : "onnx",\n    windowsOcrMode: russianReader ? "whole" : "bands",\n  });''',
+              'Russian pipeline mode',
+          )
+
+          # Whole-crop OCR can contain line breaks; lock in that canonicalization behavior.
+          replace_once(
+              'tests/main/rewardRussianOcr.test.ts',
+              '''  it("normalizes ё/е differences", () => {\n    expect(canonicalizeRussianRewardText("Чертёж Формы", items)).toBe("Forma Blueprint");\n  });\n''',
+              '''  it("normalizes ё/е differences", () => {\n    expect(canonicalizeRussianRewardText("Чертёж Формы", items)).toBe("Forma Blueprint");\n  });\n\n  it("canonicalizes a wrapped two-line reward from a whole-card OCR read", () => {\n    expect(canonicalizeRussianRewardText("Нижнее Плечо\\nПарис Прайм", items)).toBe(\n      "Paris Prime Lower Limb",\n    );\n  });\n''',
+              'Russian multiline test',
+          )
+          PY
+
+      - name: Format touched files
+        run: pnpm exec prettier --write services/rewardScanner.ts services/rewardScannerPipeline.ts services/rewardScannerSlotScan.ts tests/main/rewardRussianOcr.test.ts
+
+      - name: Verify formatting
+        run: pnpm exec prettier --check services/rewardScanner.ts services/rewardScannerPipeline.ts services/rewardScannerSlotScan.ts tests/main/rewardRussianOcr.test.ts
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Russian OCR tests
+        run: pnpm exec vitest run tests/main/rewardRussianOcr.test.ts
+
+      - name: Full tests
+        run: pnpm exec vitest run
+
+      - name: Deadcode check
+        run: pnpm run audit:deadcode
+
+      - name: Commit product changes
+        shell: bash
+        run: |
+          git config user.name "MikhailMostWanted"
+          git config user.email "159386897+MikhailMostWanted@users.noreply.github.com"
+          git add services/rewardScanner.ts services/rewardScannerPipeline.ts services/rewardScannerSlotScan.ts tests/main/rewardRussianOcr.test.ts
+          git status --short
+          git commit -m "[perf] - reduce Russian reward OCR passes"
+          git push --no-verify origin HEAD:feat/russian-ui-ocr
