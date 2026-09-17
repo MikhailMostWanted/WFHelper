@@ -1,10 +1,10 @@
-name: Windows Russian Build
+name: RusFrame Windows Build
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - feat/russian-ui-ocr
+      - feat/rusframe-build
 
 jobs:
   build-windows:
@@ -22,6 +22,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      - name: Prepare RusFrame identity
+        run: node scripts/prepare-rusframe-build.mjs
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -41,9 +44,9 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: WFHelper-RU-Windows
+          name: RusFrame-Windows
           path: |
-            release/*Setup.exe
+            release/RusFrame-*Setup.exe
             release/*.blockmap
           if-no-files-found: error
           retention-days: 14
