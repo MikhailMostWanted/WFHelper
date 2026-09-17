@@ -13,8 +13,11 @@ import {
 import type { SortedItem } from "./rewardScannerMatch";
 import type { RewardReader } from "./rewardScannerSlotScan";
 import { REFERENCE_WARFRAME_UI_SCALE } from "../config/runtime/overlaySettings";
-import * as itemDatabase from "./itemDatabase";
-import { runRussianRewardOcrStructuredBuffer, shouldUseRussianRewardOcr } from "./rewardRussianOcr";
+import {
+  localizeMatchedRewardDisplayNames,
+  runRussianRewardOcrStructuredBuffer,
+  shouldUseRussianRewardOcr,
+} from "./rewardRussianOcr";
 
 export { captureSourceMeta } from "./screenCapture";
 export { resetFrameDedup };
@@ -73,16 +76,6 @@ async function runRewardOCRStructuredBuffer(imageBuffer: Buffer, timeoutMs: numb
   return runDefaultOCRStructuredBuffer(imageBuffer, timeoutMs);
 }
 
-function localizeMatchedRewards(items: SortedItem[]): SortedItem[] {
-  return items.map((item) => {
-    const canonical = String(item?.name || "");
-    const uniqueName = typeof item?.uniqueName === "string" ? item.uniqueName : null;
-    if (!canonical || !uniqueName) return item;
-    const displayName = itemDatabase.localizedNameFields(uniqueName, canonical).displayName;
-    return displayName ? { ...item, displayName } : item;
-  });
-}
-
 export async function scanRewardsDetailed(
   preCapture?: PreCaptureResult | null,
   scanOptions?: { reader?: RewardReader; warframeUiScale?: number },
@@ -113,5 +106,5 @@ export async function scanRewardsDetailed(
   });
 
   if (!result || !russianReader) return result;
-  return { ...result, items: localizeMatchedRewards(result.items) };
+  return { ...result, items: localizeMatchedRewardDisplayNames(result.items) };
 }

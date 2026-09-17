@@ -16,7 +16,10 @@ vi.mock("../../services/itemDatabase", () => ({
   }),
 }));
 
-import { canonicalizeRussianRewardText } from "../../services/rewardRussianOcr";
+import {
+  canonicalizeRussianRewardText,
+  localizeMatchedRewardDisplayNames,
+} from "../../services/rewardRussianOcr";
 import type { SortedItem } from "../../services/rewardScannerMatch";
 
 const items: SortedItem[] = [
@@ -39,6 +42,14 @@ const items: SortedItem[] = [
 
 describe("Russian relic reward OCR bridge", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("keeps canonical names as join keys and puts Russian text only in displayName", () => {
+    const [localized] = localizeMatchedRewardDisplayNames([items[1]]);
+
+    expect(localized.name).toBe("Braton Prime Barrel");
+    expect(localized.displayName).toBe("Ствол Братон Прайм");
+    expect(localized.urlName).toBe("braton_prime_barrel");
+  });
 
   it("maps an exact official Russian reward name back to the canonical market name", () => {
     expect(canonicalizeRussianRewardText("Ствол Братон Прайм", items)).toBe("Braton Prime Barrel");

@@ -75,6 +75,16 @@ interface LocalizedCandidate {
   normalized: string;
 }
 
+export function localizeMatchedRewardDisplayNames(items: SortedItem[]): SortedItem[] {
+  return items.map((item) => {
+    const canonical = String(item?.name || "");
+    const uniqueName = typeof item?.uniqueName === "string" ? item.uniqueName : null;
+    if (!canonical || !uniqueName) return item;
+    const displayName = itemDatabase.localizedNameFields(uniqueName, canonical).displayName;
+    return displayName ? { ...item, displayName } : item;
+  });
+}
+
 function localizedCandidates(items: SortedItem[]): LocalizedCandidate[] {
   const out: LocalizedCandidate[] = [];
   const seen = new Set<string>();
