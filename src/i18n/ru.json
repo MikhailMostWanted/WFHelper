@@ -150,7 +150,6 @@
   "inventory.value.unpriced": "Без цены: {count}",
 
   "browse.avgPrice": "Средняя цена",
-  "browse.buyers": "Покупатели",
   "browse.col.buy": "Покупка",
   "browse.col.qty": "Кол-во",
   "browse.col.sell": "Продажа",
@@ -168,7 +167,6 @@
   "browse.owned": "Есть x{count}",
   "browse.period": "Период",
   "browse.searchPlaceholder": "Поиск торгуемого предмета...",
-  "browse.sellers": "Продавцы",
   "browse.status": "Статус",
   "browse.status.ingame": "В игре",
   "browse.tabOrders": "Ордера",
