@@ -124,6 +124,7 @@
   import { eligibleSelectionKeys } from "../lib/tradeWorkbench/queueModel.js";
   import { workbenchState } from "../lib/tradeWorkbench/workbenchState.js";
   import { isRankedGroup } from "../../config/shared/numeric.js";
+  import { inventoryMarketPrice, type InventoryMarketSide } from "../lib/inventoryMarketSide.js";
   import type { SharedSortKey, SharedFiltersState, SortDirection } from "../types/filters.js";
 
   const METRIC_VISIBLE_PREFETCH_LIMIT = 42;
@@ -140,6 +141,7 @@
   // release adds shows up by default instead of being silently missing.
   const EVERYTHING_HIDDEN_KEY = "wf_inventory_everything_hidden_sources";
   const FULL_SETS_HIDDEN_KEY = "wf_inventory_full_sets_hidden_categories";
+  const MARKET_PRICE_SIDE_KEY = "wf_inventory_market_price_side";
   /** Legacy key: held the ENABLED sources; read only to seed the hidden set. */
   const LEGACY_EVERYTHING_SOURCES_KEY = "wf_inventory_everything_sources";
 
@@ -151,6 +153,10 @@
     const raw = readStorage(FILTER_TAB_KEY);
     const known = INVENTORY_FILTERS.some((entry) => entry.key === raw);
     return known ? (raw as InventoryFilterTab) : "all_parts";
+  }
+
+  function restoreMarketPriceSide(): InventoryMarketSide {
+    return readStorage(MARKET_PRICE_SIDE_KEY) === "wts" ? "wts" : "wtb";
   }
 
   function parseKeyList(raw: string | null): string[] {
@@ -198,6 +204,7 @@
   } as Partial<Record<InventoryFilterTab, Array<[SharedSortKey, string]>>>;
 
   let filter: InventoryFilterTab = restoreFilterTab();
+  let marketPriceSide: InventoryMarketSide = restoreMarketPriceSide();
   let hiddenEverythingSources: string[] = restoreHiddenEverythingSources();
   let hiddenSetCategories: string[] = parseKeyList(readStorage(FULL_SETS_HIDDEN_KEY));
   let missingIconsOnly = false;
@@ -283,6 +290,11 @@
 
   function applyListSort(patch: { sortBy: SharedSortKey; sortDirection: SortDirection }): void {
     updateSharedFilters("inventory", patch);
+  }
+
+  function setMarketPriceSide(side: InventoryMarketSide): void {
+    marketPriceSide = side;
+    writeStorage(MARKET_PRICE_SIDE_KEY, side);
   }
 
   function setValueScope(allTradables: boolean): void {
@@ -556,11 +568,17 @@
     ),
   ];
   $: tabItems = buildInventoryViewItems(tabBaseItems, $hydrationMetrics);
+  // Keep 48h averages in hydration/valueInventoryItems. Only the rows handed to
+  // the inventory UI replace platinum with the selected live order side.
+  $: marketPricedTabItems = tabItems.map((item) => ({
+    ...item,
+    platinum: inventoryMarketPrice(item, marketPriceSide),
+  }));
   $: relicSearchKeywordIndex = buildRelicSearchKeywordIndex($relicDb);
   $: searchableTabItems =
     filter !== "relics" && filter !== "everything"
-      ? tabItems
-      : tabItems.map((item) => {
+      ? marketPricedTabItems
+      : marketPricedTabItems.map((item) => {
           const relicKeywords = relicSearchKeywordIndex[item.internalName] || [];
           if (relicKeywords.length === 0) return item;
 
@@ -724,6 +742,8 @@
     activeFilter={filter}
     {showFilterPanel}
     sortOptions={tabSortOptions}
+    {marketPriceSide}
+    onMarketPriceSideChange={setMarketPriceSide}
     advancedCount={activeAdvancedCount}
     filtersEnabled={marketTab}
     basicFiltersEnabled={filter !== "pets"}

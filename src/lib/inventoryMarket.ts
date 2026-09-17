@@ -303,7 +303,8 @@ export function metricNeedsFromFilters(
   // Everything carries parts and ranked items at once, so it needs both.
   const needsDucatsForTab =
     activeTab === "all_parts" || activeTab === "full_sets" || activeTab === "everything";
-  const needsOrdersForTab = isRankedGroup(activeTab) || activeTab === "everything";
+  const needsOrdersForTab =
+    activeTab !== "resources" && activeTab !== "pets" && activeTab !== "relics";
   return {
     price: true,
     ducats: needsDucatsForTab || filters.sortBy === "ducats" || filters.sortBy === "ducatonator",
@@ -540,9 +541,10 @@ export function buildInventoryViewItems<T extends InventoryBaseItem>(
     const metricWtsRmax = toFiniteNumber(metricWtsRmaxRaw);
     const metricWtbRmax = toFiniteNumber(metricWtbRmaxRaw);
 
-    const cachedOrdersR0 = isRankedListingItem
-      ? getCachedRankOrderSummary(item.marketSlug, 0)
-      : null;
+    const cachedOrdersR0 = getCachedRankOrderSummary(
+      item.marketSlug,
+      isRankedListingItem ? 0 : null,
+    );
     const cachedOrdersRmax = isRankedListingItem
       ? getCachedRankOrderSummary(item.marketSlug, itemMaxRank)
       : null;
@@ -581,8 +583,8 @@ export function buildInventoryViewItems<T extends InventoryBaseItem>(
       platinum,
       platinumR0: isRankedListingItem ? metricPlatinumR0 : null,
       platinumRmax: isRankedListingItem ? metricPlatinumRmax : null,
-      wtsR0: isRankedListingItem ? (metricWtsR0 ?? cachedOrdersR0?.wts ?? null) : null,
-      wtbR0: isRankedListingItem ? (metricWtbR0 ?? cachedOrdersR0?.wtb ?? null) : null,
+      wtsR0: metricWtsR0 ?? cachedOrdersR0?.wts ?? null,
+      wtbR0: metricWtbR0 ?? cachedOrdersR0?.wtb ?? null,
       wtsRmax: isRankedListingItem ? (metricWtsRmax ?? cachedOrdersRmax?.wts ?? null) : null,
       wtbRmax: isRankedListingItem ? (metricWtbRmax ?? cachedOrdersRmax?.wtb ?? null) : null,
       ducats,

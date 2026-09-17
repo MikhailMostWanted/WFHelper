@@ -19,10 +19,7 @@
           "height": 39
         }
       ],
-      "expected": [
-        "Khora Prime Systems Blueprint",
-        "Fang Prime Handle"
-      ],
+      "expected": ["Khora Prime Systems Blueprint", "Fang Prime Handle"],
       "width": 1920,
       "height": 1080,
       "sha256": "9d94b90522d67ad598b28272d2902e53011790833dd26dfbf0fa595e9359ce24",

@@ -20,6 +20,8 @@
   export let selectionMode = false;
   export let selectionEnabled = true;
   export let onToggleSelectionMode: () => void = () => {};
+  export let marketPriceSide: "wtb" | "wts" = "wtb";
+  export let onMarketPriceSideChange: (side: "wtb" | "wts") => void = () => {};
 
   const dispatch = createEventDispatcher<{
     filter: InventoryFilterTab;
@@ -88,6 +90,28 @@
     </div>
     <!-- max-w-full + wrap: an unwrappable block here stretches the whole header past what a 900px window fits. -->
     <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2 pb-2">
+      <div
+        class="inline-flex min-h-8 overflow-hidden rounded border border-border"
+        role="group"
+        aria-label={$tr("common.platinum")}
+      >
+        <button
+          type="button"
+          class="filter-tab min-h-8 rounded-none border-0 px-2 py-0 text-xs"
+          class:active={marketPriceSide === "wtb"}
+          aria-pressed={marketPriceSide === "wtb"}
+          title={$tr("orderbook.bestWtb")}
+          on:click={() => onMarketPriceSideChange("wtb")}>WTB</button
+        >
+        <button
+          type="button"
+          class="filter-tab min-h-8 rounded-none border-0 border-l border-border px-2 py-0 text-xs"
+          class:active={marketPriceSide === "wts"}
+          aria-pressed={marketPriceSide === "wts"}
+          title={$tr("orderbook.bestWts")}
+          on:click={() => onMarketPriceSideChange("wts")}>WTS</button
+        >
+      </div>
       {#if basicFiltersEnabled}
         <SharedFilterBar
           scope="inventory"

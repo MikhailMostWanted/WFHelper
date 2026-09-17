@@ -17,6 +17,7 @@ What you expected to happen.
 If applicable, add screenshots (redact anything personal).
 
 **Environment**
+
 - WFHelper version:
 - Windows version or Linux distribution:
 - On Linux: desktop/compositor and X11 or Wayland:

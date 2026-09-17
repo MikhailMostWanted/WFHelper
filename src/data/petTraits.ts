@@ -6,6 +6,8 @@ import data from "./petTraits.json";
 interface PetTraitName {
   en: string;
   de: string;
+  /** Russian falls back to English until the generated pet-trait table ships it. */
+  ru?: string;
   zh: string;
 }
 

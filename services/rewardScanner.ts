@@ -13,6 +13,8 @@ import {
 import type { SortedItem } from "./rewardScannerMatch";
 import type { RewardReader } from "./rewardScannerSlotScan";
 import { REFERENCE_WARFRAME_UI_SCALE } from "../config/runtime/overlaySettings";
+import * as itemDatabase from "./itemDatabase";
+import { runRussianRewardOcrStructuredBuffer, shouldUseRussianRewardOcr } from "./rewardRussianOcr";
 
 export { captureSourceMeta } from "./screenCapture";
 export { resetFrameDedup };
@@ -26,7 +28,11 @@ const REWARD_SCAN_SETTINGS: RewardScanSettings = Object.freeze({
   ocrTimeoutMs: 15_000,
 });
 
-const { runOCR, runOCRBuffer, runOCRStructuredBuffer } = createRewardOcrRunner({
+const {
+  runOCR,
+  runOCRBuffer,
+  runOCRStructuredBuffer: runDefaultOCRStructuredBuffer,
+} = createRewardOcrRunner({
   log,
   getRequestedEngine: () => "windows",
   ocrScriptPath: SCANNER_TUNING.paths.ocrScript,
@@ -56,6 +62,27 @@ export function detectRelicSelectionEra(
   return detectRelicSelectionEraWithOcr(options, eraOcr, REWARD_SCAN_SETTINGS);
 }
 
+async function runRewardOCRStructuredBuffer(imageBuffer: Buffer, timeoutMs: number) {
+  if (shouldUseRussianRewardOcr()) {
+    try {
+      return await runRussianRewardOcrStructuredBuffer(imageBuffer, timeoutMs, sortedItems);
+    } catch (error) {
+      log.warn("[RewardScanner] Russian OCR failed, falling back to default OCR:", error);
+    }
+  }
+  return runDefaultOCRStructuredBuffer(imageBuffer, timeoutMs);
+}
+
+function localizeMatchedRewards(items: SortedItem[]): SortedItem[] {
+  return items.map((item) => {
+    const canonical = String(item?.name || "");
+    const uniqueName = typeof item?.uniqueName === "string" ? item.uniqueName : null;
+    if (!canonical || !uniqueName) return item;
+    const displayName = itemDatabase.localizedNameFields(uniqueName, canonical).displayName;
+    return displayName ? { ...item, canonicalName: canonical, name: displayName } : item;
+  });
+}
+
 export async function scanRewardsDetailed(
   preCapture?: PreCaptureResult | null,
   scanOptions?: { reader?: RewardReader; warframeUiScale?: number },
@@ -68,15 +95,22 @@ export async function scanRewardsDetailed(
     return null;
   }
 
-  return runRewardScanPipeline({
+  const russianReader = shouldUseRussianRewardOcr();
+
+  const result = await runRewardScanPipeline({
     preCapture,
     sortedItems,
     settings: {
       ...REWARD_SCAN_SETTINGS,
       warframeUiScale: scanOptions?.warframeUiScale ?? REFERENCE_WARFRAME_UI_SCALE,
     },
-    runOCRStructuredBuffer,
-    // Windows OCR does not exist off-Windows; pin the cross-platform onnx reader.
-    reader: process.platform === "win32" ? scanOptions?.reader : "onnx",
+    runOCRStructuredBuffer: runRewardOCRStructuredBuffer,
+    // The bundled ONNX recognizer is Latin-oriented. On a Russian client use
+    // the language-aware Windows system OCR path only.
+    reader:
+      process.platform === "win32" ? (russianReader ? "windows" : scanOptions?.reader) : "onnx",
   });
+
+  if (!result || !russianReader) return result;
+  return { ...result, items: localizeMatchedRewards(result.items) };
 }

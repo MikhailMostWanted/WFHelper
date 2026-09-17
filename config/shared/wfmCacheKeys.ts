@@ -2,8 +2,8 @@ export function rendererPriceCacheKey(slug: string, rank: number | null): string
   return rank == null ? slug : `${slug}:rank-v3:r${rank}`;
 }
 
-export function rendererOrderSummaryCacheKey(slug: string, rank: number | null): string | null {
-  return rank == null ? null : `${slug}:r${rank}`;
+export function rendererOrderSummaryCacheKey(slug: string, rank: number | null): string {
+  return rank == null ? slug : `${slug}:r${rank}`;
 }
 
 export function rendererOrderBookCacheKey(slug: string, rank: number | null): string {

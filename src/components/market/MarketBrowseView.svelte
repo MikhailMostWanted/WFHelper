@@ -118,21 +118,29 @@
     return [...bySlug.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  $: suggestions = buildSuggestions(catalog, query);
+  $: suggestions = buildSuggestions(catalog, query, $itemDb);
   $: suggestionsOpen = showSuggestions && suggestions.length > 0;
   // A new query builds a new list, so the highlight must not stay on the index
   // it held for the old one.
   $: if (suggestions) activeSuggestion = 0;
 
-  function buildSuggestions(items: BrowseItem[], rawQuery: string): BrowseItem[] {
+  function buildSuggestions(
+    items: BrowseItem[],
+    rawQuery: string,
+    db: typeof $itemDb,
+  ): BrowseItem[] {
     const needle = rawQuery.trim().toLowerCase();
     if (needle.length < 2) return [];
     const starts: BrowseItem[] = [];
     const contains: BrowseItem[] = [];
     for (const item of items) {
-      const hay = item.name.toLowerCase();
-      if (hay.startsWith(needle)) starts.push(item);
-      else if (hay.includes(needle)) contains.push(item);
+      const englishName = item.name.toLowerCase();
+      const localizedName = catalogLabel(item, db).toLowerCase();
+      if (englishName.startsWith(needle) || localizedName.startsWith(needle)) {
+        starts.push(item);
+      } else if (englishName.includes(needle) || localizedName.includes(needle)) {
+        contains.push(item);
+      }
     }
     return [...starts, ...contains].slice(0, MAX_SUGGESTIONS);
   }
@@ -190,7 +198,7 @@
 
   function pick(item: BrowseItem): void {
     selected = item;
-    query = item.name;
+    query = catalogLabel(item, $itemDb);
     showSuggestions = false;
     rankFilter = "all";
     subtype = "regular";
@@ -794,12 +802,12 @@
             <button
               class="filter-tab browse-side-sell"
               class:active={side === "sell"}
-              on:click={() => setSide("sell")}>{$translate("browse.sellers")}</button
+              on:click={() => setSide("sell")}>WTS</button
             >
             <button
               class="filter-tab browse-side-buy"
               class:active={side === "buy"}
-              on:click={() => setSide("buy")}>{$translate("browse.buyers")}</button
+              on:click={() => setSide("buy")}>WTB</button
             >
           </div>
         </div>
