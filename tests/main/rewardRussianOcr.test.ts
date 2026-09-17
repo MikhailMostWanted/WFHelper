@@ -48,6 +48,12 @@ describe("Russian relic reward OCR bridge", () => {
     expect(canonicalizeRussianRewardText("Чертёж Формы", items)).toBe("Forma Blueprint");
   });
 
+  it("canonicalizes a wrapped two-line reward from a whole-card OCR read", () => {
+    expect(canonicalizeRussianRewardText("Нижнее Плечо\nПарис Прайм", items)).toBe(
+      "Paris Prime Lower Limb",
+    );
+  });
+
   it("tolerates a small OCR error when one candidate is clearly best", () => {
     expect(canonicalizeRussianRewardText("Нижнее Плечо Парис Праим", items)).toBe(
       "Paris Prime Lower Limb",

@@ -109,6 +109,7 @@ export async function scanRewardsDetailed(
     // the language-aware Windows system OCR path only.
     reader:
       process.platform === "win32" ? (russianReader ? "windows" : scanOptions?.reader) : "onnx",
+    windowsOcrMode: russianReader ? "whole" : "bands",
   });
 
   if (!result || !russianReader) return result;

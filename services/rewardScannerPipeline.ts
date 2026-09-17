@@ -48,6 +48,7 @@ interface RewardScanPipelineOptions {
   settings: RewardScanSettings;
   runOCRStructuredBuffer: StructuredOcrBufferRunner;
   reader?: RewardReader;
+  windowsOcrMode?: "bands" | "whole";
 }
 
 type Screenshot = CaptureResult | PreCaptureResult;
@@ -252,6 +253,7 @@ export async function runRewardScanPipeline({
   settings,
   runOCRStructuredBuffer,
   reader,
+  windowsOcrMode,
 }: RewardScanPipelineOptions): Promise<{
   items: SortedItem[];
   meta: Record<string, unknown>;
@@ -310,6 +312,7 @@ export async function runRewardScanPipeline({
       ocrTimeoutMs: settings.ocrTimeoutMs,
       runOCRStructuredBuffer,
       reader,
+      windowsOcrMode,
       warframeUiScale: settings.warframeUiScale,
       stats: slotStats,
     },
