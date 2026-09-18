@@ -44,7 +44,9 @@ function copyLegacyUserData(appDataRoot: string, targetDir: string): void {
       copiedFrom ? `migrated from ${copiedFrom}\n` : "no legacy profile found\n",
       "utf8",
     );
-  } catch {}
+  } catch {
+    return;
+  }
 }
 
 const appDataRoot = app.getPath("appData");
