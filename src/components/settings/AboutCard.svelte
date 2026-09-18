@@ -45,10 +45,14 @@
     },
     {
       label: $tr("settings.creditSource"),
-      url: "https://github.com/WFHelper/WFHelper",
+      url: "https://github.com/MikhailMostWanted/WFHelper",
       text: "GitHub",
     },
-    { label: $tr("settings.creditWebsite"), url: "https://wfhelper.com", text: "wfhelper.com" },
+    {
+      label: $tr("settings.creditWebsite"),
+      url: "https://github.com/MikhailMostWanted/WFHelper/releases",
+      text: "WantedFrame Releases",
+    },
     {
       label: $tr("settings.creditCommunity"),
       url: "https://discord.gg/7Gm3UvUSww",

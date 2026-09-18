@@ -361,7 +361,7 @@ async function runOnceWindows(): Promise<boolean> {
   const reason = native ? await nativeAuthzReason(native.reason) : "error";
   if (reason === "access-denied") {
     log.error(
-      "Warframe is likely running as administrator - WFHelper cannot read an " +
+      "Warframe is likely running as administrator - WantedFrame cannot read an " +
         "elevated game. Restart Warframe without admin rights.",
     );
   }
@@ -471,7 +471,7 @@ function runHelperExe(): Promise<{ ok: boolean; reason: HelperRunReason | null }
           log.error(`Helper output did not contain auth params (${reason})`);
           if (reason === "access-denied") {
             log.error(
-              "Warframe is likely running as administrator - WFHelper cannot read " +
+              "Warframe is likely running as administrator - WantedFrame cannot read " +
                 "an elevated game. Restart Warframe without admin rights.",
             );
           }
@@ -718,7 +718,7 @@ function httpsDownloadToFile(
         rejectOnce(err);
         return;
       }
-      const request = https.get(absUrl, { headers: { "User-Agent": "WFHelper" } }, (res) => {
+      const request = https.get(absUrl, { headers: { "User-Agent": "WantedFrame" } }, (res) => {
         // Follow redirect - but only to https:// targets. Resolve relative
         // locations against the current URL before re-validating.
         if (
@@ -804,7 +804,7 @@ export async function downloadHelper(
 
     const releaseRes = await httpsGetBuffer(
       GITHUB_RELEASES_URL,
-      { "User-Agent": "WFHelper", Accept: "application/vnd.github+json" },
+      { "User-Agent": "WantedFrame", Accept: "application/vnd.github+json" },
       MAX_RELEASE_METADATA_BYTES,
     );
 
