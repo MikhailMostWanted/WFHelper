@@ -40,7 +40,7 @@ vi.mock("electron", () => ({
 }));
 vi.mock("../../services/atomicFile", () => ({ writeFileAtomicSync: h.write }));
 vi.mock("../../services/userDataPath", () => ({
-  userDataPath: (name: string) => path.join("C:\\App Data\\WFHelper", name),
+  userDataPath: (name: string) => path.join("C:\\App Data\\WantedFrame", name),
 }));
 vi.mock("../../services/logger", () => ({
   withScope: () => ({ info: vi.fn(), warn: vi.fn() }),
@@ -54,7 +54,7 @@ vi.mock("../../services/win32Process", () => ({
 
 type Lifecycle = typeof import("../../services/warframeLifecycle");
 let lifecycle: Lifecycle;
-const configPath = path.join("C:\\App Data\\WFHelper", "warframe-watcher.json");
+const configPath = path.join("C:\\App Data\\WantedFrame", "warframe-watcher.json");
 const quit = vi.fn();
 const realPlatform = process.platform;
 
@@ -135,7 +135,7 @@ describe("Warframe lifecycle", () => {
     );
     expect(h.login).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: "WFHelperWarframeWatcher",
+        name: "WantedFrameWarframeWatcher",
         openAtLogin: true,
         args: expect.arrayContaining([`"${configPath}"`]),
       }),
@@ -241,7 +241,7 @@ describe("Warframe lifecycle", () => {
     await vi.advanceTimersByTimeAsync(8000);
     await lifecycle.configureWarframeLifecycle(false);
     expect(h.files.has(configPath)).toBe(false);
-    expect(h.files.has(path.join("C:\\App Data\\WFHelper", "warframe-watcher.ps1"))).toBe(false);
+    expect(h.files.has(path.join("C:\\App Data\\WantedFrame", "warframe-watcher.ps1"))).toBe(false);
     expect(h.login).toHaveBeenLastCalledWith(expect.objectContaining({ openAtLogin: false }));
     await vi.advanceTimersByTimeAsync(60_000);
     expect(quit).not.toHaveBeenCalled();
@@ -311,7 +311,7 @@ describe("Warframe lifecycle", () => {
       configPath,
       JSON.stringify({
         enabled: true,
-        executable: "C:\\old\\wfhelper.exe",
+        executable: "C:\\old\\wantedframe.exe",
         revision: "old",
         appPid: 999,
       }),
@@ -327,7 +327,7 @@ describe("Warframe lifecycle", () => {
   });
 
   it("removes an orphaned watcher script while disabled", async () => {
-    const script = path.join("C:\\App Data\\WFHelper", "warframe-watcher.ps1");
+    const script = path.join("C:\\App Data\\WantedFrame", "warframe-watcher.ps1");
     h.files.set(script, "old script");
     await lifecycle.configureWarframeLifecycle(false);
     expect(h.files.has(script)).toBe(false);

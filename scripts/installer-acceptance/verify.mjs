@@ -4,7 +4,7 @@ import path from "node:path";
 
 if (
   process.env.USERNAME !== "WDAGUtilityAccount" ||
-  process.env.WFHELPER_USER_DATA !== path.join(process.env.APPDATA, "WFHelper")
+  process.env.WFHELPER_USER_DATA !== path.join(process.env.APPDATA, "WantedFrame")
 ) {
   throw new Error(
     "This verifier only runs inside the generated Windows Sandbox acceptance session",

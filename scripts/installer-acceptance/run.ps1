@@ -3,14 +3,14 @@ $ErrorActionPreference = "Stop"
 
 if (-not $InWindowsSandbox -or $env:USERNAME -ne "WDAGUtilityAccount" -or
     $env:USERPROFILE -ne "C:\Users\WDAGUtilityAccount" -or
-    $PSScriptRoot -ne "C:\WFHelperInputs") {
-  throw "Refusing installation outside the generated Windows Sandbox session. Open WFHelper-upgrade.wsb."
+    $PSScriptRoot -ne "C:\WantedFrameInputs") {
+  throw "Refusing installation outside the generated Windows Sandbox session. Open WantedFrame-upgrade.wsb."
 }
 
-$work = "C:\WFHelperAcceptance"
-$results = "C:\WFHelperResults"
+$work = "C:\WantedFrameAcceptance"
+$results = "C:\WantedFrameResults"
 $install = Join-Path $work "App"
-$profile = Join-Path $env:APPDATA "WFHelper"
+$profile = Join-Path $env:APPDATA "WantedFrame"
 if (Test-Path -LiteralPath $work) { throw "Acceptance requires a fresh Windows Sandbox session" }
 New-Item -ItemType Directory -Path $work, $profile -Force | Out-Null
 Start-Transcript -Path (Join-Path $results "acceptance.log") -Force | Out-Null
@@ -60,7 +60,7 @@ try {
     }
     $setup.Refresh()
     if ($setup.ExitCode -ne 0) { throw "$phase installer failed with exit $($setup.ExitCode)" }
-    $executable = Join-Path $install "WFHelper.exe"
+    $executable = Join-Path $install "WantedFrame.exe"
     $version = (Get-Item -LiteralPath $executable).VersionInfo.FileVersion
     if ($version -ne $entry.version) { throw "$phase installed version '$version', expected '$($entry.version)'" }
     $preferences = Get-Content -Raw -LiteralPath (Join-Path $profile "setup-preferences.json") | ConvertFrom-Json

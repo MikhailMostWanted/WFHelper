@@ -61,7 +61,7 @@ fs.copyFileSync(process.execPath, path.join(input, "node.exe"));
 const xml = (value) =>
   value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 fs.writeFileSync(
-  path.join(destination, "WFHelper-upgrade.wsb"),
+  path.join(destination, "WantedFrame-upgrade.wsb"),
   `<Configuration>
   <Networking>Disable</Networking>
   <ClipboardRedirection>Disable</ClipboardRedirection>
@@ -69,12 +69,12 @@ fs.writeFileSync(
   <VideoInput>Disable</VideoInput>
   <PrinterRedirection>Disable</PrinterRedirection>
   <MappedFolders>
-    <MappedFolder><HostFolder>${xml(input)}</HostFolder><SandboxFolder>C:\\WFHelperInputs</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>
-    <MappedFolder><HostFolder>${xml(output)}</HostFolder><SandboxFolder>C:\\WFHelperResults</SandboxFolder><ReadOnly>false</ReadOnly></MappedFolder>
+    <MappedFolder><HostFolder>${xml(input)}</HostFolder><SandboxFolder>C:\\WantedFrameInputs</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>
+    <MappedFolder><HostFolder>${xml(output)}</HostFolder><SandboxFolder>C:\\WantedFrameResults</SandboxFolder><ReadOnly>false</ReadOnly></MappedFolder>
   </MappedFolders>
-  <LogonCommand><Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\WFHelperInputs\\run.ps1 -InWindowsSandbox</Command></LogonCommand>
+  <LogonCommand><Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\WantedFrameInputs\\run.ps1 -InWindowsSandbox</Command></LogonCommand>
 </Configuration>
 `,
 );
-console.log(`Prepared: ${path.join(destination, "WFHelper-upgrade.wsb")}`);
+console.log(`Prepared: ${path.join(destination, "WantedFrame-upgrade.wsb")}`);
 console.log("No installers were run. Open the .wsb file to execute inside Windows Sandbox.");

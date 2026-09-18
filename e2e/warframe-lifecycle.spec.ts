@@ -60,7 +60,7 @@ test("Warframe lifecycle stays opt-in and closes only after an observed game exi
       processApi.enumProcessNames = () => {
         scope.lifecycleTest.samples += 1;
         return [
-          { pid: process.pid, name: "WFHelper.exe" },
+          { pid: process.pid, name: "WantedFrame.exe" },
           ...(scope.lifecycleTest.gameRunning
             ? [{ pid: fakeGamePid, name: "Warframe.x64.exe" }]
             : []),
