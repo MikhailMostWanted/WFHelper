@@ -241,10 +241,10 @@
   "overlay.reward.detecting": "Определяем...",
   "overlay.reward.inFoundry": "В кузнице",
   "overlay.reward.noPricedRewards": "Пока нет наград с ценой",
-  "overlay.reward.ocrFailed": "Не удалось распознать награды на текущем экране. Используйте оконный режим без рамки и укажите в настройках WFHelper тот же масштаб интерфейса, что и в Warframe.",
+  "overlay.reward.ocrFailed": "Не удалось распознать награды на текущем экране. Используйте оконный режим без рамки и укажите в настройках WantedFrame тот же масштаб интерфейса, что и в Warframe.",
   "overlay.reward.ocrFailedShort": "Ошибка OCR",
-  "overlay.reward.ocrUnavailable": "На этом компьютере недоступен Windows OCR для русского языка. В Параметрах Windows > Время и язык > Язык и регион установите языковые компоненты русского языка, затем перезапустите WFHelper.",
-  "overlay.reward.captureUnavailable": "WFHelper не получил изображение экрана. Разрешите захват экрана для WFHelper и откройте следующий экран наград.",
+  "overlay.reward.ocrUnavailable": "На этом компьютере недоступен Windows OCR для русского языка. В Параметрах Windows > Время и язык > Язык и регион установите языковые компоненты русского языка, затем перезапустите WantedFrame.",
+  "overlay.reward.captureUnavailable": "WantedFrame не получил изображение экрана. Разрешите захват экрана для WantedFrame и откройте следующий экран наград.",
   "overlay.reward.ownedParts": "Есть {owned}/{required}",
   "overlay.reward.partFallback": "Часть",
   "overlay.reward.partInFoundry": "(в кузнице)",
@@ -289,7 +289,7 @@
   "settings.redoSetup": "Повторить первоначальную настройку",
   "settings.showFeatureTour": "Показать обзор возможностей",
 
-  "tray.show": "Показать WFHelper",
+  "tray.show": "Показать WantedFrame",
   "tray.quit": "Выйти",
 
   "world.loading": "Загрузка данных мира...",
