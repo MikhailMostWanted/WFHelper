@@ -1,1 +1,76 @@
-name: WantedFrame Preview\n\non:\n  push:\n    branches:\n      - "feat/wantedframe-brand"\n  workflow_dispatch:\n\npermissions:\n  contents: write\n\njobs:\n  build-windows:\n    runs-on: windows-latest\n    timeout-minutes: 25\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n\n      - name: Setup pnpm\n        uses: pnpm/action-setup@v4\n\n      - name: Setup Node\n        uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: pnpm\n\n      - name: Set preview version\n        shell: bash\n        run: pnpm version 0.1.0 --no-git-tag-version --allow-same-version\n\n      - name: Install dependencies\n        run: pnpm install --frozen-lockfile\n\n      - name: Build WantedFrame installer\n        shell: pwsh\n        env:\n          CSC_IDENTITY_AUTO_DISCOVERY: "false"\n          VITE_WFM_BACKEND_URL: "https://api.wfhelper.com"\n          VITE_WFM_BACKEND_DIRECT_FALLBACK: "high"\n          VITE_WFM_BACKEND_BOOTSTRAP_ENABLED: "1"\n        run: |\n          pnpm run verify:onnx-models\n          pnpm run build\n          pnpm exec electron-builder --win nsis --publish never\n\n      - name: Verify packaged app\n        run: pnpm run test:packaged release/win-unpacked/WantedFrame.exe\n\n      - name: Upload installer artifact\n        uses: actions/upload-artifact@v4\n        with:\n          name: WantedFrame-0.1.0-Windows\n          path: |\n            release/WantedFrame-0.1.0-Setup.exe\n            release/WantedFrame-0.1.0-Setup.exe.blockmap\n            release/latest.yml\n          if-no-files-found: error\n\n      - name: Publish WantedFrame release\n        shell: pwsh\n        env:\n          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n        run: |\n          $tag = "v0.1.0"\n          $notes = "WantedFrame 0.1.0`n`n- Full WantedFrame desktop branding and installer naming`n- Russian interface and Russian relic reward OCR`n- Bilingual Market search and WTB/WTS pricing`n- Migration from legacy WFHelper/RusFrame profile data`n- Legacy WFHelper Warframe watcher cleanup during installation"\n          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null\n          if ($LASTEXITCODE -ne 0) {\n            gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "WantedFrame v0.1.0" --notes $notes\n            if ($LASTEXITCODE -ne 0) { throw "Could not create WantedFrame release" }\n          }\n          $paths = @("release/WantedFrame-0.1.0-Setup.exe", "release/WantedFrame-0.1.0-Setup.exe.blockmap", "release/latest.yml")\n          gh release upload $tag @paths --clobber --repo $env:GITHUB_REPOSITORY\n          if ($LASTEXITCODE -ne 0) { throw "Could not upload WantedFrame release assets" }\n
+name: WantedFrame Preview
+
+on:
+  push:
+    branches:
+      - "feat/wantedframe-brand"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Set preview version
+        shell: bash
+        run: pnpm version 0.1.0 --no-git-tag-version --allow-same-version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build WantedFrame installer
+        shell: pwsh
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          VITE_WFM_BACKEND_URL: "https://api.wfhelper.com"
+          VITE_WFM_BACKEND_DIRECT_FALLBACK: "high"
+          VITE_WFM_BACKEND_BOOTSTRAP_ENABLED: "1"
+        run: |
+          pnpm run verify:onnx-models
+          pnpm run build
+          pnpm exec electron-builder --win nsis --publish never
+
+      - name: Verify packaged app
+        run: pnpm run test:packaged release/win-unpacked/WantedFrame.exe
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WantedFrame-0.1.0-Windows
+          path: |
+            release/WantedFrame-0.1.0-Setup.exe
+            release/WantedFrame-0.1.0-Setup.exe.blockmap
+            release/latest.yml
+          if-no-files-found: error
+
+      - name: Publish WantedFrame release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "v0.1.0"
+          $notes = "WantedFrame 0.1.0`n`n- Full WantedFrame desktop branding and installer naming`n- Russian interface and Russian relic reward OCR`n- Bilingual Market search and WTB/WTS pricing`n- Migration from legacy WFHelper/RusFrame profile data`n- Legacy WFHelper Warframe watcher cleanup during installation"
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "WantedFrame v0.1.0" --notes $notes
+            if ($LASTEXITCODE -ne 0) { throw "Could not create WantedFrame release" }
+          }
+          $paths = @("release/WantedFrame-0.1.0-Setup.exe", "release/WantedFrame-0.1.0-Setup.exe.blockmap", "release/latest.yml")
+          gh release upload $tag @paths --clobber --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw "Could not upload WantedFrame release assets" }
