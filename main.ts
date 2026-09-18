@@ -435,7 +435,7 @@ function reportSessionHealth(profileStage: ProfileStage): void {
   if (injectors.length > 0) {
     log.warn(
       `[Startup] software known to crash its host is injected here: ${injectors.join(", ")}. ` +
-        "Disabling its overlay, or excluding WFHelper from it, is the fix.",
+        "Disabling its overlay, or excluding WantedFrame from it, is the fix.",
     );
   }
 }
