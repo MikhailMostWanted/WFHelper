@@ -4,7 +4,8 @@ import path from "node:path";
 import { APP_PRODUCT_NAME } from "../shared/appMeta";
 
 const APP_USER_DATA_DIR_NAME = APP_PRODUCT_NAME;
-const LEGACY_USER_DATA_DIR_NAMES = ["warframe-companion"];
+const LEGACY_USER_DATA_DIR_NAMES = ["RusFrame", "WFHelper", "warframe-companion"];
+const MIGRATION_MARKER = ".wantedframe-migrated";
 
 function directoryHasEntries(dir: string): boolean {
   try {
@@ -15,24 +16,35 @@ function directoryHasEntries(dir: string): boolean {
 }
 
 function copyLegacyUserData(appDataRoot: string, targetDir: string): void {
-  if (directoryHasEntries(targetDir)) return;
+  const marker = path.join(targetDir, MIGRATION_MARKER);
+  if (fs.existsSync(marker)) return;
 
+  let copiedFrom: string | null = null;
   for (const legacyName of LEGACY_USER_DATA_DIR_NAMES) {
     const legacyDir = path.join(appDataRoot, legacyName);
     if (legacyDir === targetDir || !directoryHasEntries(legacyDir)) continue;
 
     try {
-      fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+      fs.mkdirSync(targetDir, { recursive: true });
       fs.cpSync(legacyDir, targetDir, {
         recursive: true,
         force: false,
         errorOnExist: false,
       });
-      return;
+      copiedFrom ??= legacyName;
     } catch {
-      return;
+      continue;
     }
   }
+
+  try {
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.writeFileSync(
+      marker,
+      copiedFrom ? `migrated from ${copiedFrom}\n` : "no legacy profile found\n",
+      "utf8",
+    );
+  } catch {}
 }
 
 const appDataRoot = app.getPath("appData");

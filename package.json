@@ -1,9 +1,9 @@
 {
-  "name": "wfhelper",
+  "name": "wantedframe",
   "version": "0.0.0",
   "description": "Warframe companion: inventory, foundry, relic and riven scanning, market orders.",
   "main": ".electron-build/main.js",
-  "desktopName": "wfhelper.desktop",
+  "desktopName": "wantedframe.desktop",
   "engines": {
     "node": ">=22.12",
     "pnpm": ">=11"
@@ -87,7 +87,7 @@
     "companion",
     "inventory"
   ],
-  "author": "WFHelper",
+  "author": "WantedFrame",
   "license": "MIT",
   "devDependencies": {
     "@electron/asar": "^3.4.1",
@@ -143,7 +143,7 @@
   },
   "build": {
     "appId": "com.wfhelper.app",
-    "productName": "WFHelper",
+    "productName": "WantedFrame",
     "directories": {
       "output": "release"
     },
@@ -231,8 +231,8 @@
       "uninstallerIcon": "assets/logo.ico",
       "installerHeaderIcon": "assets/logo.ico",
       "include": "build/installer.nsh",
-      "uninstallDisplayName": "WFHelper",
-      "shortcutName": "WFHelper",
+      "uninstallDisplayName": "WantedFrame",
+      "shortcutName": "WantedFrame",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "runAfterFinish": true,
@@ -241,7 +241,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "WFHelper",
+        "owner": "MikhailMostWanted",
         "repo": "WFHelper",
         "releaseType": "release"
       }
@@ -249,10 +249,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/WFHelper/WFHelper.git"
+    "url": "https://github.com/MikhailMostWanted/WFHelper.git"
   },
   "bugs": {
-    "url": "https://github.com/WFHelper/WFHelper/issues"
+    "url": "https://github.com/MikhailMostWanted/WFHelper/issues"
   },
-  "homepage": "https://github.com/WFHelper/WFHelper#readme"
+  "homepage": "https://github.com/MikhailMostWanted/WFHelper#readme"
 }
