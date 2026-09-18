@@ -9,8 +9,8 @@ import { pathToFileURL } from "node:url";
 
 const CONTENT_LIMIT = 2000;
 const MAX_MESSAGES = 10;
-const USERNAME = "WFHelper Releases";
-const FALLBACK_BODY = "A new version of WFHelper is available - see the release for details.";
+const USERNAME = "WantedFrame Releases";
+const FALLBACK_BODY = "A new version of WantedFrame is available - see the release for details.";
 
 function normalizeBody(body) {
   return String(body ?? "")
@@ -32,8 +32,8 @@ function takeChunk(text, limit) {
 export function buildMessages({ title, tag, url, body, roleId }) {
   const name = title || tag;
   const mention = roleId ? ` <@&${roleId}>` : "";
-  const header = `## [WFHelper ${name}](${url}) is out 🎉${mention}\n`;
-  const footer = `\n-# [Release notes](${url}) · Download at wfhelper.com`;
+  const header = `## [WantedFrame ${name}](${url}) is out 🎉${mention}\n`;
+  const footer = `\n-# [Release notes](${url}) · Download from GitHub Releases`;
   const more = `\n\n**[Full changelog →](${url})**`;
   const messages = [];
   let rest = normalizeBody(body) || FALLBACK_BODY;

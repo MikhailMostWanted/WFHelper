@@ -56,7 +56,7 @@ beforeEach(async () => {
   Object.defineProperty(process, "platform", { value: "win32", configurable: true });
   vi.mocked(queryExePath).mockImplementation((pid) => ({
     status: "ok",
-    path: pid === 10 ? gamePath : "C:\\Apps\\WFHelper.exe",
+    path: pid === 10 ? gamePath : "C:\\Apps\\WantedFrame.exe",
   }));
   status = await import("../../services/warframeStatus");
 });

@@ -9,7 +9,7 @@ Only the latest release receives security fixes. Please update before reporting.
 Please **do not** open a public issue for security problems.
 
 Report privately through GitHub's
-[private vulnerability reporting](https://github.com/WFHelper/WFHelper/security/advisories/new)
+[private vulnerability reporting](https://github.com/MikhailMostWanted/WantedFrame/security/advisories/new)
 (Security tab → "Report a vulnerability"). Include:
 
 - what an attacker can do and how you found it,
@@ -21,7 +21,7 @@ with you.
 
 ## Scope
 
-WFHelper reads local game files (inventory snapshots, `EE.log`), captures the
+WantedFrame reads local game files (inventory snapshots, `EE.log`), captures the
 screen for OCR, and talks to its own caching backend plus warframe.market. Areas
 of particular interest:
 

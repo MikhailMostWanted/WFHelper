@@ -1,12 +1,12 @@
-# WFHelper
+# WantedFrame
 
 Unofficial Warframe companion app for Windows and Linux. Reads your
 inventory, prices it with live warframe.market data, scans relic rewards on
 screen and tracks your arbitration runs straight from EE.log.
 
-**[wfhelper.com](https://wfhelper.com)**: download, the full feature tour, and FAQ.
+**[WantedFrame Releases](https://github.com/MikhailMostWanted/WantedFrame/releases)**: download the current Windows build and release notes.
 
-![WFHelper inventory with live warframe.market prices](.github/screenshots/inventory.png)
+![WantedFrame inventory with live warframe.market prices](.github/screenshots/inventory.png)
 
 <sub>Shown in the midnight-blue theme. 10 themes are built in, or build your own.</sub>
 
@@ -39,27 +39,27 @@ In-game overlays (Warframe in Borderless mode):
 Notifications: in-game whispers, warframe.market DMs and arbitration windows can
 raise Windows notifications while you play.
 
-> **Use English for Warframe's interface.** Relic and riven OCR recognizes only
-> English item names. WFHelper's display language is separate and can be changed
-> in Settings.
+> **Relic reward OCR supports English and Russian item names.** Riven OCR remains
+> more dependent on English game text. WantedFrame's display language is separate
+> and can be changed in Settings.
 
 ## Install
 
-Download the latest `WFHelper-<version>-Setup.exe` from
-[Releases](https://github.com/WFHelper/WFHelper/releases) and run it.
+Download the latest `WantedFrame-<version>-Setup.exe` from
+[Releases](https://github.com/MikhailMostWanted/WantedFrame/releases) and run it.
 
 Windows SmartScreen may warn on first run because the installer is not
 code-signed: click "More info", then "Run anyway".
 
 ### Linux
 
-Download `WFHelper-<version>.AppImage` from
-[Releases](https://github.com/WFHelper/WFHelper/releases), make it executable
+Download `WantedFrame-<version>.AppImage` from
+[Releases](https://github.com/MikhailMostWanted/WantedFrame/releases), make it executable
 and run it:
 
 ```
-chmod +x WFHelper-*.AppImage
-./WFHelper-*.AppImage
+chmod +x WantedFrame-*.AppImage
+./WantedFrame-*.AppImage
 ```
 
 In a file manager instead: right-click the file, open Properties, then
@@ -67,14 +67,14 @@ Permissions, tick "Allow executing as program" and double-click it.
 
 Good to know:
 
-- **Warframe runs through Steam (Proton).** WFHelper finds the game's log
+- **Warframe runs through Steam (Proton).** WantedFrame finds the game's log
   inside the Proton prefix on its own, including Flatpak and Snap Steam
   installs.
 - **Inventory comes straight from the running game.** Nothing extra to
   download on Linux.
 - **Wayland picks its own backend.** The app puts itself on XWayland so the overlays
   can sit on top of the game. Compositors without a real XWayland (niri) show
-  no window at all, so WFHelper notices, restarts on native Wayland and
+  no window at all, so WantedFrame notices, restarts on native Wayland and
   remembers it. Settings lets you pick the backend by hand. Wayland gives no
   app a way to force itself above another, so overlays are best-effort there.
 - **SteamOS is untested.** Desktop mode may work like any other distro. Game
@@ -137,11 +137,8 @@ pnpm run dist:win   # build the NSIS installer
 
 ## Support
 
-WFHelper is free and open source, with no ads or accounts. If it saves you
-plat, [Patreon](https://www.patreon.com/WFHelper) or
-[GitHub Sponsors](https://github.com/sponsors/MrZockerator) helps cover the
-Cloudflare infrastructure it runs on. Supporters get a Discord role and a
-thank-you in the app.
+WantedFrame is maintained in this fork. Use the repository Issues page for bugs
+and feature requests.
 
 ## Disclaimer
 

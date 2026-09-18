@@ -1,6 +1,6 @@
-# Contributing to WFHelper
+# Contributing to WantedFrame
 
-Thanks for your interest. WFHelper is a Windows-first Electron + Svelte 5 desktop
+Thanks for your interest. WantedFrame is a Windows-first Electron + Svelte 5 desktop
 app; the backend is a Cloudflare Worker under `backend/worker`.
 
 ## Getting started
