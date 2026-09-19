@@ -476,9 +476,7 @@ async function readSlotTitle(
     bottomRead.rawText || bottomRead.text,
   );
   const joinedResolution =
-    options.postProcessWindowsText && joinedRaw
-      ? options.postProcessWindowsText(joinedRaw)
-      : null;
+    options.postProcessWindowsText && joinedRaw ? options.postProcessWindowsText(joinedRaw) : null;
   const joined = cleanRewardOcrText(joinedResolution?.text || joinedCanonical);
   const wholeClean = cleanRewardOcrText(wholeRead.text);
   const onnxClean = cleanRewardOcrText(onnxRead?.text || "");
@@ -733,8 +731,7 @@ export async function scanRewardSlotsFallback(
       rawText: slot.rawText || slot.windowsText,
       resolvedText: slot.resolvedText || slot.windowsText,
       matchMode: slot.ocrMatchMode || null,
-      matchConfidence:
-        typeof slot.ocrMatchConfidence === "number" ? slot.ocrMatchConfidence : null,
+      matchConfidence: typeof slot.ocrMatchConfidence === "number" ? slot.ocrMatchConfidence : null,
       itemName: slot.matchedName,
       rankMode: slot.mode,
       rankConfidence: slot.confidence,

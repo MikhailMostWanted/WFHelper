@@ -236,10 +236,7 @@ export async function runRussianRewardOcrStructuredBuffer(
 
   let result: Awaited<ReturnType<SystemOcrModule["recognize"]>>;
   try {
-    result = await withTimeout(
-      ocr.recognize(imageBuffer, undefined, [RUSSIAN_LOCALE]),
-      timeoutMs,
-    );
+    result = await withTimeout(ocr.recognize(imageBuffer, undefined, [RUSSIAN_LOCALE]), timeoutMs);
     lastRussianOcrError = null;
   } catch (error) {
     lastRussianOcrError = normalizeErrorMessage(error);

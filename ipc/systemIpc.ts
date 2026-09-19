@@ -265,13 +265,11 @@ function register(): void {
           rawText: typeof slot.rawText === "string" ? slot.rawText : "",
           resolvedText: typeof slot.resolvedText === "string" ? slot.resolvedText : "",
           matchMode: typeof slot.matchMode === "string" ? slot.matchMode : null,
-          matchConfidence:
-            typeof slot.matchConfidence === "number" ? slot.matchConfidence : null,
+          matchConfidence: typeof slot.matchConfidence === "number" ? slot.matchConfidence : null,
           itemName: matched?.name || (typeof slot.itemName === "string" ? slot.itemName : null),
           itemDisplayName: matched?.displayName ?? null,
           rankMode: typeof slot.rankMode === "string" ? slot.rankMode : null,
-          rankConfidence:
-            typeof slot.rankConfidence === "number" ? slot.rankConfidence : null,
+          rankConfidence: typeof slot.rankConfidence === "number" ? slot.rankConfidence : null,
           diverged: slot.diverged === true,
         };
       });
