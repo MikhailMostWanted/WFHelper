@@ -18,6 +18,7 @@ import {
   type RewardReader,
   type SlotScanStats,
   type StructuredOcrBufferRunner,
+  type WindowsOcrMode,
 } from "./rewardScannerSlotScan";
 import { CROP_PRESETS, SCANNER_TUNING } from "./rewardScannerSupport";
 import { round4, yieldToEventLoop } from "./rewardScannerUtils";
@@ -48,7 +49,7 @@ interface RewardScanPipelineOptions {
   settings: RewardScanSettings;
   runOCRStructuredBuffer: StructuredOcrBufferRunner;
   reader?: RewardReader;
-  windowsOcrMode?: "bands" | "whole";
+  windowsOcrMode?: WindowsOcrMode;
 }
 
 type Screenshot = CaptureResult | PreCaptureResult;
@@ -300,6 +301,7 @@ export async function runRewardScanPipeline({
     ocrMs: 0,
     ocrReads: 0,
     layoutsTried: 0,
+    adaptiveRetries: 0,
   };
   const slotsStartedAt = Date.now();
   const slotResult = await scanRewardSlotsFallback(
@@ -373,7 +375,7 @@ export async function runRewardScanPipeline({
   log.info(
     `[RewardScanner] timing capture=${captureMs}ms guards=${guardsMs}ms ` +
       `layout=${slotStats.layoutMs}ms(${slotStats.layoutsTried}/${slotStats.layoutCount} tried, cards=${slotStats.cardCount}) ` +
-      `slots=${slotsMs}ms(${slotStats.ocrReads} reads, ocr ${slotStats.ocrMs}ms) ` +
+      `slots=${slotsMs}ms(${slotStats.ocrReads} reads, adaptive=${slotStats.adaptiveRetries || 0}, ocr ${slotStats.ocrMs}ms) ` +
       `fallback=${fallbackMs}ms total=${Date.now() - scanStartedAt}ms ` +
       `frame=${frameSize.width}x${frameSize.height}`,
   );

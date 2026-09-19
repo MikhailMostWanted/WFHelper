@@ -53,11 +53,32 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
+const LATIN_TO_CYRILLIC: Readonly<Record<string, string>> = Object.freeze({
+  a: "а",
+  b: "в",
+  c: "с",
+  e: "е",
+  h: "н",
+  k: "к",
+  m: "м",
+  o: "о",
+  p: "р",
+  t: "т",
+  x: "х",
+  y: "у",
+});
+
+function normalizeMixedRussianToken(token: string): string {
+  if (!/[а-яё]/i.test(token)) return token;
+  return token.replace(/[abcehkmoptyx]/g, (char) => LATIN_TO_CYRILLIC[char] || char);
+}
+
 function normalizeRussian(value: unknown): string {
   return String(value || "")
     .normalize("NFKC")
     .toLocaleLowerCase("ru-RU")
     .replace(/ё/g, "е")
+    .replace(/\S+/g, normalizeMixedRussianToken)
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -75,6 +96,27 @@ interface LocalizedCandidate {
   normalized: string;
 }
 
+interface LocalizedCandidateIndex {
+  candidates: LocalizedCandidate[];
+  exactByNormalized: Map<string, LocalizedCandidate>;
+}
+
+const localizedCandidateIndexCache = new WeakMap<SortedItem[], LocalizedCandidateIndex>();
+
+export type RussianRewardMatchMode = "exact" | "substring" | "partial" | "fuzzy" | "none";
+
+export interface RussianRewardResolution {
+  text: string;
+  matchMode: RussianRewardMatchMode;
+  matchConfidence: number;
+}
+
+export interface RussianRewardOcrResult extends StructuredOcrResult {
+  rawText: string;
+  matchMode: RussianRewardMatchMode;
+  matchConfidence: number;
+}
+
 export function localizeMatchedRewardDisplayNames(items: SortedItem[]): SortedItem[] {
   return items.map((item) => {
     const canonical = String(item?.name || "");
@@ -85,9 +127,12 @@ export function localizeMatchedRewardDisplayNames(items: SortedItem[]): SortedIt
   });
 }
 
-function localizedCandidates(items: SortedItem[]): LocalizedCandidate[] {
-  const out: LocalizedCandidate[] = [];
-  const seen = new Set<string>();
+function localizedCandidateIndex(items: SortedItem[]): LocalizedCandidateIndex {
+  const cached = localizedCandidateIndexCache.get(items);
+  if (cached) return cached;
+
+  const candidates: LocalizedCandidate[] = [];
+  const exactByNormalized = new Map<string, LocalizedCandidate>();
   for (const item of items) {
     const canonical = String(item?.name || "").trim();
     const uniqueName = typeof item?.uniqueName === "string" ? item.uniqueName : null;
@@ -95,11 +140,16 @@ function localizedCandidates(items: SortedItem[]): LocalizedCandidate[] {
     const localized = itemDatabase.localizedNameFields(uniqueName, canonical).displayName;
     if (!localized || localized === canonical) continue;
     const normalized = normalizeRussian(localized);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-    out.push({ canonical, localized, normalized });
+    if (!normalized || exactByNormalized.has(normalized)) continue;
+    const candidate = { canonical, localized, normalized };
+    exactByNormalized.set(normalized, candidate);
+    candidates.push(candidate);
   }
-  return out.sort((a, b) => b.normalized.length - a.normalized.length);
+
+  candidates.sort((a, b) => b.normalized.length - a.normalized.length);
+  const index = { candidates, exactByNormalized };
+  localizedCandidateIndexCache.set(items, index);
+  return index;
 }
 
 function isUsefulPartialRead(text: string, candidate: string): boolean {
@@ -108,31 +158,39 @@ function isUsefulPartialRead(text: string, candidate: string): boolean {
   return wordCount >= 2 && text.length >= candidate.length * MIN_PARTIAL_NAME_RATIO;
 }
 
-/**
- * The existing reward matcher intentionally stays English/canonical because it
- * is also the join key for warframe.market. On a Russian client we OCR the
- * official DE Russian name, resolve that name here, then feed the canonical
- * English reward name into the unchanged matcher.
- */
-export function canonicalizeRussianRewardText(text: string, items: SortedItem[]): string {
+export function resolveRussianRewardText(
+  text: string,
+  items: SortedItem[],
+): RussianRewardResolution {
   const normalizedText = normalizeRussian(text);
-  if (!normalizedText) return text;
+  if (!normalizedText) {
+    return { text, matchMode: "none", matchConfidence: 0 };
+  }
 
-  const candidates = localizedCandidates(items);
+  const { candidates, exactByNormalized } = localizedCandidateIndex(items);
+  const exact = exactByNormalized.get(normalizedText);
+  if (exact) {
+    return { text: exact.canonical, matchMode: "exact", matchConfidence: 1 };
+  }
+
   for (const candidate of candidates) {
+    if (normalizedText.includes(candidate.normalized)) {
+      return { text: candidate.canonical, matchMode: "substring", matchConfidence: 0.97 };
+    }
     if (
-      normalizedText === candidate.normalized ||
-      normalizedText.includes(candidate.normalized) ||
-      (candidate.normalized.includes(normalizedText) &&
-        isUsefulPartialRead(normalizedText, candidate.normalized))
+      candidate.normalized.includes(normalizedText) &&
+      isUsefulPartialRead(normalizedText, candidate.normalized)
     ) {
-      return candidate.canonical;
+      return {
+        text: candidate.canonical,
+        matchMode: "partial",
+        matchConfidence: Math.min(0.96, normalizedText.length / candidate.normalized.length),
+      };
     }
   }
 
   let best: { candidate: LocalizedCandidate; score: number } | null = null;
   let secondScore = 0;
-
   for (const candidate of candidates) {
     const score = similarity(normalizedText, candidate.normalized);
     if (!best || score > best.score) {
@@ -144,17 +202,21 @@ export function canonicalizeRussianRewardText(text: string, items: SortedItem[])
   }
 
   if (best && best.score >= MIN_FUZZY_CONFIDENCE && best.score - secondScore >= MIN_FUZZY_MARGIN) {
-    return best.candidate.canonical;
+    return { text: best.candidate.canonical, matchMode: "fuzzy", matchConfidence: best.score };
   }
 
-  return text;
+  return { text, matchMode: "none", matchConfidence: best?.score ?? 0 };
+}
+
+export function canonicalizeRussianRewardText(text: string, items: SortedItem[]): string {
+  return resolveRussianRewardText(text, items).text;
 }
 
 export async function runRussianRewardOcrStructuredBuffer(
   imageBuffer: Buffer,
   timeoutMs: number,
   items: SortedItem[],
-): Promise<StructuredOcrResult> {
+): Promise<RussianRewardOcrResult> {
   const ocr = getSystemOcr();
   if (!ocr) throw new Error("@napi-rs/system-ocr is unavailable");
 
@@ -163,11 +225,15 @@ export async function runRussianRewardOcrStructuredBuffer(
     timeoutMs,
   );
   const rawText = String(result?.text || "").trim();
-  const text = canonicalizeRussianRewardText(rawText, items);
+  const resolution = resolveRussianRewardText(rawText, items);
+  const text = resolution.text;
   const words = text.split(/\s+/).filter(Boolean);
 
   return {
     text,
+    rawText,
+    matchMode: resolution.matchMode,
+    matchConfidence: resolution.matchConfidence,
     lines: text
       ? [
           {

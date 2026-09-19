@@ -77,6 +77,79 @@ describe("scanRewardSlotsFallback Windows OCR strategy", () => {
     expect(stats.ocrReads).toBe(1);
   });
 
+  it("keeps one read when adaptive mode gets a strong whole-card match", async () => {
+    h.layouts = [{ count: 1, confidence: 0.9, slots: [slot(0)] }];
+    h.matches = { "forma blueprint": match("Forma Blueprint") };
+    const runOCRStructuredBuffer = vi.fn(async () => ({
+      text: "forma blueprint",
+      matchMode: "exact",
+      matchConfidence: 1,
+    }));
+    const stats = {
+      layoutCount: 0,
+      cardCount: 0,
+      layoutMs: 0,
+      ocrMs: 0,
+      ocrReads: 0,
+      layoutsTried: 0,
+      adaptiveRetries: 0,
+    };
+
+    const result = await scanRewardSlotsFallback({ image: {} as never }, 4, 60_000, Date.now(), {
+      sortedItems: [],
+      ocrTimeoutMs: 1000,
+      runOCRStructuredBuffer,
+      reader: "windows",
+      windowsOcrMode: "adaptive",
+      stats,
+    });
+
+    expect(result?.items.map((item) => item.name)).toEqual(["Forma Blueprint"]);
+    expect(runOCRStructuredBuffer).toHaveBeenCalledTimes(1);
+    expect(stats.ocrReads).toBe(1);
+    expect(stats.adaptiveRetries).toBe(0);
+  });
+
+  it("retries with two bands when adaptive whole-card matching is weak", async () => {
+    h.layouts = [{ count: 1, confidence: 0.9, slots: [slot(0)] }];
+    h.matches = {
+      "wrong weak": [],
+      "forma blueprint": match("Forma Blueprint"),
+    };
+    const runOCRStructuredBuffer = vi
+      .fn()
+      .mockResolvedValueOnce({
+        text: "wrong weak",
+        matchMode: "fuzzy",
+        matchConfidence: 0.74,
+      })
+      .mockResolvedValueOnce({ text: "forma" })
+      .mockResolvedValueOnce({ text: "blueprint" });
+    const stats = {
+      layoutCount: 0,
+      cardCount: 0,
+      layoutMs: 0,
+      ocrMs: 0,
+      ocrReads: 0,
+      layoutsTried: 0,
+      adaptiveRetries: 0,
+    };
+
+    const result = await scanRewardSlotsFallback({ image: {} as never }, 4, 60_000, Date.now(), {
+      sortedItems: [],
+      ocrTimeoutMs: 1000,
+      runOCRStructuredBuffer,
+      reader: "windows",
+      windowsOcrMode: "adaptive",
+      stats,
+    });
+
+    expect(result?.items.map((item) => item.name)).toEqual(["Forma Blueprint"]);
+    expect(runOCRStructuredBuffer).toHaveBeenCalledTimes(3);
+    expect(stats.ocrReads).toBe(3);
+    expect(stats.adaptiveRetries).toBe(1);
+  });
+
   it("keeps the three-band Windows OCR strategy as the default", async () => {
     h.layouts = [{ count: 1, confidence: 0.9, slots: [slot(0)] }];
     h.matches = { "forma blueprint": match("Forma Blueprint") };

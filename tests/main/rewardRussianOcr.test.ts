@@ -11,14 +11,16 @@ const localizedByUniqueName: Record<string, string> = {
 };
 
 vi.mock("../../services/itemDatabase", () => ({
-  localizedNameFields: (uniqueName: string, english: string) => ({
+  localizedNameFields: vi.fn((uniqueName: string, english: string) => ({
     displayName: localizedByUniqueName[uniqueName] || english,
-  }),
+  })),
 }));
 
+import * as itemDatabase from "../../services/itemDatabase";
 import {
   canonicalizeRussianRewardText,
   localizeMatchedRewardDisplayNames,
+  resolveRussianRewardText,
 } from "../../services/rewardRussianOcr";
 import type { SortedItem } from "../../services/rewardScannerMatch";
 
@@ -69,6 +71,31 @@ describe("Russian relic reward OCR bridge", () => {
     expect(canonicalizeRussianRewardText("Нижнее Плечо Парис Праим", items)).toBe(
       "Paris Prime Lower Limb",
     );
+  });
+
+  it("repairs Latin lookalikes inside otherwise Cyrillic OCR words", () => {
+    expect(canonicalizeRussianRewardText("Нижнее Плечо Пaрис Пpайм", items)).toBe(
+      "Paris Prime Lower Limb",
+    );
+  });
+
+  it("reports weak fuzzy resolutions so the slot reader can retry adaptively", () => {
+    const resolution = resolveRussianRewardText("Нижнее Плечо Парис Праим", items);
+    expect(resolution.text).toBe("Paris Prime Lower Limb");
+    expect(resolution.matchMode).toBe("fuzzy");
+    expect(resolution.matchConfidence).toBeGreaterThanOrEqual(0.7);
+    expect(resolution.matchConfidence).toBeLessThan(0.9);
+  });
+
+  it("caches the localized candidate index for repeated reads of the same item list", () => {
+    const localizedNameFields = vi.mocked(itemDatabase.localizedNameFields);
+    const freshItems = items.map((item) => ({ ...item }));
+    localizedNameFields.mockClear();
+
+    canonicalizeRussianRewardText("Ствол Братон Прайм", freshItems);
+    canonicalizeRussianRewardText("Чертёж Формы", freshItems);
+
+    expect(localizedNameFields).toHaveBeenCalledTimes(freshItems.length);
   });
 
   it("leaves unrelated text untouched instead of inventing a reward", () => {
