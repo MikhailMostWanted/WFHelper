@@ -103,15 +103,15 @@ interface LocalizedCandidateIndex {
 
 const localizedCandidateIndexCache = new WeakMap<SortedItem[], LocalizedCandidateIndex>();
 
-export type RussianRewardMatchMode = "exact" | "substring" | "partial" | "fuzzy" | "none";
+type RussianRewardMatchMode = "exact" | "substring" | "partial" | "fuzzy" | "none";
 
-export interface RussianRewardResolution {
+interface RussianRewardResolution {
   text: string;
   matchMode: RussianRewardMatchMode;
   matchConfidence: number;
 }
 
-export interface RussianRewardOcrResult extends StructuredOcrResult {
+interface RussianRewardOcrResult extends StructuredOcrResult {
   rawText: string;
   matchMode: RussianRewardMatchMode;
   matchConfidence: number;
