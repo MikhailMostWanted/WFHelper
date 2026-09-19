@@ -105,7 +105,7 @@ export async function scanRewardsDetailed(
       process.platform === "win32" ? (russianReader ? "windows" : scanOptions?.reader) : "onnx",
     windowsOcrMode: russianReader ? "adaptive" : "bands",
     postProcessWindowsText: russianReader
-      ? (text) => resolveRussianRewardText(text, sortedItems).text
+      ? (text) => resolveRussianRewardText(text, sortedItems)
       : undefined,
   });
 

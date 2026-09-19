@@ -50,6 +50,7 @@ import {
   APP_UPDATE_STATUS,
   APP_RUNTIME_INFO,
   SCAN_DEBUG_OPEN_FOLDER,
+  REWARD_OCR_DIAGNOSTIC_RUN,
   LOGS_OPEN_FOLDER,
   LINUX_DISPLAY_GET,
   LINUX_DISPLAY_SET,
@@ -229,6 +230,7 @@ try {
     installDownloadedUpdate: inv<"installDownloadedUpdate">(APP_UPDATE_INSTALL),
     getAppRuntimeInfo: inv<"getAppRuntimeInfo">(APP_RUNTIME_INFO),
     openScanDebugFolder: inv<"openScanDebugFolder">(SCAN_DEBUG_OPEN_FOLDER),
+    runRewardOcrDiagnostic: inv<"runRewardOcrDiagnostic">(REWARD_OCR_DIAGNOSTIC_RUN),
     openLogFolder: inv<"openLogFolder">(LOGS_OPEN_FOLDER),
 
     onInventoryUpdated: ipcDataBridge<IpcEventMap["inventory-updated"]>(

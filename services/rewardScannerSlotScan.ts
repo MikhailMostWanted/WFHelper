@@ -43,6 +43,10 @@ interface SlotDebugInfo {
   index: number;
   stripPng: Buffer;
   windowsText: string;
+  rawText: string;
+  resolvedText: string;
+  ocrMatchMode: string | null;
+  ocrMatchConfidence: number | null;
   onnxText: string;
   diverged: boolean;
 }
@@ -58,6 +62,10 @@ function toScanDebugSlots(
       index: entry.debug.index,
       stripPng: entry.debug.stripPng,
       windowsText: entry.debug.windowsText,
+      rawText: entry.debug.rawText,
+      resolvedText: entry.debug.resolvedText,
+      ocrMatchMode: entry.debug.ocrMatchMode,
+      ocrMatchConfidence: entry.debug.ocrMatchConfidence,
       onnxText: entry.debug.onnxText,
       diverged: entry.debug.diverged,
       matchedName: matched ? matched.item.name : null,
@@ -78,6 +86,17 @@ interface SlotScanResult {
   avgConfidence: number;
   matchedSlots: number;
   emptySlots: number;
+  slotDiagnostics?: Array<{
+    slotIndex: number;
+    rawText: string;
+    resolvedText: string;
+    matchMode: string | null;
+    matchConfidence: number | null;
+    itemName: string | null;
+    rankMode: string | null;
+    rankConfidence: number | null;
+    diverged: boolean;
+  }>;
 }
 
 interface SlotRect {
@@ -217,6 +236,11 @@ export type StructuredOcrBufferRunner = (
 /** Which OCR reader(s) feed slot candidates; "both" is production behavior. */
 export type RewardReader = "windows" | "onnx" | "both";
 export type WindowsOcrMode = "bands" | "whole" | "adaptive";
+export type WindowsTextPostProcessor = (text: string) => {
+  text: string;
+  matchMode?: string;
+  matchConfidence?: number;
+};
 
 /** Out-param: lets the caller tell "not the reward screen" from "OCR missed",
  *  and carries the stage costs the per-attempt timing line reports. */
@@ -308,6 +332,10 @@ interface SlotRead {
   nearMiss: SlotCandidate | null;
   stripPng: Buffer;
   windowsText: string;
+  rawText: string;
+  resolvedText: string;
+  ocrMatchMode: string | null;
+  ocrMatchConfidence: number | null;
   onnxText: string;
   diverged: boolean;
 }
@@ -373,7 +401,7 @@ async function readSlotTitle(
     runOCRStructuredBuffer: StructuredOcrBufferRunner;
     reader: RewardReader;
     windowsOcrMode?: WindowsOcrMode;
-    postProcessWindowsText?: (text: string) => string;
+    postProcessWindowsText?: WindowsTextPostProcessor;
     stats?: SlotScanStats;
   },
 ): Promise<SlotRead | null> {
@@ -447,10 +475,11 @@ async function readSlotTitle(
     topRead.rawText || topRead.text,
     bottomRead.rawText || bottomRead.text,
   );
-  const joined =
+  const joinedResolution =
     options.postProcessWindowsText && joinedRaw
       ? options.postProcessWindowsText(joinedRaw)
-      : joinedCanonical;
+      : null;
+  const joined = cleanRewardOcrText(joinedResolution?.text || joinedCanonical);
   const wholeClean = cleanRewardOcrText(wholeRead.text);
   const onnxClean = cleanRewardOcrText(onnxRead?.text || "");
 
@@ -477,11 +506,23 @@ async function readSlotTitle(
     );
   }
 
+  const preferredResolution = adaptiveRetried && joinedResolution ? joinedResolution : wholeRead;
+  const rawText = adaptiveRetried
+    ? joinedRaw || wholeRead.rawText || wholeClean
+    : wholeRead.rawText || joinedRaw || wholeClean;
+  const resolvedText = adaptiveRetried ? joined || wholeClean : wholeClean || joined;
+
   return {
     candidates: rankedCandidates,
     nearMiss: bestRejected,
     stripPng: cropPng,
-    windowsText: adaptiveRetried ? joinedRaw || joined || wholeClean : wholeClean || joined,
+    windowsText: resolvedText,
+    rawText,
+    resolvedText,
+    ocrMatchMode: preferredResolution.matchMode || null,
+    ocrMatchConfidence: Number.isFinite(Number(preferredResolution.matchConfidence))
+      ? Number(preferredResolution.matchConfidence)
+      : null,
     onnxText: onnxClean,
     diverged,
   };
@@ -504,7 +545,7 @@ export async function scanRewardSlotsFallback(
     runOCRStructuredBuffer: StructuredOcrBufferRunner;
     reader?: RewardReader;
     windowsOcrMode?: WindowsOcrMode;
-    postProcessWindowsText?: (text: string) => string;
+    postProcessWindowsText?: WindowsTextPostProcessor;
     warframeUiScale?: number;
     stats?: SlotScanStats;
   },
@@ -568,6 +609,10 @@ export async function scanRewardSlotsFallback(
             index: i,
             stripPng: read.stripPng,
             windowsText: read.windowsText,
+            rawText: read.rawText,
+            resolvedText: read.resolvedText,
+            ocrMatchMode: read.ocrMatchMode,
+            ocrMatchConfidence: read.ocrMatchConfidence,
             onnxText: read.onnxText,
             diverged: read.diverged,
           } satisfies SlotDebugInfo,
@@ -683,6 +728,18 @@ export async function scanRewardSlotsFallback(
   }
 
   if (bestResult) {
+    bestResult.slotDiagnostics = bestDebugSlots.map((slot) => ({
+      slotIndex: slot.index,
+      rawText: slot.rawText || slot.windowsText,
+      resolvedText: slot.resolvedText || slot.windowsText,
+      matchMode: slot.ocrMatchMode || null,
+      matchConfidence:
+        typeof slot.ocrMatchConfidence === "number" ? slot.ocrMatchConfidence : null,
+      itemName: slot.matchedName,
+      rankMode: slot.mode,
+      rankConfidence: slot.confidence,
+      diverged: slot.diverged,
+    }));
     const anyDiverge = bestDebugSlots.some((slot) => slot.diverged);
     // Dump the wider crops only when that layout resolved fewer cards than the
     // narrow winner and threw away a near-gate read; without both, a healthy

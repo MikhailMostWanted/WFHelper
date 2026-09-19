@@ -19,6 +19,7 @@ import {
   type SlotScanStats,
   type StructuredOcrBufferRunner,
   type WindowsOcrMode,
+  type WindowsTextPostProcessor,
 } from "./rewardScannerSlotScan";
 import { CROP_PRESETS, SCANNER_TUNING } from "./rewardScannerSupport";
 import { round4, yieldToEventLoop } from "./rewardScannerUtils";
@@ -50,7 +51,7 @@ interface RewardScanPipelineOptions {
   runOCRStructuredBuffer: StructuredOcrBufferRunner;
   reader?: RewardReader;
   windowsOcrMode?: WindowsOcrMode;
-  postProcessWindowsText?: (text: string) => string;
+  postProcessWindowsText?: WindowsTextPostProcessor;
 }
 
 type Screenshot = CaptureResult | PreCaptureResult;
@@ -106,6 +107,7 @@ function buildScanMeta({
   ocrReads,
   ocrMs,
   adaptiveRetries,
+  slotDiagnostics,
 }: {
   screenshot: Screenshot | null;
   band: { top: number; height: number } | null;
@@ -125,6 +127,7 @@ function buildScanMeta({
   ocrReads: number;
   ocrMs: number;
   adaptiveRetries: number;
+  slotDiagnostics: unknown[];
 }): Record<string, unknown> {
   const captureSize = screenshot?.image?.getSize?.() || { width: 0, height: 0 };
   const top = band ? round4(band.top, 0) : null;
@@ -151,6 +154,7 @@ function buildScanMeta({
     ocrReads,
     ocrMs,
     adaptiveRetries,
+    slotDiagnostics,
     ocrVariant: variant,
     hadOcrSuccess: !!hadOcrSuccess,
     bandTopRatio: top,
@@ -417,6 +421,7 @@ export async function runRewardScanPipeline({
       ocrReads: slotStats.ocrReads,
       ocrMs: slotStats.ocrMs,
       adaptiveRetries: slotStats.adaptiveRetries || 0,
+      slotDiagnostics: slotResult?.slotDiagnostics ?? [],
     }),
   };
 

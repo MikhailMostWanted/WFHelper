@@ -199,6 +199,41 @@ import type {
   OverlayDescriptor,
 } from "../../config/shared/overlayLayout.js";
 
+export interface RewardOcrDiagnosticSlot {
+  slotIndex: number;
+  rawText: string;
+  resolvedText: string;
+  matchMode: string | null;
+  matchConfidence: number | null;
+  itemName: string | null;
+  itemDisplayName: string | null;
+  rankMode: string | null;
+  rankConfidence: number | null;
+  diverged: boolean;
+}
+
+export interface RewardOcrDiagnosticResult {
+  ok: boolean;
+  error: "capture-failed" | "scan-failed" | null;
+  gameLocale: string;
+  ocrAvailable: boolean;
+  ocrReason: string | null;
+  elapsedMs: number;
+  ocrMs: number;
+  ocrReads: number;
+  adaptiveRetries: number;
+  strategy: string;
+  reader: string;
+  mode: string;
+  layoutCount: number;
+  slotCount: number;
+  cardCount: number;
+  captureWidth: number;
+  captureHeight: number;
+  items: Array<{ name: string; displayName: string | null; slotIndex: number | null }>;
+  slots: RewardOcrDiagnosticSlot[];
+}
+
 /** The engine status plus the live per-rule cooldowns. */
 export interface MarketAlertStatusPayload extends MarketAlertEngineStatus {
   /** Rule id to cooldown end, epoch ms; a rule not in cooldown is absent. */
@@ -420,6 +455,10 @@ export interface IpcInvokeMap {
   openScanDebugFolder: {
     args: [];
     return: { ok: boolean };
+  };
+  runRewardOcrDiagnostic: {
+    args: [];
+    return: RewardOcrDiagnosticResult;
   };
   openLogFolder: {
     args: [];

@@ -82,7 +82,7 @@ describe("Russian relic reward OCR bridge", () => {
   });
 
   it("reports weak fuzzy resolutions so the slot reader can retry adaptively", () => {
-    const resolution = resolveRussianRewardText("Нижнее Плечо Парис Праим", items);
+    const resolution = resolveRussianRewardText("Нижн Плечо Парис Прай", items);
     expect(resolution.text).toBe("Paris Prime Lower Limb");
     expect(resolution.matchMode).toBe("fuzzy");
     expect(resolution.matchConfidence).toBeGreaterThanOrEqual(0.7);

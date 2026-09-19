@@ -1,4 +1,5 @@
 import { getGameLocale } from "./gameLocale";
+import { normalizeErrorMessage } from "../config/shared/errors";
 import * as itemDatabase from "./itemDatabase";
 import type { StructuredOcrResult } from "./ocrServer";
 import type { SortedItem } from "./rewardScannerMatch";
@@ -18,6 +19,7 @@ type SystemOcrModule = {
 };
 
 let systemOcr: SystemOcrModule | null | undefined;
+let lastRussianOcrError: string | null = null;
 
 function getSystemOcr(): SystemOcrModule | null {
   if (systemOcr !== undefined) return systemOcr;
@@ -31,6 +33,18 @@ function getSystemOcr(): SystemOcrModule | null {
 
 export function shouldUseRussianRewardOcr(): boolean {
   return process.platform === "win32" && getGameLocale() === RUSSIAN_LOCALE;
+}
+
+export function getRussianRewardOcrHealth(): { available: boolean; reason: string | null } {
+  if (process.platform !== "win32") {
+    return { available: false, reason: "Russian reward OCR is Windows-only" };
+  }
+  if (!getSystemOcr()) {
+    return { available: false, reason: "@napi-rs/system-ocr is unavailable" };
+  }
+  return lastRussianOcrError
+    ? { available: false, reason: lastRussianOcrError }
+    : { available: true, reason: null };
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -220,10 +234,17 @@ export async function runRussianRewardOcrStructuredBuffer(
   const ocr = getSystemOcr();
   if (!ocr) throw new Error("@napi-rs/system-ocr is unavailable");
 
-  const result = await withTimeout(
-    ocr.recognize(imageBuffer, undefined, [RUSSIAN_LOCALE]),
-    timeoutMs,
-  );
+  let result: Awaited<ReturnType<SystemOcrModule["recognize"]>>;
+  try {
+    result = await withTimeout(
+      ocr.recognize(imageBuffer, undefined, [RUSSIAN_LOCALE]),
+      timeoutMs,
+    );
+    lastRussianOcrError = null;
+  } catch (error) {
+    lastRussianOcrError = normalizeErrorMessage(error);
+    throw error;
+  }
   const rawText = String(result?.text || "").trim();
   const resolution = resolveRussianRewardText(rawText, items);
   const text = resolution.text;

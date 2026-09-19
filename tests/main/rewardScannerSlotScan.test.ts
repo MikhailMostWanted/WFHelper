@@ -195,6 +195,14 @@ describe("scanRewardSlotsFallback Windows OCR strategy", () => {
     });
 
     expect(result?.items.map((item) => item.name)).toEqual(["Paris Prime Lower Limb"]);
+    expect(result?.slotDiagnostics).toEqual([
+      expect.objectContaining({
+        slotIndex: 0,
+        rawText: "Нижнее Плечо Парис Прайм",
+        resolvedText: "paris prime lower limb",
+        itemName: "Paris Prime Lower Limb",
+      }),
+    ]);
     expect(runOCRStructuredBuffer).toHaveBeenCalledTimes(3);
     expect(stats.adaptiveRetries).toBe(1);
   });

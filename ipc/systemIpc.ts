@@ -3,7 +3,7 @@ import { assertMainRendererSender, handleAuthorized, onAuthorized } from "./ipcS
 import { unwrapInventoryPayload } from "../config/shared/inventoryPayload";
 import { getLogDirectory, withScope } from "../services/logger";
 import * as itemDb from "../services/itemDatabase";
-import { setGameLocale } from "../services/gameLocale";
+import { getGameLocale, setGameLocale } from "../services/gameLocale";
 import * as wfmCatalog from "../services/wfmCatalog";
 import * as masteryHelper from "../services/masteryHelper";
 import * as codexProfile from "../services/codexProfile";
@@ -13,6 +13,7 @@ import { broadcastToRenderers } from "./popoutIpc";
 import * as relicService from "../services/relicService";
 import * as dropData from "../services/dropData";
 import * as autoUpdater from "../services/autoUpdater";
+import { REFERENCE_WARFRAME_UI_SCALE } from "../config/runtime/overlaySettings";
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { isAllowedExternalHost } from "../config/runtime/security";
 import { app, BrowserWindow, dialog, shell } from "electron";
@@ -35,6 +36,7 @@ import {
   APP_UPDATE_INSTALL,
   APP_RUNTIME_INFO,
   SCAN_DEBUG_OPEN_FOLDER,
+  REWARD_OCR_DIAGNOSTIC_RUN,
   LOGS_OPEN_FOLDER,
   LINUX_DISPLAY_GET,
   LINUX_DISPLAY_SET,
@@ -46,6 +48,9 @@ import {
 } from "../config/shared/ipcChannels";
 import fs from "node:fs";
 import { getScanDebugDir } from "../services/rewardScanDebug";
+import * as rewardScanner from "../services/rewardScanner";
+import { getRussianRewardOcrHealth } from "../services/rewardRussianOcr";
+import { resolveWarframeUiScale } from "../services/eeLogPath";
 import * as linuxDisplay from "../services/linuxDisplayBackend";
 import { isObject } from "./ipcValidators";
 import { toNonEmptyString } from "../config/shared/stringValidation";
@@ -196,6 +201,120 @@ function register(): void {
     } catch (err) {
       log.warn("[SystemIPC] open scan-debug folder failed:", normalizeErrorMessage(err));
       return { ok: false };
+    }
+  });
+
+  handleAuthorized(REWARD_OCR_DIAGNOSTIC_RUN, assertMainRendererSender, async () => {
+    const startedAt = Date.now();
+    const locale = getGameLocale();
+    const uiScale =
+      (ctx.overlaySettings.warframeUiScaleAuto !== false ? resolveWarframeUiScale() : null) ??
+      (Number(ctx.overlaySettings.warframeUiScale) || REFERENCE_WARFRAME_UI_SCALE);
+
+    try {
+      const result = await rewardScanner.scanRewardsDetailed(null, { warframeUiScale: uiScale });
+      const health = getRussianRewardOcrHealth();
+      if (!result) {
+        return {
+          ok: false,
+          error: "capture-failed" as const,
+          gameLocale: locale,
+          ocrAvailable: health.available,
+          ocrReason: health.reason,
+          elapsedMs: Date.now() - startedAt,
+          ocrMs: 0,
+          ocrReads: 0,
+          adaptiveRetries: 0,
+          strategy: "none",
+          reader: "none",
+          mode: "none",
+          layoutCount: 0,
+          slotCount: 0,
+          cardCount: 0,
+          captureWidth: 0,
+          captureHeight: 0,
+          items: [],
+          slots: [],
+        };
+      }
+
+      const meta = result.meta ?? {};
+      const rawSlots = Array.isArray(meta.slotDiagnostics) ? meta.slotDiagnostics : [];
+      const items = result.items.map((item) => ({
+        name: String(item.name || ""),
+        displayName: typeof item.displayName === "string" ? item.displayName : null,
+        slotIndex: typeof item.slotIndex === "number" ? item.slotIndex : null,
+      }));
+      const itemBySlot = new Map(
+        items
+          .filter((item) => item.slotIndex != null)
+          .map((item) => [item.slotIndex as number, item] as const),
+      );
+      const slots = rawSlots.map((value) => {
+        const slot = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+        const slotIndex = Number.isFinite(Number(slot.slotIndex)) ? Number(slot.slotIndex) : 0;
+        const matched = itemBySlot.get(slotIndex);
+        return {
+          slotIndex,
+          rawText: typeof slot.rawText === "string" ? slot.rawText : "",
+          resolvedText: typeof slot.resolvedText === "string" ? slot.resolvedText : "",
+          matchMode: typeof slot.matchMode === "string" ? slot.matchMode : null,
+          matchConfidence:
+            typeof slot.matchConfidence === "number" ? slot.matchConfidence : null,
+          itemName: matched?.name || (typeof slot.itemName === "string" ? slot.itemName : null),
+          itemDisplayName: matched?.displayName ?? null,
+          rankMode: typeof slot.rankMode === "string" ? slot.rankMode : null,
+          rankConfidence:
+            typeof slot.rankConfidence === "number" ? slot.rankConfidence : null,
+          diverged: slot.diverged === true,
+        };
+      });
+
+      return {
+        ok: true,
+        error: null,
+        gameLocale: locale,
+        ocrAvailable: health.available,
+        ocrReason: health.reason,
+        elapsedMs: Number(meta.elapsedMs) || Date.now() - startedAt,
+        ocrMs: Number(meta.ocrMs) || 0,
+        ocrReads: Number(meta.ocrReads) || 0,
+        adaptiveRetries: Number(meta.adaptiveRetries) || 0,
+        strategy: String(meta.strategy || "none"),
+        reader: String(meta.ocrReader || "none"),
+        mode: String(meta.windowsOcrMode || "none"),
+        layoutCount: Number(meta.layoutCount) || 0,
+        slotCount: Number(meta.slotCount) || 0,
+        cardCount: Number(meta.cardCount) || 0,
+        captureWidth: Number(meta.captureWidth) || 0,
+        captureHeight: Number(meta.captureHeight) || 0,
+        items,
+        slots,
+      };
+    } catch (error) {
+      const health = getRussianRewardOcrHealth();
+      log.warn("[OCRDiagnostic] scan failed:", normalizeErrorMessage(error));
+      return {
+        ok: false,
+        error: "scan-failed" as const,
+        gameLocale: locale,
+        ocrAvailable: health.available,
+        ocrReason: health.reason || normalizeErrorMessage(error),
+        elapsedMs: Date.now() - startedAt,
+        ocrMs: 0,
+        ocrReads: 0,
+        adaptiveRetries: 0,
+        strategy: "none",
+        reader: "none",
+        mode: "none",
+        layoutCount: 0,
+        slotCount: 0,
+        cardCount: 0,
+        captureWidth: 0,
+        captureHeight: 0,
+        items: [],
+        slots: [],
+      };
     }
   });
 
