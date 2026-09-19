@@ -34,4 +34,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add ipc/systemIpc.ts services/rewardRussianOcr.ts services/rewardScannerSlotScan.ts
           git commit -m "[chore] - format OCR diagnostics"
-          git push origin HEAD:feat/russian-ocr-hardening
+          git push --no-verify origin HEAD:feat/russian-ocr-hardening
