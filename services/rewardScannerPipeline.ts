@@ -100,6 +100,11 @@ function buildScanMeta({
   layoutCount,
   slotCount,
   cardCount,
+  ocrReader,
+  windowsOcrMode,
+  ocrReads,
+  ocrMs,
+  adaptiveRetries,
 }: {
   screenshot: Screenshot | null;
   band: { top: number; height: number } | null;
@@ -114,6 +119,11 @@ function buildScanMeta({
   slotCount: number;
   /** Cards counted off the card bars, 0 when the frame had to be searched. */
   cardCount: number;
+  ocrReader: string;
+  windowsOcrMode: string;
+  ocrReads: number;
+  ocrMs: number;
+  adaptiveRetries: number;
 }): Record<string, unknown> {
   const captureSize = screenshot?.image?.getSize?.() || { width: 0, height: 0 };
   const top = band ? round4(band.top, 0) : null;
@@ -135,6 +145,11 @@ function buildScanMeta({
     layoutCount,
     slotCount,
     cardCount,
+    ocrReader,
+    windowsOcrMode,
+    ocrReads,
+    ocrMs,
+    adaptiveRetries,
     ocrVariant: variant,
     hadOcrSuccess: !!hadOcrSuccess,
     bandTopRatio: top,
@@ -394,6 +409,11 @@ export async function runRewardScanPipeline({
       layoutCount: slotStats.layoutCount,
       slotCount: slotResult?.slotCount ?? 0,
       cardCount: slotStats.cardCount,
+      ocrReader: reader || "both",
+      windowsOcrMode: windowsOcrMode || "bands",
+      ocrReads: slotStats.ocrReads,
+      ocrMs: slotStats.ocrMs,
+      adaptiveRetries: slotStats.adaptiveRetries || 0,
     }),
   };
 

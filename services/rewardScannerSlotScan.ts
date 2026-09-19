@@ -452,7 +452,10 @@ async function readSlotTitle(
     );
   }
 
-  const { rankedCandidates, bestRejected } = rankCandidateTexts(candidateTexts, options.sortedItems);
+  const { rankedCandidates, bestRejected } = rankCandidateTexts(
+    candidateTexts,
+    options.sortedItems,
+  );
   if (rankedCandidates.length === 0 && bestRejected) {
     log.info(
       `[RewardScanner] Slot ${displayIndex + 1} best candidate below gate: ` +
