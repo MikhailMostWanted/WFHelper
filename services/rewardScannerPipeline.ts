@@ -18,6 +18,8 @@ import {
   type RewardReader,
   type SlotScanStats,
   type StructuredOcrBufferRunner,
+  type WindowsOcrMode,
+  type WindowsTextPostProcessor,
 } from "./rewardScannerSlotScan";
 import { CROP_PRESETS, SCANNER_TUNING } from "./rewardScannerSupport";
 import { round4, yieldToEventLoop } from "./rewardScannerUtils";
@@ -48,7 +50,8 @@ interface RewardScanPipelineOptions {
   settings: RewardScanSettings;
   runOCRStructuredBuffer: StructuredOcrBufferRunner;
   reader?: RewardReader;
-  windowsOcrMode?: "bands" | "whole";
+  windowsOcrMode?: WindowsOcrMode;
+  postProcessWindowsText?: WindowsTextPostProcessor;
 }
 
 type Screenshot = CaptureResult | PreCaptureResult;
@@ -99,6 +102,12 @@ function buildScanMeta({
   layoutCount,
   slotCount,
   cardCount,
+  ocrReader,
+  windowsOcrMode,
+  ocrReads,
+  ocrMs,
+  adaptiveRetries,
+  slotDiagnostics,
 }: {
   screenshot: Screenshot | null;
   band: { top: number; height: number } | null;
@@ -113,6 +122,12 @@ function buildScanMeta({
   slotCount: number;
   /** Cards counted off the card bars, 0 when the frame had to be searched. */
   cardCount: number;
+  ocrReader: string;
+  windowsOcrMode: string;
+  ocrReads: number;
+  ocrMs: number;
+  adaptiveRetries: number;
+  slotDiagnostics: unknown[];
 }): Record<string, unknown> {
   const captureSize = screenshot?.image?.getSize?.() || { width: 0, height: 0 };
   const top = band ? round4(band.top, 0) : null;
@@ -134,6 +149,12 @@ function buildScanMeta({
     layoutCount,
     slotCount,
     cardCount,
+    ocrReader,
+    windowsOcrMode,
+    ocrReads,
+    ocrMs,
+    adaptiveRetries,
+    slotDiagnostics,
     ocrVariant: variant,
     hadOcrSuccess: !!hadOcrSuccess,
     bandTopRatio: top,
@@ -254,6 +275,7 @@ export async function runRewardScanPipeline({
   runOCRStructuredBuffer,
   reader,
   windowsOcrMode,
+  postProcessWindowsText,
 }: RewardScanPipelineOptions): Promise<{
   items: SortedItem[];
   meta: Record<string, unknown>;
@@ -300,6 +322,7 @@ export async function runRewardScanPipeline({
     ocrMs: 0,
     ocrReads: 0,
     layoutsTried: 0,
+    adaptiveRetries: 0,
   };
   const slotsStartedAt = Date.now();
   const slotResult = await scanRewardSlotsFallback(
@@ -313,6 +336,7 @@ export async function runRewardScanPipeline({
       runOCRStructuredBuffer,
       reader,
       windowsOcrMode,
+      postProcessWindowsText,
       warframeUiScale: settings.warframeUiScale,
       stats: slotStats,
     },
@@ -373,7 +397,7 @@ export async function runRewardScanPipeline({
   log.info(
     `[RewardScanner] timing capture=${captureMs}ms guards=${guardsMs}ms ` +
       `layout=${slotStats.layoutMs}ms(${slotStats.layoutsTried}/${slotStats.layoutCount} tried, cards=${slotStats.cardCount}) ` +
-      `slots=${slotsMs}ms(${slotStats.ocrReads} reads, ocr ${slotStats.ocrMs}ms) ` +
+      `slots=${slotsMs}ms(${slotStats.ocrReads} reads, adaptive=${slotStats.adaptiveRetries || 0}, ocr ${slotStats.ocrMs}ms) ` +
       `fallback=${fallbackMs}ms total=${Date.now() - scanStartedAt}ms ` +
       `frame=${frameSize.width}x${frameSize.height}`,
   );
@@ -392,6 +416,12 @@ export async function runRewardScanPipeline({
       layoutCount: slotStats.layoutCount,
       slotCount: slotResult?.slotCount ?? 0,
       cardCount: slotStats.cardCount,
+      ocrReader: reader || "both",
+      windowsOcrMode: windowsOcrMode || "bands",
+      ocrReads: slotStats.ocrReads,
+      ocrMs: slotStats.ocrMs,
+      adaptiveRetries: slotStats.adaptiveRetries || 0,
+      slotDiagnostics: slotResult?.slotDiagnostics ?? [],
     }),
   };
 

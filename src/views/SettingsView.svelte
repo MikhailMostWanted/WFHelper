@@ -25,6 +25,7 @@
   import SegmentedControl from "../components/SegmentedControl.svelte";
   import NotificationSoundSettings from "../components/NotificationSoundSettings.svelte";
   import RewardOverlayEditor from "../components/RewardOverlayEditor.svelte";
+  import OcrDiagnosticPanel from "../components/settings/OcrDiagnosticPanel.svelte";
   import { invoke, send, getPlatform } from "../lib/ipc.js";
   import { onInventoryLoaded } from "../lib/actions.js";
   import {
@@ -1059,6 +1060,7 @@
                 on:change={autoSave}
               />
             </SettingsRow>
+            <OcrDiagnosticPanel />
           </div>
         </SettingsSection>
 

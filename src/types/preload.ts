@@ -93,6 +93,7 @@ export interface PreloadAPI {
   installDownloadedUpdate: () => Promise<IpcInvokeMap["installDownloadedUpdate"]["return"]>;
   getAppRuntimeInfo: () => Promise<IpcInvokeMap["getAppRuntimeInfo"]["return"]>;
   openScanDebugFolder: () => Promise<IpcInvokeMap["openScanDebugFolder"]["return"]>;
+  runRewardOcrDiagnostic: () => Promise<IpcInvokeMap["runRewardOcrDiagnostic"]["return"]>;
   openLogFolder: () => Promise<IpcInvokeMap["openLogFolder"]["return"]>;
   getNotificationHistory: () => Promise<IpcInvokeMap["getNotificationHistory"]["return"]>;
   clearNotificationHistory: () => Promise<IpcInvokeMap["clearNotificationHistory"]["return"]>;

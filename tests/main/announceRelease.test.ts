@@ -15,10 +15,10 @@ const buildMessages: (input: {
   roleId: string;
 }) => Message[] = buildUntyped;
 
-const URL = "https://github.com/WFHelper/WFHelper/releases/tag/v2.0.0";
+const URL = "https://github.com/MikhailMostWanted/WFHelper/releases/tag/v2.0.0";
 const base = { title: "v2.0.0", tag: "v2.0.0", url: URL, roleId: "" };
-const HEADER = `## [WFHelper v2.0.0](${URL}) is out 🎉\n`;
-const FOOTER = `\n-# [Release notes](${URL}) · Download at wfhelper.com`;
+const HEADER = `## [WantedFrame v2.0.0](${URL}) is out 🎉\n`;
+const FOOTER = `\n-# [Release notes](${URL}) · Download from GitHub Releases`;
 
 function sections(count: number, bullets: number): string {
   return Array.from(
@@ -42,8 +42,8 @@ describe("buildMessages", () => {
 
   it("falls back to the title tag and a stock line when the body is empty", () => {
     const [message] = buildMessages({ ...base, title: "", body: "" });
-    expect(message.content).toContain("[WFHelper v2.0.0]");
-    expect(message.content).toContain("A new version of WFHelper is available");
+    expect(message.content).toContain("[WantedFrame v2.0.0]");
+    expect(message.content).toContain("A new version of WantedFrame is available");
   });
 
   it("splits a long body at blank lines and keeps every post under the cap", () => {

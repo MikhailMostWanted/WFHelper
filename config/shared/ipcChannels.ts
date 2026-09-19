@@ -68,6 +68,7 @@ export const APP_UPDATE_STATUS = "app-update-status";
 export const APP_RUNTIME_INFO = "app:runtime-info";
 export const SYSTEM_CONFIRM = "system:confirm";
 export const SCAN_DEBUG_OPEN_FOLDER = "scan-debug:open-folder";
+export const REWARD_OCR_DIAGNOSTIC_RUN = "reward-ocr:diagnostic-run";
 export const LOGS_OPEN_FOLDER = "logs:open-folder";
 
 export const LINUX_DISPLAY_GET = "linux-display:get";

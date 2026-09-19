@@ -22,6 +22,10 @@ export interface ScanDebugSlot {
   index: number;
   stripPng: Buffer | null;
   windowsText: string;
+  rawText?: string;
+  resolvedText?: string;
+  ocrMatchMode?: string | null;
+  ocrMatchConfidence?: number | null;
   onnxText: string;
   diverged: boolean;
   matchedName: string | null;

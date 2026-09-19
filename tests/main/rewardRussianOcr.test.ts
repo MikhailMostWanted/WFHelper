@@ -11,14 +11,16 @@ const localizedByUniqueName: Record<string, string> = {
 };
 
 vi.mock("../../services/itemDatabase", () => ({
-  localizedNameFields: (uniqueName: string, english: string) => ({
+  localizedNameFields: vi.fn((uniqueName: string, english: string) => ({
     displayName: localizedByUniqueName[uniqueName] || english,
-  }),
+  })),
 }));
 
+import * as itemDatabase from "../../services/itemDatabase";
 import {
-  canonicalizeRussianRewardText,
+  canonicalizeRussianRewardTextForTest,
   localizeMatchedRewardDisplayNames,
+  resolveRussianRewardText,
 } from "../../services/rewardRussianOcr";
 import type { SortedItem } from "../../services/rewardScannerMatch";
 
@@ -52,26 +54,55 @@ describe("Russian relic reward OCR bridge", () => {
   });
 
   it("maps an exact official Russian reward name back to the canonical market name", () => {
-    expect(canonicalizeRussianRewardText("Ствол Братон Прайм", items)).toBe("Braton Prime Barrel");
+    expect(canonicalizeRussianRewardTextForTest("Ствол Братон Прайм", items)).toBe(
+      "Braton Prime Barrel",
+    );
   });
 
   it("normalizes ё/е differences", () => {
-    expect(canonicalizeRussianRewardText("Чертёж Формы", items)).toBe("Forma Blueprint");
+    expect(canonicalizeRussianRewardTextForTest("Чертёж Формы", items)).toBe("Forma Blueprint");
   });
 
   it("canonicalizes a wrapped two-line reward from a whole-card OCR read", () => {
-    expect(canonicalizeRussianRewardText("Нижнее Плечо\nПарис Прайм", items)).toBe(
+    expect(canonicalizeRussianRewardTextForTest("Нижнее Плечо\nПарис Прайм", items)).toBe(
       "Paris Prime Lower Limb",
     );
   });
 
   it("tolerates a small OCR error when one candidate is clearly best", () => {
-    expect(canonicalizeRussianRewardText("Нижнее Плечо Парис Праим", items)).toBe(
+    expect(canonicalizeRussianRewardTextForTest("Нижнее Плечо Парис Праим", items)).toBe(
       "Paris Prime Lower Limb",
     );
   });
 
+  it("repairs Latin lookalikes inside otherwise Cyrillic OCR words", () => {
+    expect(canonicalizeRussianRewardTextForTest("Нижнее Плечо Пaрис Пpайм", items)).toBe(
+      "Paris Prime Lower Limb",
+    );
+  });
+
+  it("reports weak fuzzy resolutions so the slot reader can retry adaptively", () => {
+    const resolution = resolveRussianRewardText("Нижн Плечо Парис Прай", items);
+    expect(resolution.text).toBe("Paris Prime Lower Limb");
+    expect(resolution.matchMode).toBe("fuzzy");
+    expect(resolution.matchConfidence).toBeGreaterThanOrEqual(0.7);
+    expect(resolution.matchConfidence).toBeLessThan(0.9);
+  });
+
+  it("caches the localized candidate index for repeated reads of the same item list", () => {
+    const localizedNameFields = vi.mocked(itemDatabase.localizedNameFields);
+    const freshItems = items.map((item) => ({ ...item }));
+    localizedNameFields.mockClear();
+
+    canonicalizeRussianRewardTextForTest("Ствол Братон Прайм", freshItems);
+    canonicalizeRussianRewardTextForTest("Чертёж Формы", freshItems);
+
+    expect(localizedNameFields).toHaveBeenCalledTimes(freshItems.length);
+  });
+
   it("leaves unrelated text untouched instead of inventing a reward", () => {
-    expect(canonicalizeRussianRewardText("совсем другой текст", items)).toBe("совсем другой текст");
+    expect(canonicalizeRussianRewardTextForTest("совсем другой текст", items)).toBe(
+      "совсем другой текст",
+    );
   });
 });

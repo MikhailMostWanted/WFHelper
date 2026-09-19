@@ -27,6 +27,9 @@ interface OcrLine {
 interface StructuredOcrResult {
   text?: string;
   lines?: OcrLine[];
+  rawText?: string;
+  matchMode?: string;
+  matchConfidence?: number;
 }
 
 interface SlotCandidate {
@@ -40,6 +43,10 @@ interface SlotDebugInfo {
   index: number;
   stripPng: Buffer;
   windowsText: string;
+  rawText: string;
+  resolvedText: string;
+  ocrMatchMode: string | null;
+  ocrMatchConfidence: number | null;
   onnxText: string;
   diverged: boolean;
 }
@@ -55,6 +62,10 @@ function toScanDebugSlots(
       index: entry.debug.index,
       stripPng: entry.debug.stripPng,
       windowsText: entry.debug.windowsText,
+      rawText: entry.debug.rawText,
+      resolvedText: entry.debug.resolvedText,
+      ocrMatchMode: entry.debug.ocrMatchMode,
+      ocrMatchConfidence: entry.debug.ocrMatchConfidence,
       onnxText: entry.debug.onnxText,
       diverged: entry.debug.diverged,
       matchedName: matched ? matched.item.name : null,
@@ -75,6 +86,17 @@ interface SlotScanResult {
   avgConfidence: number;
   matchedSlots: number;
   emptySlots: number;
+  slotDiagnostics?: Array<{
+    slotIndex: number;
+    rawText: string;
+    resolvedText: string;
+    matchMode: string | null;
+    matchConfidence: number | null;
+    itemName: string | null;
+    rankMode: string | null;
+    rankConfidence: number | null;
+    diverged: boolean;
+  }>;
 }
 
 interface SlotRect {
@@ -213,6 +235,12 @@ export type StructuredOcrBufferRunner = (
 
 /** Which OCR reader(s) feed slot candidates; "both" is production behavior. */
 export type RewardReader = "windows" | "onnx" | "both";
+export type WindowsOcrMode = "bands" | "whole" | "adaptive";
+export type WindowsTextPostProcessor = (text: string) => {
+  text: string;
+  matchMode?: string;
+  matchConfidence?: number;
+};
 
 /** Out-param: lets the caller tell "not the reward screen" from "OCR missed",
  *  and carries the stage costs the per-attempt timing line reports. */
@@ -224,6 +252,7 @@ export interface SlotScanStats {
   ocrMs: number;
   ocrReads: number;
   layoutsTried: number;
+  adaptiveRetries?: number;
 }
 
 // Just under the 0.86 fuzzy gate, so a read that nearly cleared it counts as a
@@ -246,22 +275,38 @@ function isUsableSlotCandidate(candidate: SlotCandidate): boolean {
   return candidate.confidence >= 0.86;
 }
 
+interface OcrRegionRead {
+  text: string;
+  rawText?: string;
+  matchMode?: string;
+  matchConfidence?: number;
+}
+
+const EMPTY_OCR_REGION_READ: OcrRegionRead = Object.freeze({ text: "" });
+
 async function ocrRewardRegion(
   cropPng: Buffer,
   topFrac: number,
   heightFrac: number,
   options: { runOCRStructuredBuffer: StructuredOcrBufferRunner },
   timeoutMs: number,
-): Promise<string> {
+): Promise<OcrRegionRead> {
   try {
     const buf = await binarizeRewardRegion(cropPng, topFrac, heightFrac);
-    if (!buf) return "";
+    if (!buf) return EMPTY_OCR_REGION_READ;
     const structured = await options.runOCRStructuredBuffer(buf, timeoutMs);
-    return String(structured?.text || "")
-      .replace(/\s+/g, " ")
-      .trim();
+    return {
+      text: String(structured?.text || "")
+        .replace(/\s+/g, " ")
+        .trim(),
+      rawText: String(structured?.rawText || structured?.text || "")
+        .replace(/\s+/g, " ")
+        .trim(),
+      matchMode: structured?.matchMode,
+      matchConfidence: structured?.matchConfidence,
+    };
   } catch {
-    return "";
+    return EMPTY_OCR_REGION_READ;
   }
 }
 
@@ -269,7 +314,7 @@ async function ocrRewardRegion(
 function cleanRewardOcrText(text: string): string {
   return String(text || "")
     .split(/\s+/)
-    .filter((w) => w === "&" || w.replace(/[^a-z0-9]/gi, "").length > 1)
+    .filter((w) => w === "&" || w.replace(/[^\p{L}\p{N}]/gu, "").length > 1)
     .join(" ")
     .trim();
 }
@@ -287,8 +332,61 @@ interface SlotRead {
   nearMiss: SlotCandidate | null;
   stripPng: Buffer;
   windowsText: string;
+  rawText: string;
+  resolvedText: string;
+  ocrMatchMode: string | null;
+  ocrMatchConfidence: number | null;
   onnxText: string;
   diverged: boolean;
+}
+
+function rankCandidateTexts(
+  candidateTexts: Iterable<string>,
+  sortedItems: SortedItem[],
+): { rankedCandidates: SlotCandidate[]; bestRejected: SlotCandidate | null } {
+  const rankedCandidates: SlotCandidate[] = [];
+  let bestRejected: SlotCandidate | null = null;
+
+  for (const candidateText of candidateTexts) {
+    for (const candidate of rankRewardCandidatesDetailed(candidateText, sortedItems, 4)) {
+      if (!candidate.item) continue;
+      const slotCandidate: SlotCandidate = {
+        item: candidate.item,
+        confidence: candidate.confidence,
+        score: candidate.score,
+        mode: candidate.mode,
+      };
+      if (isUsableSlotCandidate(slotCandidate)) {
+        rankedCandidates.push(slotCandidate);
+      } else if (!bestRejected || slotCandidate.confidence > bestRejected.confidence) {
+        bestRejected = slotCandidate;
+      }
+    }
+  }
+
+  rankedCandidates.sort(
+    (a, b) =>
+      b.score - a.score ||
+      b.confidence - a.confidence ||
+      (a.mode === "exact" && b.mode === "exact" ? b.item.name.length - a.item.name.length : 0),
+  );
+  return { rankedCandidates, bestRejected };
+}
+
+function isStrongAdaptiveWindowsRead(read: OcrRegionRead, sortedItems: SortedItem[]): boolean {
+  const confidence = Number(read.matchConfidence);
+  if (read.matchMode === "exact") return true;
+  if (read.matchMode === "substring") return Number.isFinite(confidence) && confidence >= 0.95;
+  if (read.matchMode === "partial" || read.matchMode === "fuzzy") {
+    return Number.isFinite(confidence) && confidence >= 0.9;
+  }
+  if (read.matchMode === "none") return false;
+
+  const cleaned = cleanRewardOcrText(read.text);
+  if (!cleaned) return false;
+  const best = rankCandidateTexts([cleaned], sortedItems).rankedCandidates[0];
+  if (!best) return false;
+  return best.mode === "exact" || best.confidence >= 0.94;
 }
 
 async function readSlotTitle(
@@ -302,11 +400,11 @@ async function readSlotTitle(
     ocrTimeoutMs: number;
     runOCRStructuredBuffer: StructuredOcrBufferRunner;
     reader: RewardReader;
-    windowsOcrMode?: "bands" | "whole";
+    windowsOcrMode?: WindowsOcrMode;
+    postProcessWindowsText?: WindowsTextPostProcessor;
     stats?: SlotScanStats;
   },
 ): Promise<SlotRead | null> {
-  // Stagger the slots' sync crop+encode work across macrotasks.
   await yieldToEventLoop();
   const remainingBudgetMs = totalBudgetMs - (Date.now() - startedAt);
   if (remainingBudgetMs <= 0) return null;
@@ -326,32 +424,61 @@ async function readSlotTitle(
   const windowsOcrMode = options.windowsOcrMode || "bands";
 
   const ocrStartedAt = Date.now();
-  // Names wrap to two lines in 3/4-player layouts: OCR overlapping bands plus
-  // the whole crop; both readers feed one pool, the ranking arbitrates.
-  const [regionTexts, onnxRead] = await Promise.all([
-    useWindows
-      ? windowsOcrMode === "whole"
-        ? Promise.all([
-            Promise.resolve(""),
-            Promise.resolve(""),
-            ocrRewardRegion(cropPng, 0, 1, options, timeout),
-          ])
-        : Promise.all([
-            ocrRewardRegion(cropPng, 0, 0.58, options, timeout),
-            ocrRewardRegion(cropPng, 0.42, 0.58, options, timeout),
-            ocrRewardRegion(cropPng, 0, 1, options, timeout),
-          ])
-      : Promise.resolve(["", "", ""]),
-    useOnnx ? recognizeRewardStripOnnx(cropPng) : Promise.resolve(null),
-  ]);
-  if (options.stats) {
-    options.stats.ocrMs += Date.now() - ocrStartedAt;
-    options.stats.ocrReads +=
-      (useWindows ? (windowsOcrMode === "whole" ? 1 : 3) : 0) + (useOnnx ? 1 : 0);
+  const onnxPromise = useOnnx ? recognizeRewardStripOnnx(cropPng) : Promise.resolve(null);
+  let topRead: OcrRegionRead = EMPTY_OCR_REGION_READ;
+  let bottomRead: OcrRegionRead = EMPTY_OCR_REGION_READ;
+  let wholeRead: OcrRegionRead = EMPTY_OCR_REGION_READ;
+  let windowsReads = 0;
+  let adaptiveRetried = false;
+
+  if (useWindows) {
+    if (windowsOcrMode === "bands") {
+      [topRead, bottomRead, wholeRead] = await Promise.all([
+        ocrRewardRegion(cropPng, 0, 0.58, options, timeout),
+        ocrRewardRegion(cropPng, 0.42, 0.58, options, timeout),
+        ocrRewardRegion(cropPng, 0, 1, options, timeout),
+      ]);
+      windowsReads = 3;
+    } else {
+      wholeRead = await ocrRewardRegion(cropPng, 0, 1, options, timeout);
+      windowsReads = 1;
+
+      if (
+        windowsOcrMode === "adaptive" &&
+        !isStrongAdaptiveWindowsRead(wholeRead, options.sortedItems)
+      ) {
+        const retryBudgetMs = totalBudgetMs - (Date.now() - startedAt);
+        if (retryBudgetMs >= 250) {
+          const retryTimeout = Math.max(250, Math.min(options.ocrTimeoutMs, retryBudgetMs));
+          [topRead, bottomRead] = await Promise.all([
+            ocrRewardRegion(cropPng, 0, 0.58, options, retryTimeout),
+            ocrRewardRegion(cropPng, 0.42, 0.58, options, retryTimeout),
+          ]);
+          windowsReads += 2;
+          adaptiveRetried = true;
+          if (options.stats) {
+            options.stats.adaptiveRetries = (options.stats.adaptiveRetries || 0) + 1;
+          }
+        }
+      }
+    }
   }
 
-  const joined = joinRewardLines(regionTexts[0], regionTexts[1]);
-  const wholeClean = cleanRewardOcrText(regionTexts[2]);
+  const onnxRead = await onnxPromise;
+  if (options.stats) {
+    options.stats.ocrMs += Date.now() - ocrStartedAt;
+    options.stats.ocrReads += windowsReads + (useOnnx ? 1 : 0);
+  }
+
+  const joinedCanonical = joinRewardLines(topRead.text, bottomRead.text);
+  const joinedRaw = joinRewardLines(
+    topRead.rawText || topRead.text,
+    bottomRead.rawText || bottomRead.text,
+  );
+  const joinedResolution =
+    options.postProcessWindowsText && joinedRaw ? options.postProcessWindowsText(joinedRaw) : null;
+  const joined = cleanRewardOcrText(joinedResolution?.text || joinedCanonical);
+  const wholeClean = cleanRewardOcrText(wholeRead.text);
   const onnxClean = cleanRewardOcrText(onnxRead?.text || "");
 
   const candidateTexts = new Set<string>();
@@ -366,44 +493,34 @@ async function readSlotTitle(
     );
   }
 
-  const rankedCandidates: SlotCandidate[] = [];
-  let bestRejected: SlotCandidate | null = null;
-  for (const candidateText of candidateTexts) {
-    for (const candidate of rankRewardCandidatesDetailed(candidateText, options.sortedItems, 4)) {
-      if (!candidate.item) continue;
-      const slotCandidate: SlotCandidate = {
-        item: candidate.item,
-        confidence: candidate.confidence,
-        score: candidate.score,
-        mode: candidate.mode,
-      };
-      if (isUsableSlotCandidate(slotCandidate)) {
-        rankedCandidates.push(slotCandidate);
-      } else if (!bestRejected || slotCandidate.confidence > bestRejected.confidence) {
-        bestRejected = slotCandidate;
-      }
-    }
-  }
-
+  const { rankedCandidates, bestRejected } = rankCandidateTexts(
+    candidateTexts,
+    options.sortedItems,
+  );
   if (rankedCandidates.length === 0 && bestRejected) {
     log.info(
       `[RewardScanner] Slot ${displayIndex + 1} best candidate below gate: ` +
         `"${bestRejected.item.name}" (${bestRejected.mode} ${bestRejected.confidence.toFixed(3)})`,
     );
   }
-  // A clipped component name can be an exact base Blueprint match in the other reader.
-  rankedCandidates.sort(
-    (a, b) =>
-      b.score - a.score ||
-      b.confidence - a.confidence ||
-      (a.mode === "exact" && b.mode === "exact" ? b.item.name.length - a.item.name.length : 0),
-  );
+
+  const preferredResolution = adaptiveRetried && joinedResolution ? joinedResolution : wholeRead;
+  const rawText = adaptiveRetried
+    ? joinedRaw || wholeRead.rawText || wholeClean
+    : wholeRead.rawText || joinedRaw || wholeClean;
+  const resolvedText = adaptiveRetried ? joined || wholeClean : wholeClean || joined;
 
   return {
     candidates: rankedCandidates,
     nearMiss: bestRejected,
     stripPng: cropPng,
-    windowsText: wholeClean || joined,
+    windowsText: resolvedText,
+    rawText,
+    resolvedText,
+    ocrMatchMode: preferredResolution.matchMode || null,
+    ocrMatchConfidence: Number.isFinite(Number(preferredResolution.matchConfidence))
+      ? Number(preferredResolution.matchConfidence)
+      : null,
     onnxText: onnxClean,
     diverged,
   };
@@ -425,7 +542,8 @@ export async function scanRewardSlotsFallback(
     ocrTimeoutMs: number;
     runOCRStructuredBuffer: StructuredOcrBufferRunner;
     reader?: RewardReader;
-    windowsOcrMode?: "bands" | "whole";
+    windowsOcrMode?: WindowsOcrMode;
+    postProcessWindowsText?: WindowsTextPostProcessor;
     warframeUiScale?: number;
     stats?: SlotScanStats;
   },
@@ -456,6 +574,7 @@ export async function scanRewardSlotsFallback(
       runOCRStructuredBuffer: options.runOCRStructuredBuffer,
       reader: options.reader || "both",
       windowsOcrMode: options.windowsOcrMode,
+      postProcessWindowsText: options.postProcessWindowsText,
       stats,
     });
     readCache.set(key, pending);
@@ -488,6 +607,10 @@ export async function scanRewardSlotsFallback(
             index: i,
             stripPng: read.stripPng,
             windowsText: read.windowsText,
+            rawText: read.rawText,
+            resolvedText: read.resolvedText,
+            ocrMatchMode: read.ocrMatchMode,
+            ocrMatchConfidence: read.ocrMatchConfidence,
             onnxText: read.onnxText,
             diverged: read.diverged,
           } satisfies SlotDebugInfo,
@@ -603,6 +726,17 @@ export async function scanRewardSlotsFallback(
   }
 
   if (bestResult) {
+    bestResult.slotDiagnostics = bestDebugSlots.map((slot) => ({
+      slotIndex: slot.index,
+      rawText: slot.rawText || slot.windowsText,
+      resolvedText: slot.resolvedText || slot.windowsText,
+      matchMode: slot.ocrMatchMode || null,
+      matchConfidence: typeof slot.ocrMatchConfidence === "number" ? slot.ocrMatchConfidence : null,
+      itemName: slot.matchedName,
+      rankMode: slot.mode,
+      rankConfidence: slot.confidence,
+      diverged: slot.diverged,
+    }));
     const anyDiverge = bestDebugSlots.some((slot) => slot.diverged);
     // Dump the wider crops only when that layout resolved fewer cards than the
     // narrow winner and threw away a near-gate read; without both, a healthy
