@@ -27,6 +27,7 @@ interface OcrLine {
 interface StructuredOcrResult {
   text?: string;
   lines?: OcrLine[];
+  rawText?: string;
   matchMode?: string;
   matchConfidence?: number;
 }
@@ -252,6 +253,7 @@ function isUsableSlotCandidate(candidate: SlotCandidate): boolean {
 
 interface OcrRegionRead {
   text: string;
+  rawText?: string;
   matchMode?: string;
   matchConfidence?: number;
 }
@@ -273,6 +275,9 @@ async function ocrRewardRegion(
       text: String(structured?.text || "")
         .replace(/\s+/g, " ")
         .trim(),
+      rawText: String(structured?.rawText || structured?.text || "")
+        .replace(/\s+/g, " ")
+        .trim(),
       matchMode: structured?.matchMode,
       matchConfidence: structured?.matchConfidence,
     };
@@ -285,7 +290,7 @@ async function ocrRewardRegion(
 function cleanRewardOcrText(text: string): string {
   return String(text || "")
     .split(/\s+/)
-    .filter((w) => w === "&" || w.replace(/[^a-z0-9]/gi, "").length > 1)
+    .filter((w) => w === "&" || w.replace(/[^\p{L}\p{N}]/gu, "").length > 1)
     .join(" ")
     .trim();
 }
@@ -368,6 +373,7 @@ async function readSlotTitle(
     runOCRStructuredBuffer: StructuredOcrBufferRunner;
     reader: RewardReader;
     windowsOcrMode?: WindowsOcrMode;
+    postProcessWindowsText?: (text: string) => string;
     stats?: SlotScanStats;
   },
 ): Promise<SlotRead | null> {
@@ -436,7 +442,15 @@ async function readSlotTitle(
     options.stats.ocrReads += windowsReads + (useOnnx ? 1 : 0);
   }
 
-  const joined = joinRewardLines(topRead.text, bottomRead.text);
+  const joinedCanonical = joinRewardLines(topRead.text, bottomRead.text);
+  const joinedRaw = joinRewardLines(
+    topRead.rawText || topRead.text,
+    bottomRead.rawText || bottomRead.text,
+  );
+  const joined =
+    options.postProcessWindowsText && joinedRaw
+      ? options.postProcessWindowsText(joinedRaw)
+      : joinedCanonical;
   const wholeClean = cleanRewardOcrText(wholeRead.text);
   const onnxClean = cleanRewardOcrText(onnxRead?.text || "");
 
@@ -467,7 +481,7 @@ async function readSlotTitle(
     candidates: rankedCandidates,
     nearMiss: bestRejected,
     stripPng: cropPng,
-    windowsText: adaptiveRetried ? joined || wholeClean : wholeClean || joined,
+    windowsText: adaptiveRetried ? joinedRaw || joined || wholeClean : wholeClean || joined,
     onnxText: onnxClean,
     diverged,
   };
@@ -490,6 +504,7 @@ export async function scanRewardSlotsFallback(
     runOCRStructuredBuffer: StructuredOcrBufferRunner;
     reader?: RewardReader;
     windowsOcrMode?: WindowsOcrMode;
+    postProcessWindowsText?: (text: string) => string;
     warframeUiScale?: number;
     stats?: SlotScanStats;
   },
@@ -520,6 +535,7 @@ export async function scanRewardSlotsFallback(
       runOCRStructuredBuffer: options.runOCRStructuredBuffer,
       reader: options.reader || "both",
       windowsOcrMode: options.windowsOcrMode,
+      postProcessWindowsText: options.postProcessWindowsText,
       stats,
     });
     readCache.set(key, pending);

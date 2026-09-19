@@ -50,6 +50,7 @@ interface RewardScanPipelineOptions {
   runOCRStructuredBuffer: StructuredOcrBufferRunner;
   reader?: RewardReader;
   windowsOcrMode?: WindowsOcrMode;
+  postProcessWindowsText?: (text: string) => string;
 }
 
 type Screenshot = CaptureResult | PreCaptureResult;
@@ -270,6 +271,7 @@ export async function runRewardScanPipeline({
   runOCRStructuredBuffer,
   reader,
   windowsOcrMode,
+  postProcessWindowsText,
 }: RewardScanPipelineOptions): Promise<{
   items: SortedItem[];
   meta: Record<string, unknown>;
@@ -330,6 +332,7 @@ export async function runRewardScanPipeline({
       runOCRStructuredBuffer,
       reader,
       windowsOcrMode,
+      postProcessWindowsText,
       warframeUiScale: settings.warframeUiScale,
       stats: slotStats,
     },

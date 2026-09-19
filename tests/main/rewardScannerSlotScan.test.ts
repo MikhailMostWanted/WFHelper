@@ -150,6 +150,55 @@ describe("scanRewardSlotsFallback Windows OCR strategy", () => {
     expect(stats.adaptiveRetries).toBe(1);
   });
 
+  it("re-canonicalizes raw Russian text after adaptive band reads are joined", async () => {
+    h.layouts = [{ count: 1, confidence: 0.9, slots: [slot(0)] }];
+    h.matches = { "paris prime lower limb": match("Paris Prime Lower Limb") };
+    const runOCRStructuredBuffer = vi
+      .fn()
+      .mockResolvedValueOnce({
+        text: "шум",
+        rawText: "шум",
+        matchMode: "none",
+        matchConfidence: 0.1,
+      })
+      .mockResolvedValueOnce({
+        text: "Нижнее Плечо",
+        rawText: "Нижнее Плечо",
+        matchMode: "none",
+        matchConfidence: 0.6,
+      })
+      .mockResolvedValueOnce({
+        text: "Парис Прайм",
+        rawText: "Парис Прайм",
+        matchMode: "none",
+        matchConfidence: 0.6,
+      });
+    const stats = {
+      layoutCount: 0,
+      cardCount: 0,
+      layoutMs: 0,
+      ocrMs: 0,
+      ocrReads: 0,
+      layoutsTried: 0,
+      adaptiveRetries: 0,
+    };
+
+    const result = await scanRewardSlotsFallback({ image: {} as never }, 4, 60_000, Date.now(), {
+      sortedItems: [],
+      ocrTimeoutMs: 1000,
+      runOCRStructuredBuffer,
+      reader: "windows",
+      windowsOcrMode: "adaptive",
+      postProcessWindowsText: (text) =>
+        text === "Нижнее Плечо Парис Прайм" ? "paris prime lower limb" : text,
+      stats,
+    });
+
+    expect(result?.items.map((item) => item.name)).toEqual(["Paris Prime Lower Limb"]);
+    expect(runOCRStructuredBuffer).toHaveBeenCalledTimes(3);
+    expect(stats.adaptiveRetries).toBe(1);
+  });
+
   it("keeps the three-band Windows OCR strategy as the default", async () => {
     h.layouts = [{ count: 1, confidence: 0.9, slots: [slot(0)] }];
     h.matches = { "forma blueprint": match("Forma Blueprint") };

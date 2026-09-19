@@ -15,6 +15,7 @@ import type { RewardReader } from "./rewardScannerSlotScan";
 import { REFERENCE_WARFRAME_UI_SCALE } from "../config/runtime/overlaySettings";
 import {
   localizeMatchedRewardDisplayNames,
+  resolveRussianRewardText,
   runRussianRewardOcrStructuredBuffer,
   shouldUseRussianRewardOcr,
 } from "./rewardRussianOcr";
@@ -103,6 +104,9 @@ export async function scanRewardsDetailed(
     reader:
       process.platform === "win32" ? (russianReader ? "windows" : scanOptions?.reader) : "onnx",
     windowsOcrMode: russianReader ? "adaptive" : "bands",
+    postProcessWindowsText: russianReader
+      ? (text) => resolveRussianRewardText(text, sortedItems).text
+      : undefined,
   });
 
   if (!result || !russianReader) return result;
