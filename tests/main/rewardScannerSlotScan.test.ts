@@ -189,8 +189,11 @@ describe("scanRewardSlotsFallback Windows OCR strategy", () => {
       runOCRStructuredBuffer,
       reader: "windows",
       windowsOcrMode: "adaptive",
-      postProcessWindowsText: (text) =>
-        text === "Нижнее Плечо Парис Прайм" ? "paris prime lower limb" : text,
+      postProcessWindowsText: (text) => ({
+        text: text === "Нижнее Плечо Парис Прайм" ? "paris prime lower limb" : text,
+        matchMode: text === "Нижнее Плечо Парис Прайм" ? "exact" : "none",
+        matchConfidence: text === "Нижнее Плечо Парис Прайм" ? 1 : 0,
+      }),
       stats,
     });
 
