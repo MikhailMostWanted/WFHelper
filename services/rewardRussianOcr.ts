@@ -208,7 +208,7 @@ export function resolveRussianRewardText(
   return { text, matchMode: "none", matchConfidence: best?.score ?? 0 };
 }
 
-export function canonicalizeRussianRewardText(text: string, items: SortedItem[]): string {
+export function canonicalizeRussianRewardTextForTest(text: string, items: SortedItem[]): string {
   return resolveRussianRewardText(text, items).text;
 }
 
