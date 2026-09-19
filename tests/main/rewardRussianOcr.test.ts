@@ -54,7 +54,9 @@ describe("Russian relic reward OCR bridge", () => {
   });
 
   it("maps an exact official Russian reward name back to the canonical market name", () => {
-    expect(canonicalizeRussianRewardTextForTest("Ствол Братон Прайм", items)).toBe("Braton Prime Barrel");
+    expect(canonicalizeRussianRewardTextForTest("Ствол Братон Прайм", items)).toBe(
+      "Braton Prime Barrel",
+    );
   });
 
   it("normalizes ё/е differences", () => {
@@ -99,6 +101,8 @@ describe("Russian relic reward OCR bridge", () => {
   });
 
   it("leaves unrelated text untouched instead of inventing a reward", () => {
-    expect(canonicalizeRussianRewardTextForTest("совсем другой текст", items)).toBe("совсем другой текст");
+    expect(canonicalizeRussianRewardTextForTest("совсем другой текст", items)).toBe(
+      "совсем другой текст",
+    );
   });
 });
