@@ -47,7 +47,11 @@ import {
   OPEN_EXTERNAL,
 } from "../config/shared/ipcChannels";
 import fs from "node:fs";
-import { getScanDebugDir } from "../services/rewardScanDebug";
+import {
+  areOcrDebugDumpsEnabled,
+  getScanDebugDir,
+  setOcrDebugDumpsEnabled,
+} from "../services/rewardScanDebug";
 import * as rewardScanner from "../services/rewardScanner";
 import { getRussianRewardOcrHealth } from "../services/rewardRussianOcr";
 import { resolveWarframeUiScale } from "../services/eeLogPath";
@@ -210,6 +214,8 @@ function register(): void {
     const uiScale =
       (ctx.overlaySettings.warframeUiScaleAuto !== false ? resolveWarframeUiScale() : null) ??
       (Number(ctx.overlaySettings.warframeUiScale) || REFERENCE_WARFRAME_UI_SCALE);
+    const debugWasEnabled = areOcrDebugDumpsEnabled();
+    if (!debugWasEnabled) setOcrDebugDumpsEnabled(true);
 
     try {
       const result = await rewardScanner.scanRewardsDetailed(null, { warframeUiScale: uiScale });
@@ -315,6 +321,8 @@ function register(): void {
         items: [],
         slots: [],
       };
+    } finally {
+      if (!debugWasEnabled) setOcrDebugDumpsEnabled(false);
     }
   });
 
