@@ -241,6 +241,16 @@ export interface MarketAlertStatusPayload extends MarketAlertEngineStatus {
 }
 
 export interface IpcInvokeMap {
+  getAccountSnapshotStatus: {
+    args: [];
+    return: {
+      updatedAt: number | null;
+      rows: number | null;
+      coverage: Array<{ section: string; status: string; rows: number; rejected: number }>;
+      error: string | null;
+    };
+  };
+  exportAccountSnapshot: { args: []; return: { saved: boolean } };
   getPersonalProfile: {
     args: [refresh?: boolean];
     return: import("../../config/shared/personalProfile.js").PersonalProfileResult;

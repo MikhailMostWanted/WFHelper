@@ -22,6 +22,7 @@ const t = window.overlayI18n.t;
 
 function setOverlayInteractiveMode(interactive) {
   overlayInteractiveMode = !!interactive;
+  document.body.classList.toggle("overlay-interactive", !!interactive);
   const closeButton = document.getElementById("btn-close");
   if (!closeButton) return;
   closeButton.classList.toggle("is-hidden", !overlayInteractiveMode);

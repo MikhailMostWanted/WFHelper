@@ -37,6 +37,7 @@ function renderInteractionHint() {
 
 function setOverlayInteractiveMode(interactive) {
   _overlayInteractiveMode = !!interactive;
+  document.body.classList.toggle("overlay-interactive", !!interactive);
   const closeButton = el("btn-close");
   if (closeButton) closeButton.classList.toggle("is-hidden", !_overlayInteractiveMode);
   const rescanButton = el("btn-rescan");

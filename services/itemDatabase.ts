@@ -875,7 +875,7 @@ function applyMechPartTradability(): void {
   if (fixed > 0) log.info(`[ItemDB] Marked ${fixed} Necramech part items tradable`);
 }
 
-export function buildDatabase(): void {
+function* databaseBuildStages(): Generator<void> {
   log.time("[ItemDB] Total build time");
 
   // Reset so a rebuild (e.g. after the DE export refresh) starts clean.
@@ -890,20 +890,42 @@ export function buildDatabase(): void {
   dojoResearchResultTypes = new Set();
 
   const pepCount = loadPublicExportPlus();
+  yield;
   buildRecipeIndex();
+  yield;
   const wfcdCount = loadWfcdItems();
+  yield;
   inheritSentinelWeaponVaulting();
+  yield;
   applyMechPartTradability();
+  yield;
   linkBlueprintsToResults();
+  yield;
   inheritBlueprintDisplayFromResults();
+  yield;
   applyAcquisitionSources();
+  yield;
   resolveAllImages();
+  yield;
 
   log.info(`[ItemDB] Total: ${Object.keys(itemsByUniqueName).length} items`);
   log.timeEnd("[ItemDB] Total build time");
 
   if (pepCount === 0 && wfcdCount === 0) {
     log.error("[ItemDB] WARNING: No item data loaded! Run 'npm install' to get packages.");
+  }
+}
+
+export function buildDatabase(): void {
+  for (const _stage of databaseBuildStages()) {
+    /* synchronous compatibility */
+  }
+}
+
+/** Let window events run between the dependent database stages. */
+export async function buildDatabaseCooperatively(): Promise<void> {
+  for (const _stage of databaseBuildStages()) {
+    await new Promise<void>((resolve) => setImmediate(resolve));
   }
 }
 

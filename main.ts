@@ -68,6 +68,11 @@ const SAFE_MODE_LAUNCH =
   process.argv.includes("--safe-mode") || process.env.WFHELPER_SAFE_MODE === "1";
 
 import * as itemDb from "./services/itemDatabase";
+import {
+  beginStartupData,
+  finishStartupData,
+  waitForStartupData,
+} from "./services/startupReadiness";
 import * as publicExportSource from "./services/publicExportSource";
 import * as dropData from "./services/dropData";
 import * as wfmCatalog from "./services/wfmCatalog";
@@ -77,6 +82,7 @@ import * as relicService from "./services/relicService";
 import * as eeLogMonitor from "./services/eeLogMonitor";
 import * as rewardScanner from "./services/rewardScanner";
 import * as rewardOcrOnnx from "./services/rewardOcrOnnx";
+import { shouldUseRussianRewardOcr } from "./services/rewardRussianOcr";
 import * as autoUpdater from "./services/autoUpdater";
 import * as rivenBestAttributes from "./services/rivenBestAttributes";
 import * as warframeStatus from "./services/warframeStatus";
@@ -89,6 +95,10 @@ import * as marketAlerts from "./services/marketAlerts";
 
 import ctx from "./ipc/context";
 import * as inventoryIpc from "./ipc/inventoryIpc";
+import * as accountSnapshotIpc from "./ipc/accountSnapshotIpc";
+import { saveAccountSnapshot } from "./services/accountSnapshotStore";
+import { userDataPath } from "./services/userDataPath";
+import { nameInLocale } from "./services/gameLocale";
 import * as wfmIpc from "./ipc/wfmIpc";
 import * as overlayIpc from "./ipc/overlayIpc";
 import * as rewardOverlayIpc from "./ipc/rewardOverlayIpc";
@@ -469,6 +479,24 @@ function initTrackersAndSettings(profileStage: ProfileStage): void {
   });
   inventoryIpc.addInventoryListener((data: Record<string, unknown>) => {
     statsTracker.onInventoryData(data);
+    const source = inventoryIpc.getInventorySource();
+    const inventoryUpdatedAt = inventoryIpc.getLoadedInventoryModifiedAt();
+    void waitForStartupData()
+      .then(() => {
+        // An import/account switch while startup was pending invalidates this input.
+        if (ctx.currentInventoryData !== data || inventoryIpc.getInventorySource() !== source)
+          return;
+        return saveAccountSnapshot(userDataPath("account-snapshot.json"), data, {
+          source,
+          inventoryUpdatedAt,
+          appVersion: app.getVersion(),
+          lookup: (type) => {
+            const item = itemDb.lookupItem(type);
+            return item ? { name: item.name, nameRu: nameInLocale(item.nameKey, "ru") } : null;
+          },
+        });
+      })
+      .catch(() => log.warn("[AccountSnapshot] Item data is not ready; snapshot not replaced"));
   });
   profileStage("stats:load-history", statsLoadStart);
 }
@@ -476,6 +504,7 @@ function initTrackersAndSettings(profileStage: ProfileStage): void {
 function registerIpcHandlers(profileStage: ProfileStage): void {
   const ipcRegisterStart = Date.now();
   inventoryIpc.register();
+  accountSnapshotIpc.register();
   wfmIpc.register();
   overlayIpc.register();
   worldStateIpc.register();
@@ -547,10 +576,10 @@ function registerIpcHandlers(profileStage: ProfileStage): void {
   profileStage("ipc:register", ipcRegisterStart);
 }
 
-function initDataSources(profileStage: ProfileStage): void {
+async function initDataSources(profileStage: ProfileStage): Promise<void> {
   const itemDbStart = Date.now();
   publicExportSource.loadOverlayFromDisk();
-  itemDb.buildDatabase();
+  await itemDb.buildDatabaseCooperatively();
   profileStage("item-db:build", itemDbStart);
 
   // Refresh from DE in the background; rebuild if it added anything.
@@ -676,12 +705,22 @@ void app.whenReady().then(async () => {
   injectionGuard = applyInjectionGuardForStartup(app.getPath("userData"));
   logStartupPaths(profileStage);
   initTrackersAndSettings(profileStage);
+  beginStartupData();
   registerIpcHandlers(profileStage);
-  initDataSources(profileStage);
 
   const windowStart = Date.now();
   createWindow();
   profileStage("window:create", windowStart);
+  // Show a responsive renderer before parsing all item/drop tables. IPC waits
+  // for readiness, so an early request cannot mistake an empty DB for real data.
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  try {
+    await initDataSources(profileStage);
+    finishStartupData();
+  } catch (error) {
+    finishStartupData(false);
+    log.error("[Startup] Item data initialization failed:", error);
+  }
 
   if (DISPLAY_BACKEND === "x11") {
     if (XWAYLAND_REEXEC_FAILED) {
@@ -761,7 +800,7 @@ void app.whenReady().then(async () => {
   // Load Paddle before the first reward scan needs it.
   setTimeout(() => {
     if (isQuitting()) return;
-    void rewardOcrOnnx.warmupRewardStripOnnx();
+    if (!shouldUseRussianRewardOcr()) void rewardOcrOnnx.warmupRewardStripOnnx();
   }, 6000).unref();
 
   initGameMonitoring(profileStage);

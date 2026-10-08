@@ -26,6 +26,9 @@ import {
   type RivenStat,
 } from "./rivenScanText";
 
+import { shouldUseRussianRewardOcr, runRussianTextOcr } from "../../services/nativeRussianOcr";
+import { parseRussianRivenStats } from "../../services/rivenRussianText";
+
 const log = withScope("rivenScan");
 export const MIN_ACCEPTABLE_RIVEN_STATS = 2;
 // Every riven rolls at least two buffs, with or without a curse.
@@ -143,6 +146,31 @@ export async function recognizeRivenCardStats(
   const cropStart = Date.now();
   const { cardCrop, statCrop } = cropRivenStatImage(image, rect, options.sourceType);
   const cropRefineMs = Date.now() - cropStart;
+
+  if (shouldUseRussianRewardOcr()) {
+    const deadline = Date.now() + 4000;
+    // Two DIFFERENT crops, not three passes through an English recognition model.
+    for (const crop of [statCrop, cardCrop]) {
+      if (options.isStale(options.generation) || Date.now() >= deadline) break;
+      try {
+        const text = await runRussianTextOcr(crop.toPNG(), Math.min(2200, deadline - Date.now()));
+        if (options.isStale(options.generation)) break;
+        const parsed = parseRussianRivenStats(text);
+        if (
+          !isIncompleteRivenRead(parsed.stats) &&
+          parsed.stats.length >= 2 &&
+          parsed.stats.length <= 4 &&
+          parsed.unresolved.length === 0
+        ) {
+          return { text, titleText: "", footerText: "", stats: parsed.stats, lowConfidence: false };
+        }
+      } catch {
+        log.warn("[RivenScan] Russian OCR unavailable or deadline exceeded");
+      }
+    }
+    dumpScanCrops(label, "failed", cardCrop, statCrop);
+    return { text: "", titleText: "", footerText: "", stats: [], lowConfidence: true };
+  }
 
   if (!rivenOcrOnnxAvailable()) {
     log.warn("[RivenScan] ONNX models not found - riven OCR unavailable.");

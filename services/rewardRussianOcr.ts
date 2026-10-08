@@ -1,71 +1,13 @@
-import { getGameLocale } from "./gameLocale";
-import { normalizeErrorMessage } from "../config/shared/errors";
 import * as itemDatabase from "./itemDatabase";
 import type { StructuredOcrResult } from "./ocrServer";
 import type { SortedItem } from "./rewardScannerMatch";
 import { levenshteinDistance } from "./rewardScannerUtils";
 
-const RUSSIAN_LOCALE = "ru";
+import { runRussianTextOcr } from "./nativeRussianOcr";
+export { shouldUseRussianRewardOcr, getRussianRewardOcrHealth } from "./nativeRussianOcr";
 const MIN_FUZZY_CONFIDENCE = 0.7;
 const MIN_FUZZY_MARGIN = 0.045;
 const MIN_PARTIAL_NAME_RATIO = 0.6;
-
-type SystemOcrModule = {
-  recognize: (
-    input: Buffer | string,
-    accuracy?: unknown,
-    languages?: string[],
-  ) => Promise<{ text?: string; confidence?: number }>;
-};
-
-let systemOcr: SystemOcrModule | null | undefined;
-let lastRussianOcrError: string | null = null;
-
-function getSystemOcr(): SystemOcrModule | null {
-  if (systemOcr !== undefined) return systemOcr;
-  try {
-    systemOcr = require("@napi-rs/system-ocr") as SystemOcrModule;
-  } catch {
-    systemOcr = null;
-  }
-  return systemOcr;
-}
-
-export function shouldUseRussianRewardOcr(): boolean {
-  return process.platform === "win32" && getGameLocale() === RUSSIAN_LOCALE;
-}
-
-export function getRussianRewardOcrHealth(): { available: boolean; reason: string | null } {
-  if (process.platform !== "win32") {
-    return { available: false, reason: "Russian reward OCR is Windows-only" };
-  }
-  if (!getSystemOcr()) {
-    return { available: false, reason: "@napi-rs/system-ocr is unavailable" };
-  }
-  return lastRussianOcrError
-    ? { available: false, reason: lastRussianOcrError }
-    : { available: true, reason: null };
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`Russian OCR timed out after ${timeoutMs}ms`)),
-      timeoutMs,
-    );
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
-}
 
 const LATIN_TO_CYRILLIC: Readonly<Record<string, string>> = Object.freeze({
   a: "а",
@@ -191,17 +133,24 @@ export function resolveRussianRewardText(
     if (normalizedText.includes(candidate.normalized)) {
       return { text: candidate.canonical, matchMode: "substring", matchConfidence: 0.97 };
     }
-    if (
-      candidate.normalized.includes(normalizedText) &&
-      isUsefulPartialRead(normalizedText, candidate.normalized)
-    ) {
-      return {
-        text: candidate.canonical,
-        matchMode: "partial",
-        matchConfidence: Math.min(0.96, normalizedText.length / candidate.normalized.length),
-      };
-    }
   }
+
+  // Several components share their weapon/frame name. Never pick the first
+  // longer name when OCR lost the one word distinguishing those components.
+  const partials = candidates.filter(
+    (candidate) =>
+      candidate.normalized.includes(normalizedText) &&
+      isUsefulPartialRead(normalizedText, candidate.normalized),
+  );
+  if (partials.length === 1) {
+    const candidate = partials[0];
+    return {
+      text: candidate.canonical,
+      matchMode: "partial",
+      matchConfidence: Math.min(0.96, normalizedText.length / candidate.normalized.length),
+    };
+  }
+  if (partials.length > 1) return { text, matchMode: "none", matchConfidence: 0 };
 
   let best: { candidate: LocalizedCandidate; score: number } | null = null;
   let secondScore = 0;
@@ -231,18 +180,7 @@ export async function runRussianRewardOcrStructuredBuffer(
   timeoutMs: number,
   items: SortedItem[],
 ): Promise<RussianRewardOcrResult> {
-  const ocr = getSystemOcr();
-  if (!ocr) throw new Error("@napi-rs/system-ocr is unavailable");
-
-  let result: Awaited<ReturnType<SystemOcrModule["recognize"]>>;
-  try {
-    result = await withTimeout(ocr.recognize(imageBuffer, undefined, [RUSSIAN_LOCALE]), timeoutMs);
-    lastRussianOcrError = null;
-  } catch (error) {
-    lastRussianOcrError = normalizeErrorMessage(error);
-    throw error;
-  }
-  const rawText = String(result?.text || "").trim();
+  const rawText = await runRussianTextOcr(imageBuffer, timeoutMs);
   const resolution = resolveRussianRewardText(rawText, items);
   const text = resolution.text;
   const words = text.split(/\s+/).filter(Boolean);

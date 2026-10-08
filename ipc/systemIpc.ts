@@ -60,6 +60,8 @@ import { isObject } from "./ipcValidators";
 import { toNonEmptyString } from "../config/shared/stringValidation";
 import { parsePersonalLoadouts } from "../services/personalLoadouts";
 
+import { waitForStartupData } from "../services/startupReadiness";
+
 const log = withScope("systemIpc");
 let stopProfileAccountListener: (() => void) | null = null;
 let stopInventoryBindingListener: (() => void) | null = null;
@@ -71,9 +73,10 @@ function register(): void {
   stopInventoryBindingListener ??= codexProfile.onInventoryProfileBindingChanged(() =>
     broadcastToRenderers(INVENTORY_STATUS_UPDATED, getInventoryStatus()),
   );
-  handleAuthorized(DB_GET_ITEM_DATABASE, assertMainRendererSender, () =>
-    itemDb.getRendererLookup(),
-  );
+  handleAuthorized(DB_GET_ITEM_DATABASE, assertMainRendererSender, async () => {
+    await waitForStartupData();
+    return itemDb.getRendererLookup();
+  });
 
   // Names are localized on the way out of the database, so a language change only
   // has to make the renderer re-pull; nothing in the database itself is rebuilt.
@@ -95,7 +98,8 @@ function register(): void {
     return wfmCatalog.getRendererLookup();
   });
 
-  handleAuthorized(DB_GET_MASTERY, assertMainRendererSender, () => {
+  handleAuthorized(DB_GET_MASTERY, assertMainRendererSender, async () => {
+    await waitForStartupData();
     if (!ctx.currentInventoryData) return null;
 
     const data = unwrapInventoryPayload(ctx.currentInventoryData, {
@@ -342,9 +346,10 @@ function register(): void {
     isPackaged: app.isPackaged,
   }));
 
-  handleAuthorized(DB_GET_RELIC_DATABASE, assertMainRendererSender, () =>
-    relicService.getRelicDatabase(),
-  );
+  handleAuthorized(DB_GET_RELIC_DATABASE, assertMainRendererSender, async () => {
+    await waitForStartupData();
+    return relicService.getRelicDatabase();
+  });
 
   handleAuthorized(LINUX_DISPLAY_GET, assertMainRendererSender, () => linuxDisplay.info());
 

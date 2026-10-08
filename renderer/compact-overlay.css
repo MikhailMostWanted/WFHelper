@@ -1,22 +1,58 @@
 /* Passive HUD. The interaction key restores detail; the editor retains its coordinates. */
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) #panel {
-  height: auto; max-height: 150px; min-height: 90px;
-  position: absolute; bottom: 0; border-radius: 8px; backdrop-filter: none;
+  height: auto;
+  max-height: 150px;
+  min-height: 90px;
+  position: absolute;
+  bottom: 0;
+  border-radius: 8px;
+  backdrop-filter: none;
 }
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-player,
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-set-parts,
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-meta-chip.set,
-body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-meta-chip.set-price { display: none; }
-body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .reward-slot { padding: 8px 10px; }
-body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-name {
-  font: 600 14px/1.2 "Segoe UI", system-ui, sans-serif;
-  min-height: 34px; max-height: 34px; overflow: hidden;
+body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing)
+  .slot-meta-chip.set-price {
+  display: none;
 }
-body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-price { font-size: 18px; }
-body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) #best-footer { padding: 3px 10px; min-height: 22px; }
-body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) #panel { top: 0; bottom: auto; max-height: 350px; }
+body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .reward-slot {
+  padding: 8px 10px;
+}
+body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-name {
+  font:
+    600 14px/1.2 "Segoe UI",
+    system-ui,
+    sans-serif;
+  min-height: 34px;
+  max-height: 34px;
+  overflow: hidden;
+}
+body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-price {
+  font-size: 18px;
+}
+body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) #best-footer {
+  padding: 3px 10px;
+  min-height: 22px;
+}
+body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) #panel {
+  top: 0;
+  bottom: auto;
+  max-height: 350px;
+}
 body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) #best-attributes,
-body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) #similar-listings { display: none; }
-body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) #stats-container { flex: 0 1 auto; overflow: hidden; max-height: 240px; }
-body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) .stat-row { padding: 5px 9px; min-height: 36px; }
-body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) #weapon-warning { padding: 5px 10px; font-size: 11px; }
+body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) #similar-listings {
+  display: none;
+}
+body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) #stats-container {
+  flex: 0 1 auto;
+  overflow: hidden;
+  max-height: 240px;
+}
+body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) .stat-row {
+  padding: 5px 9px;
+  min-height: 36px;
+}
+body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) #weapon-warning {
+  padding: 5px 10px;
+  font-size: 11px;
+}

@@ -7,6 +7,8 @@ import type {
 import type { WfmStatus } from "./market.js";
 
 export interface PreloadAPI {
+  getAccountSnapshotStatus: () => Promise<IpcInvokeMap["getAccountSnapshotStatus"]["return"]>;
+  exportAccountSnapshot: () => Promise<IpcInvokeMap["exportAccountSnapshot"]["return"]>;
   getPersonalProfile: (
     ...args: IpcInvokeMap["getPersonalProfile"]["args"]
   ) => Promise<IpcInvokeMap["getPersonalProfile"]["return"]>;

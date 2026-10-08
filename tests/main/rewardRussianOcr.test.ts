@@ -8,6 +8,7 @@ const localizedByUniqueName: Record<string, string> = {
   "/Lotus/Test/ParisPrimeLowerLimb": "Нижнее Плечо Парис Прайм",
   "/Lotus/Test/BratonPrimeBarrel": "Ствол Братон Прайм",
   "/Lotus/Test/FormaBlueprint": "Чертеж Формы",
+  "/Lotus/Test/BratonPrimeStock": "Приклад Братон Прайм",
 };
 
 vi.mock("../../services/itemDatabase", () => ({
@@ -105,4 +106,12 @@ describe("Russian relic reward OCR bridge", () => {
       "совсем другой текст",
     );
   });
+});
+
+it("does not invent the missing component in an ambiguous Russian partial read", () => {
+  const candidates = [
+    ...items,
+    { name: "Braton Prime Stock", uniqueName: "/Lotus/Test/BratonPrimeStock" },
+  ];
+  expect(resolveRussianRewardText("Братон Прайм", candidates).matchMode).toBe("none");
 });

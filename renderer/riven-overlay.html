@@ -7,14 +7,11 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none';"
     />
     <title data-i18n="settings.rivenOverlay">Riven Overlay</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="riven-overlay.css" />
     <link rel="stylesheet" href="overlay-layout.css" />
+    <link rel="stylesheet" href="compact-overlay.css" />
   </head>
-  <body>
+  <body class="riven-compact">
     <!-- Each window is one panel (left=current or right=new roll).
          The ?side= query parameter determines which data this window displays. -->
     <div id="panel">
@@ -52,7 +49,7 @@
       </div>
 
       <div id="error-banner">
-        Couldn't read the riven. Keep the card visible and set Warframe's UI language to English.
+        Could not read the complete card. Keep its stat text visible and retry.
       </div>
 
       <div id="weapon-warning" class="is-hidden" data-i18n="overlay.riven.weaponMissing">

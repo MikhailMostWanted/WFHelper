@@ -1,39 +1,183 @@
 [
-{"key":"/Lotus/Language/Upgrades/AttackSpeedBuffDesc","english":"Attack Speed","russian":"к скорости атаки"},
-{"key":"/Lotus/Language/Upgrades/ComboDurationSimpleModDesc","english":"Combo Duration","russian":"к длительности комбо"},
-{"key":"/Lotus/Language/Upgrades/ComboInitialBonusModDesc","english":"Initial Combo","russian":"к стартовому счётчику комбо"},
-{"key":"/Lotus/Language/Upgrades/ComboPointsMissOnHitMod","english":"Chance to Gain Combo Count","russian":"к шансу получить счётчик комбо"},
-{"key":"/Lotus/Language/Upgrades/FireRateModDesc","english":"Fire Rate","russian":"к скорострельности"},
-{"key":"/Lotus/Language/Upgrades/MeleeComboGainExtraChance","english":"Additional Combo Count Chance","russian":"к шансу получить дополнительный счетчик комбо"},
-{"key":"/Lotus/Language/Upgrades/MeleeDamageBuffDesc","english":"Melee Damage","russian":"урона в ближнем бою"},
-{"key":"/Lotus/Language/Upgrades/StatusChance","english":"Status Chance","russian":"к шансу статуса"},
-{"key":"/Lotus/Language/Upgrades/WeaponClipMaxModDesc","english":"Magazine Capacity","russian":"к вместимости магазина"},
-{"key":"/Lotus/Language/Upgrades/WeaponCritChance","english":"Critical Chance","russian":"шанс крит. урона"},
-{"key":"/Lotus/Language/Upgrades/WeaponCritDamage","english":"Critical Damage","russian":"крит. урона"},
-{"key":"/Lotus/Language/Upgrades/WeaponDamage","english":"Damage","russian":"урона"},
-{"key":"/Lotus/Language/Upgrades/WeaponDamageModDesc","english":"Damage","russian":"урона"},
-{"key":"/Lotus/Language/Upgrades/WeaponElectricityDamage","english":"Electricity","russian":"урона электричеством"},
-{"key":"/Lotus/Language/Upgrades/WeaponFactionDamageCorpusDesc","english":"Damage to Corpus","russian":"урона Корпусу"},
-{"key":"/Lotus/Language/Upgrades/WeaponFactionDamageGrineerDesc","english":"Damage to Grineer","russian":"урона Гринир"},
-{"key":"/Lotus/Language/Upgrades/WeaponFactionDamageInfestedDesc","english":"Damage to Infested","russian":"урона Заражённым"},
-{"key":"/Lotus/Language/Upgrades/WeaponFireDamage","english":"Heat","russian":"урона огнем"},
-{"key":"/Lotus/Language/Upgrades/WeaponFireRate","english":"Fire Rate","russian":"к скорострельности"},
-{"key":"/Lotus/Language/Upgrades/WeaponFreezeDamage","english":"Cold","russian":"урона холодом"},
-{"key":"/Lotus/Language/Upgrades/WeaponHeavyCritChance","english":"Critical Chance","russian":"к шансу критической атаки"},
-{"key":"/Lotus/Language/Upgrades/WeaponImpactDamage","english":"Impact","russian":"ударного урона"},
-{"key":"/Lotus/Language/Upgrades/WeaponMaxAmmoModDesc","english":"Ammo Maximum","russian":"максимум патронов"},
-{"key":"/Lotus/Language/Upgrades/WeaponMeleeAttackSpeed","english":"Attack Speed","russian":"скорость атаки"},
-{"key":"/Lotus/Language/Upgrades/WeaponMeleeComboUsageEfficiency","english":"Heavy Attack Efficiency","russian":"к эффективности тяжелой атаки"},
-{"key":"/Lotus/Language/Upgrades/WeaponMeleeFinisherDmgModDesc","english":"Finisher Damage","russian":"урона при добивании"},
-{"key":"/Lotus/Language/Upgrades/WeaponMultishotModDesc","english":"Multishot","russian":"мультивыстрел"},
-{"key":"/Lotus/Language/Upgrades/WeaponPoisonDamage","english":"Toxin","russian":"урона токсином"},
-{"key":"/Lotus/Language/Upgrades/WeaponProcTimeModDesc","english":"Status Duration","russian":"к длительности статуса"},
-{"key":"/Lotus/Language/Upgrades/WeaponProjectileSpeedModDesc","english":"Projectile Speed","russian":"к скорости полёта снаряда"},
-{"key":"/Lotus/Language/Upgrades/WeaponPunctureDamage","english":"Puncture","russian":"пронзающего урона"},
-{"key":"/Lotus/Language/Upgrades/WeaponPunctureDepthModDesc","english":"Punch Through","russian":"к пронзанию навылет"},
-{"key":"/Lotus/Language/Upgrades/WeaponRangeModDesc","english":"Range","russian":"Дальность поражения"},
-{"key":"/Lotus/Language/Upgrades/WeaponRecoilModDesc","english":"Weapon Recoil","russian":"к отдаче"},
-{"key":"/Lotus/Language/Upgrades/WeaponReloadSpeedModDesc","english":"Reload Speed","russian":"к скорости перезарядки"},
-{"key":"/Lotus/Language/Upgrades/WeaponSlashDamage","english":"Slash","russian":"разрезающего урона"},
-{"key":"/Lotus/Language/Upgrades/WeaponZoomModDesc","english":"Zoom","russian":"приближение"}
+  {
+    "key": "/Lotus/Language/Upgrades/AttackSpeedBuffDesc",
+    "english": "Attack Speed",
+    "russian": "к скорости атаки"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/ComboDurationSimpleModDesc",
+    "english": "Combo Duration",
+    "russian": "к длительности комбо"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/ComboInitialBonusModDesc",
+    "english": "Initial Combo",
+    "russian": "к стартовому счётчику комбо"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/ComboPointsMissOnHitMod",
+    "english": "Chance to Gain Combo Count",
+    "russian": "к шансу получить счётчик комбо"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/FireRateModDesc",
+    "english": "Fire Rate",
+    "russian": "к скорострельности"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/MeleeComboGainExtraChance",
+    "english": "Additional Combo Count Chance",
+    "russian": "к шансу получить дополнительный счетчик комбо"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/MeleeDamageBuffDesc",
+    "english": "Melee Damage",
+    "russian": "урона в ближнем бою"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/StatusChance",
+    "english": "Status Chance",
+    "russian": "к шансу статуса"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponClipMaxModDesc",
+    "english": "Magazine Capacity",
+    "russian": "к вместимости магазина"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponCritChance",
+    "english": "Critical Chance",
+    "russian": "шанс крит. урона"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponCritDamage",
+    "english": "Critical Damage",
+    "russian": "крит. урона"
+  },
+  { "key": "/Lotus/Language/Upgrades/WeaponDamage", "english": "Damage", "russian": "урона" },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponDamageModDesc",
+    "english": "Damage",
+    "russian": "урона"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponElectricityDamage",
+    "english": "Electricity",
+    "russian": "урона электричеством"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponFactionDamageCorpusDesc",
+    "english": "Damage to Corpus",
+    "russian": "урона Корпусу"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponFactionDamageGrineerDesc",
+    "english": "Damage to Grineer",
+    "russian": "урона Гринир"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponFactionDamageInfestedDesc",
+    "english": "Damage to Infested",
+    "russian": "урона Заражённым"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponFireDamage",
+    "english": "Heat",
+    "russian": "урона огнем"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponFireRate",
+    "english": "Fire Rate",
+    "russian": "к скорострельности"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponFreezeDamage",
+    "english": "Cold",
+    "russian": "урона холодом"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponHeavyCritChance",
+    "english": "Critical Chance",
+    "russian": "к шансу критической атаки"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponImpactDamage",
+    "english": "Impact",
+    "russian": "ударного урона"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponMaxAmmoModDesc",
+    "english": "Ammo Maximum",
+    "russian": "максимум патронов"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponMeleeAttackSpeed",
+    "english": "Attack Speed",
+    "russian": "скорость атаки"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponMeleeComboUsageEfficiency",
+    "english": "Heavy Attack Efficiency",
+    "russian": "к эффективности тяжелой атаки"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponMeleeFinisherDmgModDesc",
+    "english": "Finisher Damage",
+    "russian": "урона при добивании"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponMultishotModDesc",
+    "english": "Multishot",
+    "russian": "мультивыстрел"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponPoisonDamage",
+    "english": "Toxin",
+    "russian": "урона токсином"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponProcTimeModDesc",
+    "english": "Status Duration",
+    "russian": "к длительности статуса"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponProjectileSpeedModDesc",
+    "english": "Projectile Speed",
+    "russian": "к скорости полёта снаряда"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponPunctureDamage",
+    "english": "Puncture",
+    "russian": "пронзающего урона"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponPunctureDepthModDesc",
+    "english": "Punch Through",
+    "russian": "к пронзанию навылет"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponRangeModDesc",
+    "english": "Range",
+    "russian": "Дальность поражения"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponRecoilModDesc",
+    "english": "Weapon Recoil",
+    "russian": "к отдаче"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponReloadSpeedModDesc",
+    "english": "Reload Speed",
+    "russian": "к скорости перезарядки"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponSlashDamage",
+    "english": "Slash",
+    "russian": "разрезающего урона"
+  },
+  {
+    "key": "/Lotus/Language/Upgrades/WeaponZoomModDesc",
+    "english": "Zoom",
+    "russian": "приближение"
+  }
 ]

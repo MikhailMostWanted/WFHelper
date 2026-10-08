@@ -18,6 +18,7 @@
   import WorkspaceSection from "../components/settings/WorkspaceSection.svelte";
   import SettingsSection from "../components/settings/SettingsSection.svelte";
   import SettingsRow from "../components/settings/SettingsRow.svelte";
+  import AccountSnapshotCard from "../components/settings/AccountSnapshotCard.svelte";
   import AboutCard from "../components/settings/AboutCard.svelte";
   import SupportersCard from "../components/settings/SupportersCard.svelte";
   import ProtonLaunchOption from "../components/ProtonLaunchOption.svelte";
@@ -922,6 +923,7 @@
             </SettingsSection>
           {/if}
 
+          <AccountSnapshotCard />
           <AboutCard />
         </div>
 

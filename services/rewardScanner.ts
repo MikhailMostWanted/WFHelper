@@ -68,11 +68,9 @@ export function detectRelicSelectionEra(
 
 async function runRewardOCRStructuredBuffer(imageBuffer: Buffer, timeoutMs: number) {
   if (shouldUseRussianRewardOcr()) {
-    try {
-      return await runRussianRewardOcrStructuredBuffer(imageBuffer, timeoutMs, sortedItems);
-    } catch (error) {
-      log.warn("[RewardScanner] Russian OCR failed, falling back to default OCR:", error);
-    }
+    // Never spend a second timeout in an English-only reader on Cyrillic text.
+    // The caller has alternate crops and an explicit unavailable state.
+    return runRussianRewardOcrStructuredBuffer(imageBuffer, timeoutMs, sortedItems);
   }
   return runDefaultOCRStructuredBuffer(imageBuffer, timeoutMs);
 }

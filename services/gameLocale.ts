@@ -105,3 +105,12 @@ export function getGameLocale(): string {
 export function isLocalizingNames(): boolean {
   return activeLocale !== DEFAULT_GAME_LOCALE && Object.keys(activeNames).length > 0;
 }
+
+/** A verified dictionary value for an explicit locale, not a translated guess. */
+export function nameInLocale(
+  nameKey: string | null | undefined,
+  locale: GameLocale,
+): string | null {
+  if (!nameKey) return null;
+  return loadNames(locale)[nameKey] || null;
+}
