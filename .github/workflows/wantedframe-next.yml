@@ -6,13 +6,31 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: wantedframe-next-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  source:
+    if: github.ref == 'refs/heads/feat/wantedframe-next'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Archive the exact tracked source revision
+        run: git archive --format=tar.gz --output=wantedframe-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WantedFrame-Next-source
+          path: wantedframe-source.tar.gz
+          retention-days: 7
+          if-no-files-found: error
+
   preview:
     if: github.ref == 'refs/heads/feat/wantedframe-next'
     runs-on: windows-latest
@@ -28,35 +46,15 @@ jobs:
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
-          fetch-depth: 30
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-      - name: Apply reviewed source edits
-        run: python scripts/apply-next-edits.py
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-      - name: Format only preview changes
-        shell: bash
-        run: |
-          git diff --name-only 76df180f4b65f37893ecd7d13665fd2051deb9a0 -- '*.ts' '*.js' '*.json' '*.css' '*.html' '*.svelte' | while IFS= read -r file; do
-            if [ -f "$file" ]; then pnpm exec prettier --write "$file" || exit 1; fi
-          done
-      - name: Record exact applied sources on preview branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          git add -u
-          if ! git diff --cached --quiet; then
-            head=$(git ls-remote origin refs/heads/feat/wantedframe-next | cut -f1)
-            test "$head" = "$GITHUB_SHA" || { echo 'Branch moved; refusing to overwrite'; exit 1; }
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m '[feat] - prepare wantedframe next preview'
-            git push origin HEAD:refs/heads/feat/wantedframe-next
-          fi
-          git rev-parse HEAD > source-revision.txt
       - name: Typecheck main renderer and tests
         shell: bash
         run: |
@@ -65,8 +63,17 @@ jobs:
           pnpm run typecheck:tests
       - name: Targeted regression tests
         run: pnpm exec vitest run tests/main/wantedframeNext.test.ts tests/main/rivenRussianIntegration.test.ts tests/main/rewardRussianOcr.test.ts tests/main/rivenScanOcr.test.ts tests/main/personalLoadouts.test.ts tests/main/gameLocale.test.ts
-      - name: Set isolated preview version
-        run: pnpm version 0.2.0-preview.1 --no-git-tag-version --allow-same-version
+      - name: Set artifact-only version and record provenance
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.version = '0.2.0-preview.1';
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          fs.writeFileSync('source-revision.txt', process.env.GITHUB_SHA + '\n');
+          fs.writeFileSync('build-info.json', JSON.stringify({version: pkg.version, revision: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID}, null, 2) + '\n');
+          NODE
       - name: Build Windows preview without publishing a release
         shell: bash
         run: |
@@ -82,6 +89,7 @@ jobs:
           path: |
             release/WantedFrame-0.2.0-preview.1-Setup.exe
             source-revision.txt
+            build-info.json
           if-no-files-found: error
           retention-days: 14
       - name: Upload checks and screenshots
@@ -92,5 +100,6 @@ jobs:
           path: |
             test-results/packaged-*/
             source-revision.txt
+            build-info.json
           if-no-files-found: ignore
           retention-days: 7
