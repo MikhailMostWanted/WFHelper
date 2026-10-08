@@ -6,25 +6,91 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: wantedframe-next-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  source:
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
+  preview:
+    if: github.ref == 'refs/heads/feat/wantedframe-next'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: "0"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      VITE_WFM_BACKEND_URL: "https://api.wfhelper.com"
+      VITE_WFM_BACKEND_DIRECT_FALLBACK: "high"
+      VITE_WFM_BACKEND_BOOTSTRAP_ENABLED: "1"
     steps:
+      - name: Preserve exact source newlines
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
-      - name: Bundle exact tracked sources
-        run: git archive --format=tar.gz --output=wantedframe-source.tar.gz HEAD
-      - uses: actions/upload-artifact@v4
+          ref: ${{ github.ref }}
+          fetch-depth: 30
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          name: WantedFrame-Next-source
-          path: wantedframe-source.tar.gz
-          retention-days: 7
+          node-version: 22
+          cache: pnpm
+      - name: Apply reviewed source edits
+        run: python scripts/apply-next-edits.py
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Format only preview changes
+        shell: bash
+        run: |
+          git diff --name-only 76df180f4b65f37893ecd7d13665fd2051deb9a0 -- '*.ts' '*.js' '*.json' '*.css' '*.html' '*.svelte' | while IFS= read -r file; do
+            if [ -f "$file" ]; then pnpm exec prettier --write "$file" || exit 1; fi
+          done
+      - name: Record exact applied sources on preview branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -u
+          if ! git diff --cached --quiet; then
+            head=$(git ls-remote origin refs/heads/feat/wantedframe-next | cut -f1)
+            test "$head" = "$GITHUB_SHA" || { echo 'Branch moved; refusing to overwrite'; exit 1; }
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m '[feat] - prepare wantedframe next preview'
+            git push origin HEAD:refs/heads/feat/wantedframe-next
+          fi
+          git rev-parse HEAD > source-revision.txt
+      - name: Typecheck main renderer and tests
+        shell: bash
+        run: |
+          pnpm run typecheck:main
+          pnpm run typecheck:renderer
+          pnpm run typecheck:tests
+      - name: Targeted regression tests
+        run: pnpm exec vitest run tests/main/wantedframeNext.test.ts tests/main/rivenRussianIntegration.test.ts tests/main/rewardRussianOcr.test.ts tests/main/rivenScanOcr.test.ts tests/main/personalLoadouts.test.ts tests/main/gameLocale.test.ts
+      - name: Set isolated preview version
+        run: pnpm version 0.2.0-preview.1 --no-git-tag-version --allow-same-version
+      - name: Build Windows preview without publishing a release
+        shell: bash
+        run: |
+          pnpm run verify:onnx-models
+          pnpm run build
+          pnpm exec electron-builder --win nsis --publish never
+      - name: Packaged application smoke test
+        run: pnpm run test:packaged release/win-unpacked/WantedFrame.exe
+      - name: Upload Windows preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: WantedFrame-0.2.0-preview.1-Windows
+          path: |
+            release/WantedFrame-0.2.0-preview.1-Setup.exe
+            source-revision.txt
           if-no-files-found: error
+          retention-days: 14
+      - name: Upload checks and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WantedFrame-Next-checks
+          path: |
+            test-results/packaged-*/
+            source-revision.txt
+          if-no-files-found: ignore
+          retention-days: 7
