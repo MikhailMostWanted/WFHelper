@@ -496,3 +496,10 @@ export async function getPersonalProfile(refresh = false): Promise<PersonalProfi
     if (personalRequest?.promise === promise) personalRequest = null;
   }
 }
+
+/** An opaque identity, only when the loaded inventory is proven to belong to this account. */
+export function getInventoryBindingFingerprint(rawHash: string | null): string | null {
+  if (!rawHash || !isInventorySnapshotForCurrentAccount(rawHash)) return null;
+  const accountId = _loadAccountId();
+  return accountId ? createHash("sha256").update("wantedframe-account-v1:" + accountId).digest("hex") : null;
+}

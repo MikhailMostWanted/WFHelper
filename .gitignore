@@ -79,3 +79,11 @@ native/layer-shell/build/
 scripts/dojo-research/
 scripts/pets/
 scripts/syndicates/
+
+# Private WantedFrame account transfer files; never source-control live snapshots/secrets.
+wantedframe-pairing*.json
+wantedframe-chatgpt.connection
+account-snapshot.json
+WantedFrame-ChatGPT*.zip
+integrations/.state/
+integrations/*.egg-info/

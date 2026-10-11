@@ -2,7 +2,10 @@
   import { onMount } from "svelte";
   import { invoke } from "../../lib/ipc.js";
   import type { IpcInvokeMap } from "../../types/ipc.js";
-  let status = $state<IpcInvokeMap["getAccountSnapshotStatus"]["return"] | null>(null);
+  type Status = IpcInvokeMap["getAccountSnapshotStatus"]["return"] & {
+    bridge?: { connected: boolean; server: string | null; automatic: boolean; busy: boolean; lastSentAt: number | null; error: string | null };
+  };
+  let status = $state<Status | null>(null);
   let message = $state("");
   let busy = $state(false);
   async function refresh() {
@@ -20,11 +23,12 @@
     try {
       const result = await invoke("exportAccountSnapshot");
       message = result.saved
-        ? "Снимок сохранён. Его можно передать в ChatGPT."
-        : "Сохранение не выполнено";
+        ? "Действие выполнено."
+        : "Действие отменено или не выполнено";
     } catch {
       message = "Не удалось сохранить снимок";
     } finally {
+      void refresh();
       busy = false;
     }
   }
@@ -44,8 +48,8 @@
     <button class="btn-secondary btn-sm" onclick={refresh}>Обновить состояние</button>
     <button
       class="btn-primary btn-sm"
-      disabled={busy || status?.rows == null}
-      onclick={exportSnapshot}>Экспорт для ChatGPT</button
+      disabled={busy}
+      onclick={exportSnapshot}>Передать данные / подключить ChatGPT</button
     >
   </div>
   {#if message}<p role="status">{message}</p>{/if}
@@ -60,9 +64,14 @@
     {/each}
   </details>
   <p>
-    Снимок хранится локально. Автоматической отправки на сервер в этой версии нет. Игровые пароли и
-    данные входа не экспортируются.
+    ZIP включает карту разделов и инструкцию для ChatGPT. Либо подключи свой MCP и отправляй данные одной кнопкой.
+    Автоматическая синхронизация включается отдельно. Игровые данные входа в комплект не входят.
   </p>
+  {#if status?.bridge?.connected}
+    <p>MCP: {status.bridge.server} · {status.bridge.automatic ? "автосинхронизация включена" : "отправка вручную"}</p>
+    {#if status.bridge.lastSentAt}<p>Последняя подтверждённая отправка: {new Date(status.bridge.lastSentAt).toLocaleString("ru-RU")}</p>{/if}
+    {#if status.bridge.error}<p role="status">{status.bridge.error}</p>{/if}
+  {/if}
 </section>
 
 <style>
