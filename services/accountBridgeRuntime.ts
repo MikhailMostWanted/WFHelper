@@ -4,7 +4,7 @@ import ctx from "../ipc/context";
 import { getInventorySource, getLoadedInventoryModifiedAt, getLoadedInventoryHash } from "../ipc/inventoryIpc";
 import { buildAccountSnapshot } from "./accountSnapshot";
 import { buildAccountBridge, type AccountBridgeDocument } from "./accountBridge";
-import { getAllItems, lookupItem } from "./itemDatabase";
+import { getAllItems, getRendererLookup, lookupItem } from "./itemDatabase";
 import { nameInLocale } from "./gameLocale";
 import { getPersonalProfile, getInventoryBindingFingerprint } from "./codexProfile";
 import { computeMasteryProgress } from "./masteryHelper";
@@ -32,8 +32,15 @@ async function build(): Promise<AccountBridgeDocument> {
   let mastery: ReturnType<typeof computeMasteryProgress> | undefined;
   try { mastery = computeMasteryProgress(asRecord(unwrapInventoryPayload(raw)) ?? {}); } catch { /* Keep source history; never invent derived mastery. */ }
   await new Promise<void>((resolve) => setImmediate(resolve));
+  // Recipes live in a separate index. getAllItems alone cannot export crafting trees.
+  const rendererReference = getRendererLookup();
+  const gameItems = Object.fromEntries(Object.entries(getAllItems()).map(([key, item]) => [key, {
+    ...item,
+    ...(rendererReference[key]?.recipe ? { recipe: rendererReference[key].recipe } : {}),
+    ...(rendererReference[key]?.buildsProduct ? { buildsProduct: rendererReference[key].buildsProduct } : {}),
+  }]));
   const doc = buildAccountBridge(raw, snapshot, {
-    bindingId, gameItems: getAllItems(), gameNameRu: (key) => nameInLocale(key, "ru"), mastery,
+    bindingId, gameItems, gameNameRu: (key) => nameInLocale(key, "ru"), mastery,
     profile: profile && profile.status !== "account-changed" ? profile : undefined,
   });
   if (ctx.currentInventoryData !== raw || getInventorySource() !== source || getLoadedInventoryModifiedAt() !== stamp || (getInventoryBindingFingerprint(getLoadedInventoryHash()) ?? "manual") !== bindingId) throw new Error("Источник инвентаря изменился во время подготовки. Повтори запрос.");
