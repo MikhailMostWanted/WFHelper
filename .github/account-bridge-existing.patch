@@ -1,0 +1,114 @@
+diff --git a/.gitignore b/.gitignore
+index 33d36b1..4f0b98a 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -79,3 +79,11 @@ native/layer-shell/build/
+ scripts/dojo-research/
+ scripts/pets/
+ scripts/syndicates/
++
++# Private WantedFrame account transfer files; never source-control live snapshots/secrets.
++wantedframe-pairing*.json
++wantedframe-chatgpt.connection
++account-snapshot.json
++WantedFrame-ChatGPT*.zip
++integrations/.state/
++integrations/*.egg-info/
+diff --git a/services/accountSnapshotStore.ts b/services/accountSnapshotStore.ts
+index ba0e666..5f38320 100644
+--- a/services/accountSnapshotStore.ts
++++ b/services/accountSnapshotStore.ts
+@@ -10,6 +10,11 @@ let pending: { file: string; payload: unknown; options: SnapshotOptions } | null
+ let running: Promise<void> | null = null;
+ let last: AccountSnapshot | null = null;
+ let lastError: string | null = null;
++const listeners = new Set<() => void>();
++export function onAccountSnapshotSaved(listener: () => void): () => void {
++  listeners.add(listener);
++  return () => listeners.delete(listener);
++}
+ export function getAccountSnapshotStatus(): {
+   snapshot: AccountSnapshot | null;
+   error: string | null;
+@@ -42,6 +47,7 @@ async function drain(): Promise<void> {
+       await fs.rename(temp, task.file);
+       last = snapshot;
+       lastError = null;
++      for (const listener of listeners) { try { listener(); } catch { /* An optional consumer cannot break inventory saving. */ } }
+     } catch {
+       lastError = "Snapshot export failed; previous snapshot preserved";
+     } finally {
+diff --git a/services/codexProfile.ts b/services/codexProfile.ts
+index 75a9eb2..675cefe 100644
+--- a/services/codexProfile.ts
++++ b/services/codexProfile.ts
+@@ -496,3 +496,10 @@ export async function getPersonalProfile(refresh = false): Promise<PersonalProfi
+     if (personalRequest?.promise === promise) personalRequest = null;
+   }
+ }
++
++/** An opaque identity, only when the loaded inventory is proven to belong to this account. */
++export function getInventoryBindingFingerprint(rawHash: string | null): string | null {
++  if (!rawHash || !isInventorySnapshotForCurrentAccount(rawHash)) return null;
++  const accountId = _loadAccountId();
++  return accountId ? createHash("sha256").update("wantedframe-account-v1:" + accountId).digest("hex") : null;
++}
+diff --git a/src/components/settings/AccountSnapshotCard.svelte b/src/components/settings/AccountSnapshotCard.svelte
+index d6fbc41..bed2ebd 100644
+--- a/src/components/settings/AccountSnapshotCard.svelte
++++ b/src/components/settings/AccountSnapshotCard.svelte
+@@ -2,7 +2,10 @@
+   import { onMount } from "svelte";
+   import { invoke } from "../../lib/ipc.js";
+   import type { IpcInvokeMap } from "../../types/ipc.js";
+-  let status = $state<IpcInvokeMap["getAccountSnapshotStatus"]["return"] | null>(null);
++  type Status = IpcInvokeMap["getAccountSnapshotStatus"]["return"] & {
++    bridge?: { connected: boolean; server: string | null; automatic: boolean; busy: boolean; lastSentAt: number | null; error: string | null };
++  };
++  let status = $state<Status | null>(null);
+   let message = $state("");
+   let busy = $state(false);
+   async function refresh() {
+@@ -20,11 +23,12 @@
+     try {
+       const result = await invoke("exportAccountSnapshot");
+       message = result.saved
+-        ? "Снимок сохранён. Его можно передать в ChatGPT."
+-        : "Сохранение не выполнено";
++        ? "Действие выполнено."
++        : "Действие отменено или не выполнено";
+     } catch {
+       message = "Не удалось сохранить снимок";
+     } finally {
++      void refresh();
+       busy = false;
+     }
+   }
+@@ -44,8 +48,8 @@
+     <button class="btn-secondary btn-sm" onclick={refresh}>Обновить состояние</button>
+     <button
+       class="btn-primary btn-sm"
+-      disabled={busy || status?.rows == null}
+-      onclick={exportSnapshot}>Экспорт для ChatGPT</button
++      disabled={busy}
++      onclick={exportSnapshot}>Передать данные / подключить ChatGPT</button
+     >
+   </div>
+   {#if message}<p role="status">{message}</p>{/if}
+@@ -60,9 +64,14 @@
+     {/each}
+   </details>
+   <p>
+-    Снимок хранится локально. Автоматической отправки на сервер в этой версии нет. Игровые пароли и
+-    данные входа не экспортируются.
++    ZIP включает карту разделов и инструкцию для ChatGPT. Либо подключи свой MCP и отправляй данные одной кнопкой.
++    Автоматическая синхронизация включается отдельно. Игровые данные входа в комплект не входят.
+   </p>
++  {#if status?.bridge?.connected}
++    <p>MCP: {status.bridge.server} · {status.bridge.automatic ? "автосинхронизация включена" : "отправка вручную"}</p>
++    {#if status.bridge.lastSentAt}<p>Последняя подтверждённая отправка: {new Date(status.bridge.lastSentAt).toLocaleString("ru-RU")}</p>{/if}
++    {#if status.bridge.error}<p role="status">{status.bridge.error}</p>{/if}
++  {/if}
+ </section>
+ 
+ <style>

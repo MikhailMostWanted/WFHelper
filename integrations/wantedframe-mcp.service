@@ -1,0 +1,28 @@
+[Unit]
+Description=WantedFrame account MCP
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wantedframe-mcp
+Group=wantedframe-mcp
+WorkingDirectory=/opt/wantedframe-mcp
+ExecStart=/opt/wantedframe-mcp/venv/bin/wantedframe-mcp serve --config /etc/wantedframe-mcp/config.json --data /var/lib/wantedframe-mcp
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=wantedframe-mcp
+RuntimeDirectoryMode=0750
+StateDirectory=wantedframe-mcp
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/wantedframe-mcp /run/wantedframe-mcp
+MemoryMax=768M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

@@ -13,14 +13,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prepare:
+    if: github.ref == 'refs/heads/feat/wantedframe-next'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.sources.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Apply the reviewed existing-file patch once
+        id: sources
+        shell: bash
+        env:
+          HUSKY: "0"
+        run: |
+          set -euo pipefail
+          patch=.github/account-bridge-existing.patch
+          if [ -f "$patch" ]; then
+            git apply --check "$patch"
+            git apply --index "$patch"
+            python scripts/build-account-bridge-schema.py
+            git add integrations/wantedframe_mcp/schema.json
+            git rm "$patch"
+            remote=$(git ls-remote origin refs/heads/feat/wantedframe-next | cut -f1)
+            test "$remote" = "$GITHUB_SHA" || { echo 'Branch changed; refusing to overwrite'; exit 1; }
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m '[feat] - connect account bridge to desktop and publish shared data schema'
+            git push origin HEAD:refs/heads/feat/wantedframe-next
+          fi
+          test -f integrations/wantedframe_mcp/schema.json
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   source:
+    needs: prepare
     if: github.ref == 'refs/heads/feat/wantedframe-next'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
       - name: Archive the exact tracked source revision
         run: git archive --format=tar.gz --output=wantedframe-source.tar.gz HEAD
@@ -31,11 +66,37 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  account-data:
+    needs: prepare
+    if: github.ref == 'refs/heads/feat/wantedframe-next'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm install --prefix /tmp/wantedframe-ts typescript@5.9.3
+      - run: node tests/bridge/build_fixture.cjs
+        env:
+          TYPESCRIPT_PATH: /tmp/wantedframe-ts/node_modules/typescript
+      - run: python -m pip install './integrations[test]'
+      - run: python -m pytest -q tests/bridge
+      - run: python -m compileall -q integrations/wantedframe_mcp
+
   preview:
+    needs: [prepare, account-data]
     if: github.ref == 'refs/heads/feat/wantedframe-next'
     runs-on: windows-latest
     timeout-minutes: 30
     env:
+      SOURCE_REVISION: ${{ needs.prepare.outputs.sha }}
       HUSKY: "0"
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       VITE_WFM_BACKEND_URL: "https://api.wfhelper.com"
@@ -46,7 +107,7 @@ jobs:
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -69,10 +130,10 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          pkg.version = '0.2.0-preview.1';
+          pkg.version = '0.2.0-preview.2';
           fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          fs.writeFileSync('source-revision.txt', process.env.GITHUB_SHA + '\n');
-          fs.writeFileSync('build-info.json', JSON.stringify({version: pkg.version, revision: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID}, null, 2) + '\n');
+          fs.writeFileSync('source-revision.txt', process.env.SOURCE_REVISION + '\n');
+          fs.writeFileSync('build-info.json', JSON.stringify({version: pkg.version, revision: process.env.SOURCE_REVISION, runId: process.env.GITHUB_RUN_ID}, null, 2) + '\n');
           NODE
       - name: Build Windows preview without publishing a release
         shell: bash
@@ -85,9 +146,9 @@ jobs:
       - name: Upload Windows preview
         uses: actions/upload-artifact@v4
         with:
-          name: WantedFrame-0.2.0-preview.1-Windows
+          name: WantedFrame-0.2.0-preview.2-Windows
           path: |
-            release/WantedFrame-0.2.0-preview.1-Setup.exe
+            release/WantedFrame-0.2.0-preview.2-Setup.exe
             source-revision.txt
             build-info.json
           if-no-files-found: error

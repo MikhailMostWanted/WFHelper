@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "wantedframe-mcp"
+version = "0.1.0"
+description = "Owner-only WantedFrame snapshots, selective read tools and discovery"
+requires-python = ">=3.12"
+dependencies = ["fastmcp-slim[server]==4.0.11", "jsonschema>=4.23,<5", "httpx>=0.28,<1"]
+[project.optional-dependencies]
+test = ["pytest>=8,<10", "pytest-asyncio>=0.24,<2", "fastmcp-slim[client]==4.0.11"]
+[project.scripts]
+wantedframe-mcp = "wantedframe_mcp.cli:main"
+[tool.setuptools]
+packages = ["wantedframe_mcp"]
+[tool.setuptools.package-data]
+wantedframe_mcp = ["schema.json"]
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
