@@ -2,6 +2,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const process = require('node:process');
+const console = require('node:console');
 const ts = require(process.env.TYPESCRIPT_PATH || 'typescript');
 require.extensions['.ts'] = (module, filename) => {
   const source = fs.readFileSync(filename, 'utf8');

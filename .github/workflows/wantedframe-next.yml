@@ -25,23 +25,36 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Apply the reviewed existing-file patch once
+      - uses: pnpm/action-setup@v4
+        if: hashFiles('.github/account-bridge-format-once') != ''
+      - uses: actions/setup-node@v4
+        if: hashFiles('.github/account-bridge-format-once') != ''
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Normalize the final bridge sources once
+        if: hashFiles('.github/account-bridge-format-once') != ''
+        shell: bash
+        env:
+          HUSKY: "0"
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec prettier --write services/accountBridge.ts services/accountBridgeRuntime.ts services/accountBridgeSync.ts services/bridgeExport.ts services/accountSnapshotStore.ts services/codexProfile.ts ipc/accountSnapshotIpc.ts src/components/settings/AccountSnapshotCard.svelte tests/bridge/build_fixture.cjs integrations/wantedframe_mcp/schema.json
+          pnpm exec eslint services/accountBridge.ts services/accountBridgeRuntime.ts services/accountBridgeSync.ts services/bridgeExport.ts services/accountSnapshotStore.ts services/codexProfile.ts ipc/accountSnapshotIpc.ts src/components/settings/AccountSnapshotCard.svelte tests/bridge/build_fixture.cjs
+          git add services/accountBridge.ts services/accountBridgeRuntime.ts services/accountBridgeSync.ts services/bridgeExport.ts services/accountSnapshotStore.ts services/codexProfile.ts ipc/accountSnapshotIpc.ts src/components/settings/AccountSnapshotCard.svelte tests/bridge/build_fixture.cjs integrations/wantedframe_mcp/schema.json
+          git rm .github/account-bridge-format-once
+      - name: Record exact prepared sources
         id: sources
         shell: bash
         env:
           HUSKY: "0"
         run: |
           set -euo pipefail
-          patch=.github/account-bridge-existing.patch
-          if [ -f "$patch" ]; then
-            git apply --check "$patch"
-            git apply --index "$patch"
-            python scripts/build-account-bridge-schema.py
-            git add integrations/wantedframe_mcp/schema.json
-            git rm "$patch"
+          if ! git diff --cached --quiet; then
             remote=$(git ls-remote origin refs/heads/feat/wantedframe-next | cut -f1)
             test "$remote" = "$GITHUB_SHA" || { echo 'Branch changed; refusing to overwrite'; exit 1; }
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m '[feat] - connect account bridge to desktop and publish shared data schema'
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m '[chore] - normalize account bridge sources for handoff'
             git push origin HEAD:refs/heads/feat/wantedframe-next
           fi
           test -f integrations/wantedframe_mcp/schema.json
