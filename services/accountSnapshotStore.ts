@@ -47,7 +47,13 @@ async function drain(): Promise<void> {
       await fs.rename(temp, task.file);
       last = snapshot;
       lastError = null;
-      for (const listener of listeners) { try { listener(); } catch { /* An optional consumer cannot break inventory saving. */ } }
+      for (const listener of listeners) {
+        try {
+          listener();
+        } catch {
+          /* An optional consumer cannot break inventory saving. */
+        }
+      }
     } catch {
       lastError = "Snapshot export failed; previous snapshot preserved";
     } finally {

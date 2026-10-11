@@ -501,5 +501,9 @@ export async function getPersonalProfile(refresh = false): Promise<PersonalProfi
 export function getInventoryBindingFingerprint(rawHash: string | null): string | null {
   if (!rawHash || !isInventorySnapshotForCurrentAccount(rawHash)) return null;
   const accountId = _loadAccountId();
-  return accountId ? createHash("sha256").update("wantedframe-account-v1:" + accountId).digest("hex") : null;
+  return accountId
+    ? createHash("sha256")
+        .update("wantedframe-account-v1:" + accountId)
+        .digest("hex")
+    : null;
 }

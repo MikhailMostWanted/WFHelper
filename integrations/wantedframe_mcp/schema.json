@@ -1,1 +1,823 @@
-{"version":1,"maxBytes":25165824,"dailyKeys":["DailyFocus","DailyAffiliation","DailyAffiliationCetus","DailyAffiliationSolaris","DailyAffiliationVentkids","DailyAffiliationEntrati","DailyAffiliationNecraloid","DailyAffiliationZariman","DailyAffiliationCavia","DailyAffiliationHex","DailyTrades","DailyGifts","EntratiVaultCountLastPeriod","ConquestScore","LastConquestScore","DuviriConquestScore"],"$defs":{"item":{"type":["object","null"],"properties":{"section":{"type":["string","null"],"maxLength":512},"type":{"type":["string","null"],"maxLength":512},"name":{"type":["string","null"],"maxLength":512},"nameRu":{"type":["string","null"],"maxLength":512},"instanceId":{"type":["string","null"],"maxLength":512},"count":{"type":["number","null"]},"xp":{"type":["number","null"]},"rank":{"type":["number","null"]},"polarizationCount":{"type":["number","null"]},"featureFlags":{"type":["number","null"]},"modularParts":{"type":["array","null"],"items":{"type":["string","null"],"maxLength":512},"maxItems":16},"configs":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"index":{"type":["number","null"]},"name":{"type":["string","null"],"maxLength":160},"mods":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"slot":{"type":["number","null"]},"reference":{"type":["string","null"],"maxLength":512},"type":{"type":["string","null"],"maxLength":512},"rank":{"type":["number","null"]}},"additionalProperties":false},"maxItems":32}},"additionalProperties":false},"maxItems":12},"polarities":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"slot":{"type":["number","null"]},"value":{"type":["string","null"],"maxLength":512}},"additionalProperties":false},"maxItems":32},"shards":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"slot":{"type":["number","null"]},"type":{"type":["string","null"],"maxLength":512},"color":{"type":["string","null"],"maxLength":512}},"additionalProperties":false},"maxItems":5},"roll":{"type":["object","null"],"properties":{"rank":{"type":["number","null"]},"rerolls":{"type":["number","null"]},"compatibility":{"type":["string","null"],"maxLength":512},"buffs":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"tag":{"type":["string","null"],"maxLength":512},"rawValue":{"type":["number","null"]}},"additionalProperties":false},"maxItems":8},"curses":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"tag":{"type":["string","null"],"maxLength":512},"rawValue":{"type":["number","null"]}},"additionalProperties":false},"maxItems":8}},"additionalProperties":false},"completesAt":{"type":["number","null"]}},"additionalProperties":false},"gameItem":{"type":["object","null"],"properties":{"uniqueName":{"type":["string","null"],"maxLength":512},"name":{"type":["string","null"],"maxLength":512},"nameRu":{"type":["string","null"],"maxLength":512},"category":{"type":["string","null"],"maxLength":512},"productCategory":{"type":["string","null"],"maxLength":512},"type":{"type":["string","null"],"maxLength":512},"nameKey":{"type":["string","null"],"maxLength":512},"buildsProduct":{"type":["string","null"],"maxLength":512},"masteryReq":{"type":["number","null"]},"ducats":{"type":["number","null"]},"tradable":{"type":["boolean","null"]},"vaulted":{"type":["boolean","null"]},"masterable":{"type":["boolean","null"]},"isPrime":{"type":["boolean","null"]},"description":{"type":["string","null"],"maxLength":8000},"recipe":{"type":["object","null"],"properties":{"buildPrice":{"type":["number","null"]},"buildTime":{"type":["number","null"]},"num":{"type":["number","null"]},"blueprintUniqueName":{"type":["string","null"],"maxLength":512},"reusableBlueprint":{"type":["boolean","null"]},"ingredients":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"uniqueName":{"type":["string","null"],"maxLength":512},"count":{"type":["number","null"]}},"additionalProperties":false},"maxItems":100}},"additionalProperties":false},"components":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"uniqueName":{"type":["string","null"],"maxLength":512},"name":{"type":["string","null"],"maxLength":512},"itemCount":{"type":["number","null"]}},"additionalProperties":false},"maxItems":100},"drops":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"location":{"type":["string","null"],"maxLength":512},"type":{"type":["string","null"],"maxLength":512},"chance":{"type":["number","null"]},"rarity":{"type":["string","null"],"maxLength":512}},"additionalProperties":false},"maxItems":300}},"additionalProperties":false},"rawItem":{"type":["object","null"],"properties":{"ItemType":{"type":["string","null"],"maxLength":512},"Name":{"type":["string","null"],"maxLength":512},"ItemCount":{"type":["number","null"]},"XP":{"type":["number","null"]},"Polarized":{"type":["number","null"]},"Features":{"type":["number","null"]},"ItemId":{"type":["object","null"],"properties":{"$oid":{"type":["string","null"],"maxLength":512}},"additionalProperties":false},"Configs":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"Name":{"type":["string","null"],"maxLength":160},"Upgrades":{"type":["array","null"],"items":{"type":["string","null"],"maxLength":512},"maxItems":32},"Arcanes":{"type":["array","null"],"items":{"type":["string","null"],"maxLength":512},"maxItems":8},"AbilityOverride":{"type":["string","null"],"maxLength":512},"FocusLens":{"type":["string","null"],"maxLength":512}},"additionalProperties":false},"maxItems":12},"Polarity":{"type":["number","null"]},"PolarizedSlots":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"Slot":{"type":["number","null"]},"Value":{"type":["string","null"],"maxLength":512}},"additionalProperties":false},"maxItems":32},"ModularParts":{"type":["array","null"],"items":{"type":["string","null"],"maxLength":512},"maxItems":16},"CompletionDate":{"anyOf":[{"type":["number","null"]},{"type":["string","null"],"maxLength":512},{"type":["object","null"],"properties":{"$date":{"anyOf":[{"type":["number","null"]},{"type":["string","null"],"maxLength":512},{"type":["object","null"],"properties":{"$numberLong":{"type":["string","null"],"maxLength":512}},"additionalProperties":false}]}},"additionalProperties":false}]},"ExpiryDate":{"anyOf":[{"type":["number","null"]},{"type":["string","null"],"maxLength":512},{"type":["object","null"],"properties":{"$date":{"anyOf":[{"type":["number","null"]},{"type":["string","null"],"maxLength":512},{"type":["object","null"],"properties":{"$numberLong":{"type":["string","null"],"maxLength":512}},"additionalProperties":false}]}},"additionalProperties":false}]},"ActivationDate":{"anyOf":[{"type":["number","null"]},{"type":["string","null"],"maxLength":512},{"type":["object","null"],"properties":{"$date":{"anyOf":[{"type":["number","null"]},{"type":["string","null"],"maxLength":512},{"type":["object","null"],"properties":{"$numberLong":{"type":["string","null"],"maxLength":512}},"additionalProperties":false}]}},"additionalProperties":false}]}},"additionalProperties":false}},"sections":{"account":{"title":"Аккаунт: ранг мастерства и валюты","schema":{"type":["object","null"],"properties":{"masteryRank":{"type":["number","null"]},"masteryXp":{"type":["number","null"]},"credits":{"type":["number","null"]},"platinum":{"type":["number","null"]},"endo":{"type":["number","null"]}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"loadouts":{"title":"Сохранённые комплекты снаряжения","schema":{"type":["object","null"],"properties":{"mode":{"type":["string","null"],"maxLength":512},"index":{"type":["number","null"]},"name":{"type":["string","null"],"maxLength":160},"slots":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"slot":{"type":["string","null"],"maxLength":512},"instanceId":{"type":["string","null"],"maxLength":512},"modConfig":{"type":["number","null"]},"appearanceConfig":{"type":["number","null"]}},"additionalProperties":false},"maxItems":32}},"additionalProperties":false},"note":"Выбранная мод-конфигурация и внешность — разные индексы. Сохранённый комплект не доказывает, что он сейчас активен в игре."},"game.items":{"title":"Игровой справочник: предметы, рецепты и источники","schema":{"$ref":"#/$defs/gameItem"},"note":"Справочник WantedFrame: DE/Public Export и WFCD. Дата упаковки не является датой обновления игры. Урон и эффекты не вычислены."},"mastery.summary":{"title":"Расчёт прогресса мастерства","schema":{"type":["object","null"],"properties":{"rank":{"type":["number","null"]},"percentToNext":{"type":["number","null"]},"totalXp":{"type":["number","null"]},"xpIntoRank":{"type":["number","null"]},"xpForNext":{"type":["number","null"]},"testReady":{"type":["boolean","null"]}},"additionalProperties":false},"note":"Расчёт существующего WantedFrame по инвентарю и справочнику. Не путать полученный опыт и сдачу испытания ранга."},"mastery.items":{"title":"Освоенное снаряжение и оставшийся опыт","schema":{"type":["object","null"],"properties":{"name":{"type":["string","null"],"maxLength":512},"displayName":{"type":["string","null"],"maxLength":512},"uniqueName":{"type":["string","null"],"maxLength":512},"category":{"type":["string","null"],"maxLength":512},"status":{"type":["string","null"],"maxLength":512},"rank":{"type":["number","null"]},"maxRank":{"type":["number","null"]},"masteryXp":{"type":["number","null"]},"masteryXpRemaining":{"type":["number","null"]},"currentlyOwned":{"type":["boolean","null"]},"needsGilding":{"type":["boolean","null"]}},"additionalProperties":false},"note":"Освоенное когда-то не обязательно есть в инвентаре сейчас; статус missing основан на покрытии входного снимка."},"progress.Affiliations":{"title":"Синдикаты: ранги, репутация, недельные данные","schema":{"type":["object","null"],"properties":{"Tag":{"type":["string","null"],"maxLength":512},"Standing":{"type":["number","null"]},"Title":{"type":["number","null"]},"WeeklyMissions":{"type":["array","null"],"items":{"type":["object","null"],"properties":{"WeekCount":{"type":["number","null"]},"CompletedMission":{"type":["boolean","null"]}},"additionalProperties":false},"maxItems":100}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"progress.Missions":{"title":"Узлы карты и прохождения","schema":{"type":["object","null"],"properties":{"Tag":{"type":["string","null"],"maxLength":512},"Completes":{"type":["number","null"]},"Tier":{"type":["number","null"]}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"progress.PlayerSkills":{"title":"Внутренние навыки и очки","schema":{"type":["object","null"],"properties":{"key":{"type":["string","null"],"maxLength":512},"value":{"type":["number","null"]}},"additionalProperties":false},"note":"Исходные ключи LPS_/LPP_. Числовые значения не переименовываются по догадке."},"progress.FocusXP":{"title":"Опыт Фокуса","schema":{"type":["object","null"],"properties":{"key":{"type":["string","null"],"maxLength":512},"value":{"type":["number","null"]}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"progress.DailyLimits":{"title":"Дневные лимиты и недельные счётчики","schema":{"type":["object","null"],"properties":{"key":{"type":["string","null"],"maxLength":512},"value":{"type":["number","null"]}},"additionalProperties":false},"note":"DailyFocus/DailyAffiliation — остаток, не потраченное. Старый снимок не учитывает сброс дня."},"progress.ChallengeProgress":{"title":"Счётчики испытаний","schema":{"type":["object","null"],"properties":{"Name":{"type":["string","null"],"maxLength":512},"Progress":{"type":["number","null"]}},"additionalProperties":false},"note":"Счётчик не доказывает выполнение текущего задания: он может обнуляться или переиспользоваться."},"progress.PeriodicMissionCompletions":{"title":"Периодические прохождения","schema":{"type":["object","null"],"properties":{"Tag":{"type":["string","null"],"maxLength":512},"Count":{"type":["number","null"]},"Date":{"anyOf":[{"type":["number","null"]},{"type":["string","null"],"maxLength":512},{"type":["object","null"],"properties":{"$date":{"anyOf":[{"type":["number","null"]},{"type":["string","null"],"maxLength":512},{"type":["object","null"],"properties":{"$numberLong":{"type":["string","null"],"maxLength":512}},"additionalProperties":false}]}},"additionalProperties":false}]}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"progress.LibraryActiveDailyTaskInfo":{"title":"Задание сканирования","schema":{"type":["object","null"],"properties":{"Scans":{"type":["number","null"]},"ScansRequired":{"type":["number","null"]},"TargetType":{"type":["string","null"],"maxLength":512}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"progress.ResetDates":{"title":"Даты сброса наград и лимитов","schema":{"type":["object","null"],"properties":{"key":{"type":["string","null"],"maxLength":512},"value":{"anyOf":[{"type":["number","null"]},{"type":["string","null"],"maxLength":512},{"type":["object","null"],"properties":{"$date":{"anyOf":[{"type":["number","null"]},{"type":["string","null"],"maxLength":512},{"type":["object","null"],"properties":{"$numberLong":{"type":["string","null"],"maxLength":512}},"additionalProperties":false}]}},"additionalProperties":false}]}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"profile.career":{"title":"Карьера и статистика аккаунта","schema":{"type":["object","null"],"properties":{"key":{"type":["string","null"],"maxLength":512},"value":{"type":["number","null"]}},"additionalProperties":false},"note":"Отдельный кеш публичного профиля, привязанный к тому же аккаунту; имеет собственную дату."},"profile.equipment":{"title":"Статистика использования снаряжения","schema":{"type":["object","null"],"properties":{"type":{"type":["string","null"],"maxLength":512},"equipTime":{"type":["number","null"]},"kills":{"type":["number","null"]},"headshots":{"type":["number","null"]},"assists":{"type":["number","null"]},"xp":{"type":["number","null"]}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"profile.enemies":{"title":"Противники и сканирования","schema":{"type":["object","null"],"properties":{"type":{"type":["string","null"],"maxLength":512},"kills":{"type":["number","null"]},"headshots":{"type":["number","null"]},"assists":{"type":["number","null"]},"finishers":{"type":["number","null"]},"deaths":{"type":["number","null"]},"scans":{"type":["number","null"]}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"profile.abilities":{"title":"Использование способностей","schema":{"type":["object","null"],"properties":{"type":{"type":["string","null"],"maxLength":512},"name":{"type":["string","null"],"maxLength":512},"used":{"type":["number","null"]}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"profile.missions":{"title":"Рекорды миссий","schema":{"type":["object","null"],"properties":{"type":{"type":["string","null"],"maxLength":512},"name":{"type":["string","null"],"maxLength":512},"highScore":{"type":["number","null"]}},"additionalProperties":false},"note":"Поля только из полученного снимка; отсутствие поля не означает нулевое значение."},"inventory.Suits":{"title":"Варфреймы","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.LongGuns":{"title":"Основное оружие","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.Pistols":{"title":"Вторичное оружие","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.Melee":{"title":"Оружие ближнего боя","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.Sentinels":{"title":"Стражи","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.SentinelWeapons":{"title":"Оружие стражей","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.SpaceSuits":{"title":"Арчвинги","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.SpaceGuns":{"title":"Оружие Арчвинга","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.SpaceMelee":{"title":"Ближний бой Арчвинга","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.OperatorAmps":{"title":"Усилители","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.MechSuits":{"title":"Некрамехи","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.Hoverboards":{"title":"К-Драйвы","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.MoaPets":{"title":"МОА","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.KubrowPets":{"title":"Питомцы","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.DrifterMelee":{"title":"Снаряжение Скитальца","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.MiscItems":{"title":"Ресурсы и компоненты","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.Recipes":{"title":"Чертежи","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.LevelKeys":{"title":"Реликвии и ключи","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.RawUpgrades":{"title":"Непрокачанные моды","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.Upgrades":{"title":"Моды: экземпляры и ранги","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.Arcanes":{"title":"Мистификаторы","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.FusionBundles":{"title":"Наборы слияния","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.Gear":{"title":"Снаряжение","schema":{"$ref":"#/$defs/item"},"note":"Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."},"inventory.XPInfo":{"title":"Исторический опыт снаряжения","schema":{"$ref":"#/$defs/item"},"note":"XPInfo — исторический опыт, а не владение."},"inventory.PendingRecipes":{"title":"Производство в Кузнице","schema":{"$ref":"#/$defs/item"},"note":"PendingRecipes — производство, а не готовое имущество."},"extra.QuestKeys":{"title":"Квестовые ключи","schema":{"$ref":"#/$defs/rawItem"},"note":"Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."},"extra.SpecialItems":{"title":"Особое снаряжение","schema":{"$ref":"#/$defs/rawItem"},"note":"Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."},"extra.KubrowPetPrints":{"title":"Генетические шаблоны","schema":{"$ref":"#/$defs/rawItem"},"note":"Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."},"extra.WeaponSkins":{"title":"Внешний вид и оформления","schema":{"$ref":"#/$defs/rawItem"},"note":"Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."},"extra.Boosters":{"title":"Усилители ресурсов/опыта","schema":{"$ref":"#/$defs/rawItem"},"note":"Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."},"extra.FlavourItems":{"title":"Декоративные предметы","schema":{"$ref":"#/$defs/rawItem"},"note":"Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."},"equipment.details":{"title":"Дополнительные поля конфигураций","schema":{"$ref":"#/$defs/rawItem"},"note":"Исходные поля, если их предоставляет источник. Arcanes/AbilityOverride/FocusLens не гарантированы. Неразобранные ссылки не следует угадывать."}}}
+{
+  "version": 1,
+  "maxBytes": 25165824,
+  "dailyKeys": [
+    "DailyFocus",
+    "DailyAffiliation",
+    "DailyAffiliationCetus",
+    "DailyAffiliationSolaris",
+    "DailyAffiliationVentkids",
+    "DailyAffiliationEntrati",
+    "DailyAffiliationNecraloid",
+    "DailyAffiliationZariman",
+    "DailyAffiliationCavia",
+    "DailyAffiliationHex",
+    "DailyTrades",
+    "DailyGifts",
+    "EntratiVaultCountLastPeriod",
+    "ConquestScore",
+    "LastConquestScore",
+    "DuviriConquestScore"
+  ],
+  "$defs": {
+    "item": {
+      "type": ["object", "null"],
+      "properties": {
+        "section": { "type": ["string", "null"], "maxLength": 512 },
+        "type": { "type": ["string", "null"], "maxLength": 512 },
+        "name": { "type": ["string", "null"], "maxLength": 512 },
+        "nameRu": { "type": ["string", "null"], "maxLength": 512 },
+        "instanceId": { "type": ["string", "null"], "maxLength": 512 },
+        "count": { "type": ["number", "null"] },
+        "xp": { "type": ["number", "null"] },
+        "rank": { "type": ["number", "null"] },
+        "polarizationCount": { "type": ["number", "null"] },
+        "featureFlags": { "type": ["number", "null"] },
+        "modularParts": {
+          "type": ["array", "null"],
+          "items": { "type": ["string", "null"], "maxLength": 512 },
+          "maxItems": 16
+        },
+        "configs": {
+          "type": ["array", "null"],
+          "items": {
+            "type": ["object", "null"],
+            "properties": {
+              "index": { "type": ["number", "null"] },
+              "name": { "type": ["string", "null"], "maxLength": 160 },
+              "mods": {
+                "type": ["array", "null"],
+                "items": {
+                  "type": ["object", "null"],
+                  "properties": {
+                    "slot": { "type": ["number", "null"] },
+                    "reference": { "type": ["string", "null"], "maxLength": 512 },
+                    "type": { "type": ["string", "null"], "maxLength": 512 },
+                    "rank": { "type": ["number", "null"] }
+                  },
+                  "additionalProperties": false
+                },
+                "maxItems": 32
+              }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 12
+        },
+        "polarities": {
+          "type": ["array", "null"],
+          "items": {
+            "type": ["object", "null"],
+            "properties": {
+              "slot": { "type": ["number", "null"] },
+              "value": { "type": ["string", "null"], "maxLength": 512 }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 32
+        },
+        "shards": {
+          "type": ["array", "null"],
+          "items": {
+            "type": ["object", "null"],
+            "properties": {
+              "slot": { "type": ["number", "null"] },
+              "type": { "type": ["string", "null"], "maxLength": 512 },
+              "color": { "type": ["string", "null"], "maxLength": 512 }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 5
+        },
+        "roll": {
+          "type": ["object", "null"],
+          "properties": {
+            "rank": { "type": ["number", "null"] },
+            "rerolls": { "type": ["number", "null"] },
+            "compatibility": { "type": ["string", "null"], "maxLength": 512 },
+            "buffs": {
+              "type": ["array", "null"],
+              "items": {
+                "type": ["object", "null"],
+                "properties": {
+                  "tag": { "type": ["string", "null"], "maxLength": 512 },
+                  "rawValue": { "type": ["number", "null"] }
+                },
+                "additionalProperties": false
+              },
+              "maxItems": 8
+            },
+            "curses": {
+              "type": ["array", "null"],
+              "items": {
+                "type": ["object", "null"],
+                "properties": {
+                  "tag": { "type": ["string", "null"], "maxLength": 512 },
+                  "rawValue": { "type": ["number", "null"] }
+                },
+                "additionalProperties": false
+              },
+              "maxItems": 8
+            }
+          },
+          "additionalProperties": false
+        },
+        "completesAt": { "type": ["number", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "gameItem": {
+      "type": ["object", "null"],
+      "properties": {
+        "uniqueName": { "type": ["string", "null"], "maxLength": 512 },
+        "name": { "type": ["string", "null"], "maxLength": 512 },
+        "nameRu": { "type": ["string", "null"], "maxLength": 512 },
+        "category": { "type": ["string", "null"], "maxLength": 512 },
+        "productCategory": { "type": ["string", "null"], "maxLength": 512 },
+        "type": { "type": ["string", "null"], "maxLength": 512 },
+        "nameKey": { "type": ["string", "null"], "maxLength": 512 },
+        "buildsProduct": { "type": ["string", "null"], "maxLength": 512 },
+        "masteryReq": { "type": ["number", "null"] },
+        "ducats": { "type": ["number", "null"] },
+        "tradable": { "type": ["boolean", "null"] },
+        "vaulted": { "type": ["boolean", "null"] },
+        "masterable": { "type": ["boolean", "null"] },
+        "isPrime": { "type": ["boolean", "null"] },
+        "description": { "type": ["string", "null"], "maxLength": 8000 },
+        "recipe": {
+          "type": ["object", "null"],
+          "properties": {
+            "buildPrice": { "type": ["number", "null"] },
+            "buildTime": { "type": ["number", "null"] },
+            "num": { "type": ["number", "null"] },
+            "blueprintUniqueName": { "type": ["string", "null"], "maxLength": 512 },
+            "reusableBlueprint": { "type": ["boolean", "null"] },
+            "ingredients": {
+              "type": ["array", "null"],
+              "items": {
+                "type": ["object", "null"],
+                "properties": {
+                  "uniqueName": { "type": ["string", "null"], "maxLength": 512 },
+                  "count": { "type": ["number", "null"] }
+                },
+                "additionalProperties": false
+              },
+              "maxItems": 100
+            }
+          },
+          "additionalProperties": false
+        },
+        "components": {
+          "type": ["array", "null"],
+          "items": {
+            "type": ["object", "null"],
+            "properties": {
+              "uniqueName": { "type": ["string", "null"], "maxLength": 512 },
+              "name": { "type": ["string", "null"], "maxLength": 512 },
+              "itemCount": { "type": ["number", "null"] }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 100
+        },
+        "drops": {
+          "type": ["array", "null"],
+          "items": {
+            "type": ["object", "null"],
+            "properties": {
+              "location": { "type": ["string", "null"], "maxLength": 512 },
+              "type": { "type": ["string", "null"], "maxLength": 512 },
+              "chance": { "type": ["number", "null"] },
+              "rarity": { "type": ["string", "null"], "maxLength": 512 }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 300
+        }
+      },
+      "additionalProperties": false
+    },
+    "rawItem": {
+      "type": ["object", "null"],
+      "properties": {
+        "ItemType": { "type": ["string", "null"], "maxLength": 512 },
+        "Name": { "type": ["string", "null"], "maxLength": 512 },
+        "ItemCount": { "type": ["number", "null"] },
+        "XP": { "type": ["number", "null"] },
+        "Polarized": { "type": ["number", "null"] },
+        "Features": { "type": ["number", "null"] },
+        "ItemId": {
+          "type": ["object", "null"],
+          "properties": { "$oid": { "type": ["string", "null"], "maxLength": 512 } },
+          "additionalProperties": false
+        },
+        "Configs": {
+          "type": ["array", "null"],
+          "items": {
+            "type": ["object", "null"],
+            "properties": {
+              "Name": { "type": ["string", "null"], "maxLength": 160 },
+              "Upgrades": {
+                "type": ["array", "null"],
+                "items": { "type": ["string", "null"], "maxLength": 512 },
+                "maxItems": 32
+              },
+              "Arcanes": {
+                "type": ["array", "null"],
+                "items": { "type": ["string", "null"], "maxLength": 512 },
+                "maxItems": 8
+              },
+              "AbilityOverride": { "type": ["string", "null"], "maxLength": 512 },
+              "FocusLens": { "type": ["string", "null"], "maxLength": 512 }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 12
+        },
+        "Polarity": { "type": ["number", "null"] },
+        "PolarizedSlots": {
+          "type": ["array", "null"],
+          "items": {
+            "type": ["object", "null"],
+            "properties": {
+              "Slot": { "type": ["number", "null"] },
+              "Value": { "type": ["string", "null"], "maxLength": 512 }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 32
+        },
+        "ModularParts": {
+          "type": ["array", "null"],
+          "items": { "type": ["string", "null"], "maxLength": 512 },
+          "maxItems": 16
+        },
+        "CompletionDate": {
+          "anyOf": [
+            { "type": ["number", "null"] },
+            { "type": ["string", "null"], "maxLength": 512 },
+            {
+              "type": ["object", "null"],
+              "properties": {
+                "$date": {
+                  "anyOf": [
+                    { "type": ["number", "null"] },
+                    { "type": ["string", "null"], "maxLength": 512 },
+                    {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "$numberLong": { "type": ["string", "null"], "maxLength": 512 }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "ExpiryDate": {
+          "anyOf": [
+            { "type": ["number", "null"] },
+            { "type": ["string", "null"], "maxLength": 512 },
+            {
+              "type": ["object", "null"],
+              "properties": {
+                "$date": {
+                  "anyOf": [
+                    { "type": ["number", "null"] },
+                    { "type": ["string", "null"], "maxLength": 512 },
+                    {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "$numberLong": { "type": ["string", "null"], "maxLength": 512 }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "ActivationDate": {
+          "anyOf": [
+            { "type": ["number", "null"] },
+            { "type": ["string", "null"], "maxLength": 512 },
+            {
+              "type": ["object", "null"],
+              "properties": {
+                "$date": {
+                  "anyOf": [
+                    { "type": ["number", "null"] },
+                    { "type": ["string", "null"], "maxLength": 512 },
+                    {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "$numberLong": { "type": ["string", "null"], "maxLength": 512 }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "sections": {
+    "account": {
+      "title": "Аккаунт: ранг мастерства и валюты",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "masteryRank": { "type": ["number", "null"] },
+          "masteryXp": { "type": ["number", "null"] },
+          "credits": { "type": ["number", "null"] },
+          "platinum": { "type": ["number", "null"] },
+          "endo": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "loadouts": {
+      "title": "Сохранённые комплекты снаряжения",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "mode": { "type": ["string", "null"], "maxLength": 512 },
+          "index": { "type": ["number", "null"] },
+          "name": { "type": ["string", "null"], "maxLength": 160 },
+          "slots": {
+            "type": ["array", "null"],
+            "items": {
+              "type": ["object", "null"],
+              "properties": {
+                "slot": { "type": ["string", "null"], "maxLength": 512 },
+                "instanceId": { "type": ["string", "null"], "maxLength": 512 },
+                "modConfig": { "type": ["number", "null"] },
+                "appearanceConfig": { "type": ["number", "null"] }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 32
+          }
+        },
+        "additionalProperties": false
+      },
+      "note": "Выбранная мод-конфигурация и внешность — разные индексы. Сохранённый комплект не доказывает, что он сейчас активен в игре."
+    },
+    "game.items": {
+      "title": "Игровой справочник: предметы, рецепты и источники",
+      "schema": { "$ref": "#/$defs/gameItem" },
+      "note": "Справочник WantedFrame: DE/Public Export и WFCD. Дата упаковки не является датой обновления игры. Урон и эффекты не вычислены."
+    },
+    "mastery.summary": {
+      "title": "Расчёт прогресса мастерства",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "rank": { "type": ["number", "null"] },
+          "percentToNext": { "type": ["number", "null"] },
+          "totalXp": { "type": ["number", "null"] },
+          "xpIntoRank": { "type": ["number", "null"] },
+          "xpForNext": { "type": ["number", "null"] },
+          "testReady": { "type": ["boolean", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Расчёт существующего WantedFrame по инвентарю и справочнику. Не путать полученный опыт и сдачу испытания ранга."
+    },
+    "mastery.items": {
+      "title": "Освоенное снаряжение и оставшийся опыт",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "name": { "type": ["string", "null"], "maxLength": 512 },
+          "displayName": { "type": ["string", "null"], "maxLength": 512 },
+          "uniqueName": { "type": ["string", "null"], "maxLength": 512 },
+          "category": { "type": ["string", "null"], "maxLength": 512 },
+          "status": { "type": ["string", "null"], "maxLength": 512 },
+          "rank": { "type": ["number", "null"] },
+          "maxRank": { "type": ["number", "null"] },
+          "masteryXp": { "type": ["number", "null"] },
+          "masteryXpRemaining": { "type": ["number", "null"] },
+          "currentlyOwned": { "type": ["boolean", "null"] },
+          "needsGilding": { "type": ["boolean", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Освоенное когда-то не обязательно есть в инвентаре сейчас; статус missing основан на покрытии входного снимка."
+    },
+    "progress.Affiliations": {
+      "title": "Синдикаты: ранги, репутация, недельные данные",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "Tag": { "type": ["string", "null"], "maxLength": 512 },
+          "Standing": { "type": ["number", "null"] },
+          "Title": { "type": ["number", "null"] },
+          "WeeklyMissions": {
+            "type": ["array", "null"],
+            "items": {
+              "type": ["object", "null"],
+              "properties": {
+                "WeekCount": { "type": ["number", "null"] },
+                "CompletedMission": { "type": ["boolean", "null"] }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "progress.Missions": {
+      "title": "Узлы карты и прохождения",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "Tag": { "type": ["string", "null"], "maxLength": 512 },
+          "Completes": { "type": ["number", "null"] },
+          "Tier": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "progress.PlayerSkills": {
+      "title": "Внутренние навыки и очки",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "key": { "type": ["string", "null"], "maxLength": 512 },
+          "value": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Исходные ключи LPS_/LPP_. Числовые значения не переименовываются по догадке."
+    },
+    "progress.FocusXP": {
+      "title": "Опыт Фокуса",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "key": { "type": ["string", "null"], "maxLength": 512 },
+          "value": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "progress.DailyLimits": {
+      "title": "Дневные лимиты и недельные счётчики",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "key": { "type": ["string", "null"], "maxLength": 512 },
+          "value": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "DailyFocus/DailyAffiliation — остаток, не потраченное. Старый снимок не учитывает сброс дня."
+    },
+    "progress.ChallengeProgress": {
+      "title": "Счётчики испытаний",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "Name": { "type": ["string", "null"], "maxLength": 512 },
+          "Progress": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Счётчик не доказывает выполнение текущего задания: он может обнуляться или переиспользоваться."
+    },
+    "progress.PeriodicMissionCompletions": {
+      "title": "Периодические прохождения",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "Tag": { "type": ["string", "null"], "maxLength": 512 },
+          "Count": { "type": ["number", "null"] },
+          "Date": {
+            "anyOf": [
+              { "type": ["number", "null"] },
+              { "type": ["string", "null"], "maxLength": 512 },
+              {
+                "type": ["object", "null"],
+                "properties": {
+                  "$date": {
+                    "anyOf": [
+                      { "type": ["number", "null"] },
+                      { "type": ["string", "null"], "maxLength": 512 },
+                      {
+                        "type": ["object", "null"],
+                        "properties": {
+                          "$numberLong": { "type": ["string", "null"], "maxLength": 512 }
+                        },
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "progress.LibraryActiveDailyTaskInfo": {
+      "title": "Задание сканирования",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "Scans": { "type": ["number", "null"] },
+          "ScansRequired": { "type": ["number", "null"] },
+          "TargetType": { "type": ["string", "null"], "maxLength": 512 }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "progress.ResetDates": {
+      "title": "Даты сброса наград и лимитов",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "key": { "type": ["string", "null"], "maxLength": 512 },
+          "value": {
+            "anyOf": [
+              { "type": ["number", "null"] },
+              { "type": ["string", "null"], "maxLength": 512 },
+              {
+                "type": ["object", "null"],
+                "properties": {
+                  "$date": {
+                    "anyOf": [
+                      { "type": ["number", "null"] },
+                      { "type": ["string", "null"], "maxLength": 512 },
+                      {
+                        "type": ["object", "null"],
+                        "properties": {
+                          "$numberLong": { "type": ["string", "null"], "maxLength": 512 }
+                        },
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "profile.career": {
+      "title": "Карьера и статистика аккаунта",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "key": { "type": ["string", "null"], "maxLength": 512 },
+          "value": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Отдельный кеш публичного профиля, привязанный к тому же аккаунту; имеет собственную дату."
+    },
+    "profile.equipment": {
+      "title": "Статистика использования снаряжения",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "type": { "type": ["string", "null"], "maxLength": 512 },
+          "equipTime": { "type": ["number", "null"] },
+          "kills": { "type": ["number", "null"] },
+          "headshots": { "type": ["number", "null"] },
+          "assists": { "type": ["number", "null"] },
+          "xp": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "profile.enemies": {
+      "title": "Противники и сканирования",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "type": { "type": ["string", "null"], "maxLength": 512 },
+          "kills": { "type": ["number", "null"] },
+          "headshots": { "type": ["number", "null"] },
+          "assists": { "type": ["number", "null"] },
+          "finishers": { "type": ["number", "null"] },
+          "deaths": { "type": ["number", "null"] },
+          "scans": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "profile.abilities": {
+      "title": "Использование способностей",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "type": { "type": ["string", "null"], "maxLength": 512 },
+          "name": { "type": ["string", "null"], "maxLength": 512 },
+          "used": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "profile.missions": {
+      "title": "Рекорды миссий",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "type": { "type": ["string", "null"], "maxLength": 512 },
+          "name": { "type": ["string", "null"], "maxLength": 512 },
+          "highScore": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+    },
+    "inventory.Suits": {
+      "title": "Варфреймы",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.LongGuns": {
+      "title": "Основное оружие",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.Pistols": {
+      "title": "Вторичное оружие",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.Melee": {
+      "title": "Оружие ближнего боя",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.Sentinels": {
+      "title": "Стражи",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.SentinelWeapons": {
+      "title": "Оружие стражей",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.SpaceSuits": {
+      "title": "Арчвинги",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.SpaceGuns": {
+      "title": "Оружие Арчвинга",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.SpaceMelee": {
+      "title": "Ближний бой Арчвинга",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.OperatorAmps": {
+      "title": "Усилители",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.MechSuits": {
+      "title": "Некрамехи",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.Hoverboards": {
+      "title": "К-Драйвы",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.MoaPets": {
+      "title": "МОА",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.KubrowPets": {
+      "title": "Питомцы",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.DrifterMelee": {
+      "title": "Снаряжение Скитальца",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.MiscItems": {
+      "title": "Ресурсы и компоненты",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.Recipes": {
+      "title": "Чертежи",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.LevelKeys": {
+      "title": "Реликвии и ключи",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.RawUpgrades": {
+      "title": "Непрокачанные моды",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.Upgrades": {
+      "title": "Моды: экземпляры и ранги",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.Arcanes": {
+      "title": "Мистификаторы",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.FusionBundles": {
+      "title": "Наборы слияния",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.Gear": {
+      "title": "Снаряжение",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты."
+    },
+    "inventory.XPInfo": {
+      "title": "Исторический опыт снаряжения",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "XPInfo — исторический опыт, а не владение."
+    },
+    "inventory.PendingRecipes": {
+      "title": "Производство в Кузнице",
+      "schema": { "$ref": "#/$defs/item" },
+      "note": "PendingRecipes — производство, а не готовое имущество."
+    },
+    "extra.QuestKeys": {
+      "title": "Квестовые ключи",
+      "schema": { "$ref": "#/$defs/rawItem" },
+      "note": "Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."
+    },
+    "extra.SpecialItems": {
+      "title": "Особое снаряжение",
+      "schema": { "$ref": "#/$defs/rawItem" },
+      "note": "Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."
+    },
+    "extra.KubrowPetPrints": {
+      "title": "Генетические шаблоны",
+      "schema": { "$ref": "#/$defs/rawItem" },
+      "note": "Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."
+    },
+    "extra.WeaponSkins": {
+      "title": "Внешний вид и оформления",
+      "schema": { "$ref": "#/$defs/rawItem" },
+      "note": "Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."
+    },
+    "extra.Boosters": {
+      "title": "Усилители ресурсов/опыта",
+      "schema": { "$ref": "#/$defs/rawItem" },
+      "note": "Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."
+    },
+    "extra.FlavourItems": {
+      "title": "Декоративные предметы",
+      "schema": { "$ref": "#/$defs/rawItem" },
+      "note": "Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."
+    },
+    "equipment.details": {
+      "title": "Дополнительные поля конфигураций",
+      "schema": { "$ref": "#/$defs/rawItem" },
+      "note": "Исходные поля, если их предоставляет источник. Arcanes/AbilityOverride/FocusLens не гарантированы. Неразобранные ссылки не следует угадывать."
+    }
+  }
+}

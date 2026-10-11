@@ -3,7 +3,14 @@
   import { invoke } from "../../lib/ipc.js";
   import type { IpcInvokeMap } from "../../types/ipc.js";
   type Status = IpcInvokeMap["getAccountSnapshotStatus"]["return"] & {
-    bridge?: { connected: boolean; server: string | null; automatic: boolean; busy: boolean; lastSentAt: number | null; error: string | null };
+    bridge?: {
+      connected: boolean;
+      server: string | null;
+      automatic: boolean;
+      busy: boolean;
+      lastSentAt: number | null;
+      error: string | null;
+    };
   };
   let status = $state<Status | null>(null);
   let message = $state("");
@@ -22,9 +29,7 @@
     busy = true;
     try {
       const result = await invoke("exportAccountSnapshot");
-      message = result.saved
-        ? "Действие выполнено."
-        : "Действие отменено или не выполнено";
+      message = result.saved ? "Действие выполнено." : "Действие отменено или не выполнено";
     } catch {
       message = "Не удалось сохранить снимок";
     } finally {
@@ -46,10 +51,8 @@
   {#if status?.error}<p role="status">{status.error}</p>{/if}
   <div class="snapshot-actions">
     <button class="btn-secondary btn-sm" onclick={refresh}>Обновить состояние</button>
-    <button
-      class="btn-primary btn-sm"
-      disabled={busy}
-      onclick={exportSnapshot}>Передать данные / подключить ChatGPT</button
+    <button class="btn-primary btn-sm" disabled={busy} onclick={exportSnapshot}
+      >Передать данные / подключить ChatGPT</button
     >
   </div>
   {#if message}<p role="status">{message}</p>{/if}
@@ -64,12 +67,21 @@
     {/each}
   </details>
   <p>
-    ZIP включает карту разделов и инструкцию для ChatGPT. Либо подключи свой MCP и отправляй данные одной кнопкой.
-    Автоматическая синхронизация включается отдельно. Игровые данные входа в комплект не входят.
+    ZIP включает карту разделов и инструкцию для ChatGPT. Либо подключи свой MCP и отправляй данные
+    одной кнопкой. Автоматическая синхронизация включается отдельно. Игровые данные входа в комплект
+    не входят.
   </p>
   {#if status?.bridge?.connected}
-    <p>MCP: {status.bridge.server} · {status.bridge.automatic ? "автосинхронизация включена" : "отправка вручную"}</p>
-    {#if status.bridge.lastSentAt}<p>Последняя подтверждённая отправка: {new Date(status.bridge.lastSentAt).toLocaleString("ru-RU")}</p>{/if}
+    <p>
+      MCP: {status.bridge.server} · {status.bridge.automatic
+        ? "автосинхронизация включена"
+        : "отправка вручную"}
+    </p>
+    {#if status.bridge.lastSentAt}<p>
+        Последняя подтверждённая отправка: {new Date(status.bridge.lastSentAt).toLocaleString(
+          "ru-RU",
+        )}
+      </p>{/if}
     {#if status.bridge.error}<p role="status">{status.bridge.error}</p>{/if}
   {/if}
 </section>
