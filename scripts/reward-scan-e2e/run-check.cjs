@@ -525,6 +525,13 @@ function parseImageArg(argv) {
   } finally {
     if (hostExit)
       failures.push(`Electron host exited before shutdown: ${JSON.stringify(hostExit)}`);
+    await app
+      .evaluate(async (_electron, root) => {
+        await process.mainModule
+          .require(`${root}/.electron-build/services/nativeWindowsOcr.js`)
+          .stopWindowsOcr();
+      }, ROOT)
+      .catch((err) => failures.push(`Windows OCR shutdown failed: ${String(err)}`));
     await closeNativeElectron(app).catch((err) =>
       failures.push(`Electron shutdown failed: ${String(err)}`),
     );

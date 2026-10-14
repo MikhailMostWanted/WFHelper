@@ -17,8 +17,8 @@ importers:
   .:
     dependencies:
       '@napi-rs/system-ocr':
-        specifier: ^1.2.0
-        version: 1.2.0
+        specifier: ^1.0.2
+        version: 1.0.2
       '@wfcd/items':
         specifier: ^1.1275.19
         version: 1.1275.19(warframe-worldstate-data@3.7.1)
@@ -636,32 +636,32 @@ packages:
     resolution: {integrity: sha512-9QOtNffcOF/c1seMCDnjckb3R9WHcG34tky+FHpNKKCW0wc/scYLwMtO+ptyGUfMW0/b/n4qRiALlaFHc9Oj7Q==}
     engines: {node: '>= 10.0.0'}
 
-  '@napi-rs/system-ocr-darwin-arm64@1.2.0':
-    resolution: {integrity: sha512-cK8dcDBEl3P4A04xmFJSHEJQxfDytaAIFyDCLqavTp92FVU5plESttWzZsqtTkS81/kzKiBfHyPQffSIndfWbQ==}
+  '@napi-rs/system-ocr-darwin-arm64@1.0.2':
+    resolution: {integrity: sha512-/9E1T4+Pzbk8eI1QC1a1wimj4wgweKn9NUGtmO9Vf0rDi1TxYaJsv6ioSzdmhlazkKxd27Brk5VfLfUg6Bha6A==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
 
-  '@napi-rs/system-ocr-darwin-x64@1.2.0':
-    resolution: {integrity: sha512-u3TBvBGrhmT5Os6AfaxbUEg6VHe8lvrFJNPgThJgshJHyRXUx/wCfTyOroJ22KdVCP5AE4GpwS5tFHMb6p6iaQ==}
+  '@napi-rs/system-ocr-darwin-x64@1.0.2':
+    resolution: {integrity: sha512-z8FiuVjMEXrqU9O5tIWfLkNWzyx8moQZ/kgYo1jPvbiaC+bA0gBBo9X8C1dYrF7Q3nLug0zTU59FMAESXbhJpA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
 
-  '@napi-rs/system-ocr-win32-arm64-msvc@1.2.0':
-    resolution: {integrity: sha512-7ej8uMvmXomw3NXo5gZ5p2Nl6UKsHI+VRU3ELv0mhcxR0sJ6wFifYTu5bJrM1TGcz1/RsaX+TjWMmsDq8vriKQ==}
+  '@napi-rs/system-ocr-win32-arm64-msvc@1.0.2':
+    resolution: {integrity: sha512-5ygjw6gcHazDcNciqzRrRurjQC9syaQJ9Q0PTh+23sgmFR3ct4Xt/tDEstNiqoxADesJL41GwGMmMlI1rrFMkg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
 
-  '@napi-rs/system-ocr-win32-x64-msvc@1.2.0':
-    resolution: {integrity: sha512-oOoCj3FPWDVctTxx98vMBiMI6m51U+w7SMmMefvmtpcpLelzZ/zYTqdwtWZFAjShaHO+RdaKkcpeVcQuBQiVbA==}
+  '@napi-rs/system-ocr-win32-x64-msvc@1.0.2':
+    resolution: {integrity: sha512-LXo7WdwJ46r4r+a+iDk8QH3+6Z2tThRfTMq1WNhv+gsbsAsgY68FYFLQPdOO+Ek6P75E5y46aDBdhJNEAaccdA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
 
-  '@napi-rs/system-ocr@1.2.0':
-    resolution: {integrity: sha512-r0f2xNH6U+sth44qF+lUP+2WuHSGUBAry5KSCNuaLDGRbgslFqeROr/qJJ/fb6AjBp3Ov+CJP5MdrOWoaoM3cw==}
+  '@napi-rs/system-ocr@1.0.2':
+    resolution: {integrity: sha512-L6qM8ybM8RltTjLAG8rAeg/Jxgu13mxko4zL+SEWhhIikMkgjnSgvpThXueXHqt5mI9Ts96Dgc8Kpb3Y9Zj2nQ==}
     engines: {node: '>= 10'}
 
   '@napi-rs/wasm-runtime@1.1.4':
@@ -3606,24 +3606,24 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@napi-rs/system-ocr-darwin-arm64@1.2.0':
+  '@napi-rs/system-ocr-darwin-arm64@1.0.2':
     optional: true
 
-  '@napi-rs/system-ocr-darwin-x64@1.2.0':
+  '@napi-rs/system-ocr-darwin-x64@1.0.2':
     optional: true
 
-  '@napi-rs/system-ocr-win32-arm64-msvc@1.2.0':
+  '@napi-rs/system-ocr-win32-arm64-msvc@1.0.2':
     optional: true
 
-  '@napi-rs/system-ocr-win32-x64-msvc@1.2.0':
+  '@napi-rs/system-ocr-win32-x64-msvc@1.0.2':
     optional: true
 
-  '@napi-rs/system-ocr@1.2.0':
+  '@napi-rs/system-ocr@1.0.2':
     optionalDependencies:
-      '@napi-rs/system-ocr-darwin-arm64': 1.2.0
-      '@napi-rs/system-ocr-darwin-x64': 1.2.0
-      '@napi-rs/system-ocr-win32-arm64-msvc': 1.2.0
-      '@napi-rs/system-ocr-win32-x64-msvc': 1.2.0
+      '@napi-rs/system-ocr-darwin-arm64': 1.0.2
+      '@napi-rs/system-ocr-darwin-x64': 1.0.2
+      '@napi-rs/system-ocr-win32-arm64-msvc': 1.0.2
+      '@napi-rs/system-ocr-win32-x64-msvc': 1.0.2
 
   '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:

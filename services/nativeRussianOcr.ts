@@ -1,6 +1,7 @@
 import { getGameLocale } from "./gameLocale";
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { OcrWorkQueue } from "./ocrWorkQueue";
+import { recognizeWindowsOcr, windowsOcrAvailable } from "./nativeWindowsOcr";
 
 const russianWork = new OcrWorkQueue();
 const RUSSIAN_LOCALE = "ru";
@@ -11,16 +12,9 @@ type SystemOcrModule = {
     languages?: string[],
   ) => Promise<{ text?: string; confidence?: number }>;
 };
-let systemOcr: SystemOcrModule | null | undefined;
 let lastRussianOcrError: string | null = null;
 function getSystemOcr(): SystemOcrModule | null {
-  if (systemOcr !== undefined) return systemOcr;
-  try {
-    systemOcr = require("@napi-rs/system-ocr") as SystemOcrModule;
-  } catch {
-    systemOcr = null;
-  }
-  return systemOcr;
+  return windowsOcrAvailable() ? { recognize: recognizeWindowsOcr } : null;
 }
 export function shouldUseRussianRewardOcr(): boolean {
   return process.platform === "win32" && getGameLocale() === RUSSIAN_LOCALE;

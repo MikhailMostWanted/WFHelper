@@ -83,6 +83,7 @@ import * as eeLogMonitor from "./services/eeLogMonitor";
 import * as rewardScanner from "./services/rewardScanner";
 import * as rewardOcrOnnx from "./services/rewardOcrOnnx";
 import { stopOnnxOcrSessions } from "./services/rivenOcrOnnx";
+import { stopWindowsOcr } from "./services/nativeWindowsOcr";
 import { shouldUseRussianRewardOcr } from "./services/rewardRussianOcr";
 import * as autoUpdater from "./services/autoUpdater";
 import * as rivenBestAttributes from "./services/rivenBestAttributes";
@@ -893,10 +894,15 @@ app.on("before-quit", (event) => {
       eeLogMonitor.dbwinWorkerStopped(),
       stopGameMemoryReads(),
       stopOnnxOcrSessions(),
-    ]).finally(() => {
-      _dbwinQuitDone = true;
-      app.quit();
-    });
+      stopWindowsOcr(),
+    ])
+      .catch((error: unknown) => {
+        log.warn("Native shutdown failed:", error);
+      })
+      .finally(() => {
+        _dbwinQuitDone = true;
+        app.quit();
+      });
   }
 });
 

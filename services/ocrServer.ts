@@ -3,6 +3,8 @@ import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { withScope } from "./logger";
 import { resolveRuntimeResourcePath } from "./runtimeResources";
 
+import { recognizeWindowsOcr, windowsOcrAvailable } from "./nativeWindowsOcr";
+
 const log = withScope("ocrServer");
 
 const READY_MARKER = "===OCR_SERVER_READY===";
@@ -469,11 +471,17 @@ let _nativeRecognize:
   | null = null;
 
 try {
-  const mod = require("@napi-rs/system-ocr") as {
+  const mod = (
+    process.platform === "win32"
+      ? windowsOcrAvailable()
+        ? { recognize: recognizeWindowsOcr }
+        : null
+      : require("@napi-rs/system-ocr")
+  ) as {
     recognize: (input: Buffer | string) => Promise<{ text: string; confidence: number }>;
   };
-  _nativeRecognize = mod.recognize;
-  log.info("[OcrServer] Native OCR engine loaded (@napi-rs/system-ocr)");
+  _nativeRecognize = mod?.recognize ?? null;
+  log.info("[OcrServer] Native OCR package available (@napi-rs/system-ocr)");
 } catch {
   log.info("[OcrServer] Native OCR engine not available, using PowerShell pool");
 }

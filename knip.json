@@ -8,6 +8,7 @@
     "preload-trade-notification.ts",
     "preload-arbi.ts",
     "services/keyHookWorker.ts",
+    "services/nativeWindowsOcrWorker.ts",
     "src/App.svelte",
     "src/modals/**/*.svelte",
     "src/views/**/*.svelte",
@@ -24,5 +25,9 @@
   "project": ["**/*.{ts,js,mjs,cjs,svelte}"],
   "ignoreBinaries": ["powershell", "wrangler"],
   "ignoreDependencies": ["cloudflare", "esbuild", "ms", "svelte-eslint-parser", "tailwindcss"],
-  "ignore": ["backend/worker/worker-configuration.d.ts", "backend/worker/scripts/**", "scripts/dev/**"]
+  "ignore": [
+    "backend/worker/worker-configuration.d.ts",
+    "backend/worker/scripts/**",
+    "scripts/dev/**"
+  ]
 }
