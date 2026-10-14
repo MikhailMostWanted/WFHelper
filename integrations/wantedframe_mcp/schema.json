@@ -507,6 +507,20 @@
       "schema": {
         "type": ["object", "null"],
         "properties": {
+          "tag": { "type": ["string", "null"], "maxLength": 512 },
+          "date": {
+            "type": ["object", "null"],
+            "properties": {
+              "$date": {
+                "type": ["object", "null"],
+                "properties": {
+                  "$numberLong": { "type": ["string", "null"], "maxLength": 512 }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
           "Tag": { "type": ["string", "null"], "maxLength": 512 },
           "Count": { "type": ["number", "null"] },
           "Date": {
@@ -537,7 +551,7 @@
         },
         "additionalProperties": false
       },
-      "note": "Поля только из полученного снимка; отсутствие поля не означает нулевое значение."
+      "note": "Дата записи относится к прохождению; capturedAt — дата снимка. tag/date и прежние Tag/Date сохраняются как поля источника; отсутствие Count не означает ноль."
     },
     "progress.LibraryActiveDailyTaskInfo": {
       "title": "Задание сканирования",
@@ -813,6 +827,18 @@
       "title": "Декоративные предметы",
       "schema": { "$ref": "#/$defs/rawItem" },
       "note": "Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста."
+    },
+    "extra.Consumables": {
+      "title": "Расходуемые предметы",
+      "schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "ItemType": { "type": ["string", "null"], "maxLength": 512 },
+          "ItemCount": { "type": ["number", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "note": "Отдельная коллекция Consumables из инвентаря; ItemCount — количество из снимка на capturedAt. Отсутствие Gear не доказывает отсутствие снаряжения."
     },
     "equipment.details": {
       "title": "Дополнительные поля конфигураций",

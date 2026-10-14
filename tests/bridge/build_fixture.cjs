@@ -56,6 +56,13 @@ const payload = {
   ],
   PlayerSkills: { LPS_GUNNERY: 3, authToken: "DO_NOT_EXPORT_SKILLS" },
   Missions: [{ Tag: "SolNode1", Completes: 3 }],
+  PeriodicMissionCompletions: [
+    { tag: "WeeklyFixture", date: { $date: { $numberLong: String(now - 5000) } } },
+    { Tag: "LegacyWeeklyFixture", Date: now - 5000, Count: 1 },
+  ],
+  Consumables: [
+    { ItemType: "/Lotus/Test/Consumable", ItemCount: 4, token: "DO_NOT_EXPORT_CONSUMABLE" },
+  ],
   Affiliations: [
     { Tag: "TestSyndicate", Standing: -100, Title: -1, privateMessage: "DO_NOT_EXPORT_REPUTATION" },
   ],
@@ -106,6 +113,7 @@ const doc = buildAccountBridge(payload, snapshot, {
   },
 });
 const encoded = JSON.stringify(doc);
+const transferred = JSON.parse(encoded);
 assert(!encoded.includes("DO_NOT_EXPORT_"));
 assert.equal(doc.sections.find((s) => s.id === "account").rows[0].platinum, 0);
 assert.equal(doc.sections.find((s) => s.id === "account").rows[0].masteryXp, null);
@@ -113,6 +121,23 @@ assert.equal(doc.sections.find((s) => s.id === "progress.Affiliations").rows[0].
 assert.equal(doc.sections.find((s) => s.id === "inventory.LongGuns").status, "missing");
 assert.equal(doc.sections.find((s) => s.id === "extra.QuestKeys").status, "available");
 assert(doc.unmappedCollections.includes("FutureGameplayCollection"));
+assert.deepEqual(
+  {
+    sectionCount: doc.sections.length,
+    periodic: transferred.sections.find((s) => s.id === "progress.PeriodicMissionCompletions").rows,
+    consumables: transferred.sections.find((s) => s.id === "extra.Consumables").rows,
+    consumablesUnmapped: doc.unmappedCollections.includes("Consumables"),
+    gearStatus: doc.sections.find((s) => s.id === "inventory.Gear").status,
+  },
+  {
+    sectionCount: Object.keys(require("../../integrations/wantedframe_mcp/schema.json").sections)
+      .length,
+    periodic: payload.PeriodicMissionCompletions,
+    consumables: [{ ItemType: "/Lotus/Test/Consumable", ItemCount: 4 }],
+    consumablesUnmapped: false,
+    gearStatus: "missing",
+  },
+);
 assert.equal(
   doc.sections.find((s) => s.id === "inventory.Suits").rows[0].configs[0].mods[0].rank,
   8,

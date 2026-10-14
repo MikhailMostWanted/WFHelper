@@ -152,6 +152,14 @@ describe("Russian Riven labels and numbers", () => {
       2,
     );
   });
+  it("finds inline signed stats in recorded Windows OCR without repairing unclear values", () => {
+    // Native OCR of the owner's private 2026-10-07 card crop; the image stays local.
+    const result = parseRussianRivenStats(
+      "Бёрстон Cari- аспсгоп +1 3,7 % крит. урона +11,696 Звирусного урона +16,9% шанс крит. урона 11 УР. М.",
+    );
+    expect(result.stats).toMatchObject([{ name: "Critical Chance", value: 16.9, positive: true }]);
+    expect(result.unresolved).toEqual(["+1 3,7 % крит. урона", "+11,696 Звирусного урона"]);
+  });
 });
 
 describe("account snapshot", () => {

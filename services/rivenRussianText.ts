@@ -39,7 +39,12 @@ export function parseRussianRivenStats(raw: string): { stats: RivenStat[]; unres
   const unresolved: string[] = [];
   const blocks: string[] = [];
   const signed = /^[+\-−–xх×]\s*\d/i;
-  for (const line of raw
+  // Windows system OCR flattens card lines, including the mastery footer.
+  // Split only signed values; unclear digits and labels still fail validation.
+  const lines = raw
+    .replace(/\s+\d+\s+УР\.?\s*М\.?(?=\s|$)[^\r\n]*/giu, "")
+    .replace(/(?<![\p{L}\p{N}])([+\-−–xх×]\s*(?=\d))/gu, "\n$1");
+  for (const line of lines
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)) {

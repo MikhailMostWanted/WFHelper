@@ -1,0 +1,25 @@
+# Include at http scope. Use a dedicated hostname with existing TLS certificates.
+# Replace wantedframe.example.com and certificate paths before installation.
+limit_req_zone $binary_remote_addr zone=wantedframe_requests:1m rate=5r/s;
+
+server {
+    listen 443 ssl;
+    server_name wantedframe.example.com;
+    ssl_certificate /REPLACE/WITH/fullchain.pem;
+    ssl_certificate_key /REPLACE/WITH/privkey.pem;
+    access_log off;
+    error_log /var/log/nginx/wantedframe-error.log crit;
+    client_max_body_size 24m;
+    client_body_timeout 35s;
+    limit_req zone=wantedframe_requests burst=20 nodelay;
+    limit_req_status 429;
+
+    location / {
+        proxy_pass http://127.0.0.1:18767;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 120s;
+    }
+}

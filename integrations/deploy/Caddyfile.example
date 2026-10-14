@@ -1,0 +1,14 @@
+# Add this hostname block to an existing Caddy config; never replace the config.
+# Host Caddy can use the loopback target below. For Docker use the UDS variant
+# from README.md; a container's 127.0.0.1 is not the VPS host.
+wantedframe.example.com {
+    request_body {
+        max_size 25165824
+    }
+    reverse_proxy 127.0.0.1:18767 {
+        flush_interval -1
+    }
+    # Keep request logging disabled on this private hostname. Standard Caddy
+    # has no built-in request rate limiter: use the existing proxy limiter,
+    # or the nginx example. /ingest also enforces 12 authorized uploads/minute.
+}

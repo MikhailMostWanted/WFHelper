@@ -27,7 +27,7 @@ specs={
  'progress.FocusXP':section('Опыт Фокуса',obj({'key':s,'value':n})),
  'progress.DailyLimits':section('Дневные лимиты и недельные счётчики',obj({'key':s,'value':n}),'DailyFocus/DailyAffiliation — остаток, не потраченное. Старый снимок не учитывает сброс дня.'),
  'progress.ChallengeProgress':section('Счётчики испытаний',obj({'Name':s,'Progress':n}),'Счётчик не доказывает выполнение текущего задания: он может обнуляться или переиспользоваться.'),
- 'progress.PeriodicMissionCompletions':section('Периодические прохождения',obj({'Tag':s,'Count':n,'Date':date})),
+ 'progress.PeriodicMissionCompletions':section('Периодические прохождения',obj({'tag':s,'date':obj({'$date':obj({'$numberLong':s})}),'Tag':s,'Count':n,'Date':date}),'Дата записи относится к прохождению; capturedAt — дата снимка. tag/date и прежние Tag/Date сохраняются как поля источника; отсутствие Count не означает ноль.'),
  'progress.LibraryActiveDailyTaskInfo':section('Задание сканирования',obj({'Scans':n,'ScansRequired':n,'TargetType':s})),
  'progress.ResetDates':section('Даты сброса наград и лимитов',obj({'key':s,'value':date})),
  'profile.career':section('Карьера и статистика аккаунта',obj({'key':s,'value':n}),'Отдельный кеш публичного профиля, привязанный к тому же аккаунту; имеет собственную дату.'),
@@ -39,9 +39,10 @@ specs={
 collections={'Suits':'Варфреймы','LongGuns':'Основное оружие','Pistols':'Вторичное оружие','Melee':'Оружие ближнего боя','Sentinels':'Стражи','SentinelWeapons':'Оружие стражей','SpaceSuits':'Арчвинги','SpaceGuns':'Оружие Арчвинга','SpaceMelee':'Ближний бой Арчвинга','OperatorAmps':'Усилители','MechSuits':'Некрамехи','Hoverboards':'К-Драйвы','MoaPets':'МОА','KubrowPets':'Питомцы','DrifterMelee':'Снаряжение Скитальца','MiscItems':'Ресурсы и компоненты','Recipes':'Чертежи','LevelKeys':'Реликвии и ключи','RawUpgrades':'Непрокачанные моды','Upgrades':'Моды: экземпляры и ранги','Arcanes':'Мистификаторы','FusionBundles':'Наборы слияния','Gear':'Снаряжение','XPInfo':'Исторический опыт снаряжения','PendingRecipes':'Производство в Кузнице'}
 for k,title in collections.items():specs['inventory.'+k]=section(title,row, 'XPInfo — исторический опыт, а не владение.' if k=='XPInfo' else 'PendingRecipes — производство, а не готовое имущество.' if k=='PendingRecipes' else 'Слоты модов и уникальные экземпляры сохранены. rank=null — ранг не был предоставлен; rawValue модов Разлома — НЕ проценты.')
 for k,title in {'QuestKeys':'Квестовые ключи','SpecialItems':'Особое снаряжение','KubrowPetPrints':'Генетические шаблоны','WeaponSkins':'Внешний вид и оформления','Boosters':'Усилители ресурсов/опыта','FlavourItems':'Декоративные предметы'}.items():specs['extra.'+k]=section(title,raw_item,'Отобранные игровые поля исходного формата. Здесь нет автоматического вывода о статусе выполнения квеста.')
+specs['extra.Consumables']=section('Расходуемые предметы',obj({'ItemType':s,'ItemCount':n}),'Отдельная коллекция Consumables из инвентаря; ItemCount — количество из снимка на capturedAt. Отсутствие Gear не доказывает отсутствие снаряжения.')
 specs['equipment.details']=section('Дополнительные поля конфигураций',raw_item,'Исходные поля, если их предоставляет источник. Arcanes/AbilityOverride/FocusLens не гарантированы. Неразобранные ссылки не следует угадывать.')
 shared={'item':row,'gameItem':game,'rawItem':raw_item}
 for sec in specs.values():
  for name,val in shared.items():
   if sec['schema']==val:sec['schema']={'$ref':f'#/$defs/{name}'};break
-root.joinpath('integrations/wantedframe_mcp/schema.json').write_text(json.dumps({'version':1,'maxBytes':24*1024*1024,'dailyKeys':remaining_keys.split(),'$defs':shared,'sections':specs},ensure_ascii=False,separators=(',',':'))+'\n', encoding='utf-8')
+root.joinpath('integrations/wantedframe_mcp/schema.json').write_text(json.dumps({'version':1,'maxBytes':24*1024*1024,'dailyKeys':remaining_keys.split(),'$defs':shared,'sections':specs},ensure_ascii=False,separators=(',',':'))+'\n', encoding='utf-8', newline='\n')
