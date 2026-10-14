@@ -394,6 +394,15 @@ function parseImageArg(argv) {
       try {
         result = await app.evaluate(
           async ({ nativeImage }, p) => {
+            // This corpus contains English titles. Local Warframe settings can
+            // select Russian OCR and override the reader requested by the gate.
+            if (p.fixtureLocale) {
+              const locale = process.mainModule.require(p.localePath);
+              locale.setGameLocale(p.fixtureLocale);
+              if (locale.getGameLocale() !== p.fixtureLocale) {
+                throw new Error("Fixture OCR language did not apply");
+              }
+            }
             const scanner = process.mainModule.require(p.scannerPath);
             const image = nativeImage.createFromPath(p.imgPath);
             if (image.isEmpty()) return { error: "image failed to load" };
@@ -411,7 +420,13 @@ function parseImageArg(argv) {
               { reader: p.reader },
             );
           },
-          { imgPath, scannerPath, reader },
+          {
+            imgPath,
+            scannerPath,
+            reader,
+            fixtureLocale: singleImage ? null : "en",
+            localePath: path.join(ROOT, ".electron-build", "services", "gameLocale.js"),
+          },
         );
       } catch (err) {
         if (!/has been closed|Target closed/i.test(String(err))) throw err;
