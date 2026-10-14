@@ -152,3 +152,42 @@ describe("Windows game-memory scan", () => {
     });
   });
 });
+
+it("drains an in-flight native read before closing its handle and refuses later scans", async () => {
+  vi.resetModules();
+  const memory = await import("../../services/gameMemoryWin");
+  const { api, readMemory } = createWin32Fake([
+    { pid: 42, regions: [{ base: 0n, size: 8n * 1024n * 1024n, contents: AUTHZ }] },
+  ]);
+  let finishRead!: () => void;
+  readMemory.async.mockImplementation((...args: unknown[]) => {
+    const output = args[2] as Buffer;
+    const bytesRead = args[4] as Buffer;
+    const callback = args[5] as (error: Error | null, ok: number) => void;
+    output.fill(0);
+    output.write(AUTHZ, 0, "latin1");
+    bytesRead.writeBigUInt64LE(BigInt(AUTHZ.length), 0);
+    finishRead = () => callback(null, 1);
+  });
+
+  const scan = memory.readGameAuthzWin(api as never);
+  expect(readMemory.async).toHaveBeenCalledTimes(1);
+  const shutdown = memory.stopGameMemoryReads();
+  let drained = false;
+  void shutdown.then(() => (drained = true));
+  await Promise.resolve();
+  expect(drained).toBe(false);
+  expect(api.CloseHandle).not.toHaveBeenCalled();
+
+  finishRead();
+  await expect(scan).resolves.toEqual({ authz: null, reason: "shutdown" });
+  await shutdown;
+  expect(api.CloseHandle).toHaveBeenCalledExactlyOnceWith(422);
+  expect(readMemory.async).toHaveBeenCalledTimes(1);
+  const opened = api.OpenProcess.mock.calls.length;
+  await expect(memory.readGameAuthzWin(api as never)).resolves.toEqual({
+    authz: null,
+    reason: "shutdown",
+  });
+  expect(api.OpenProcess).toHaveBeenCalledTimes(opened);
+});

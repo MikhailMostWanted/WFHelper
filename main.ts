@@ -148,7 +148,7 @@ import * as tradeTracker from "./services/tradeTracker";
 import * as apiHelperRunner from "./services/apiHelperRunner";
 import * as inventorySync from "./services/inventorySync";
 import { disposeLinuxStreamCapture } from "./services/linuxStreamCapture";
-import { stopNativeOcrProcess } from "./services/nativeOcrProcess";
+import { stopGameMemoryReads } from "./services/gameMemoryWin";
 import { loadMainWindowState, saveMainWindowState } from "./services/mainWindowState";
 import { WIN_APP_USER_MODEL_ID } from "./config/shared/appMeta";
 import {
@@ -874,7 +874,6 @@ app.on("before-quit", (event) => {
   // Ahead of every teardown step: the close handler below must not read this
   // quit as a request to hide the window.
   markQuitting();
-  stopNativeOcrProcess();
   inventoryIpc.stopInventoryWatcher();
   apiHelperRunner.stopPolling();
   eeLogMonitor.stopWatching();
@@ -885,11 +884,11 @@ app.on("before-quit", (event) => {
   overlayIpc.disposeOverlayHotkeys();
   arbiScheduleIpc.shutdown();
   disposeLinuxStreamCapture();
-  // Exiting while the DBWIN worker sits in a koffi wait is a fatal napi error;
-  // hold quit until the thread has exited (bounded).
+  // Finish the current native read before disposing its N-API environment.
+  // The stop latch also prevents a late helper fallback from starting a scan.
   if (!_dbwinQuitDone) {
     event.preventDefault();
-    void eeLogMonitor.dbwinWorkerStopped().finally(() => {
+    void Promise.all([eeLogMonitor.dbwinWorkerStopped(), stopGameMemoryReads()]).finally(() => {
       _dbwinQuitDone = true;
       app.quit();
     });

@@ -133,7 +133,28 @@ function readMemory(
   });
 }
 
-export async function readGameAuthzWin(apiOverride?: Win32): Promise<AuthzResult> {
+let memoryReadsStopped = false;
+const activeScans = new Set<Promise<AuthzResult>>();
+
+/** Stop between native reads; a read already in flight must finish before its handle closes. */
+export function stopGameMemoryReads(): Promise<void> {
+  memoryReadsStopped = true;
+  return Promise.allSettled([...activeScans]).then(() => undefined);
+}
+
+export function readGameAuthzWin(apiOverride?: Win32): Promise<AuthzResult> {
+  if (memoryReadsStopped) return Promise.resolve({ authz: null, reason: "shutdown" });
+  const scan = scanGameAuthzWin(apiOverride);
+  activeScans.add(scan);
+  void scan.then(
+    () => activeScans.delete(scan),
+    () => activeScans.delete(scan),
+  );
+  return scan;
+}
+
+async function scanGameAuthzWin(apiOverride?: Win32): Promise<AuthzResult> {
+  if (memoryReadsStopped) return { authz: null, reason: "shutdown" };
   const api = apiOverride ?? loadApi();
   if (!api) return { authz: null, reason: "mem-open-noapi" };
 
@@ -155,6 +176,7 @@ export async function readGameAuthzWin(apiOverride?: Win32): Promise<AuthzResult
   let partialReads = 0;
 
   for (const pid of pids) {
+    if (memoryReadsStopped) return { authz: null, reason: "shutdown" };
     const hProc = api.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, pid) as unknown;
     if (!hProc) {
       firstOpenError ??= api.GetLastError() as number;
@@ -165,6 +187,7 @@ export async function readGameAuthzWin(apiOverride?: Win32): Promise<AuthzResult
     try {
       let addr = 0n;
       while (addr < USER_ADDRESS_CEILING) {
+        if (memoryReadsStopped) return { authz: null, reason: "shutdown" };
         const written = api.VirtualQueryEx(hProc, addr, mbi, MBI_SIZE) as number;
         if (written === 0) break;
 
@@ -179,9 +202,11 @@ export async function readGameAuthzWin(apiOverride?: Win32): Promise<AuthzResult
           readableRegions += 1;
           let off = 0n;
           while (off < regionSize) {
+            if (memoryReadsStopped) return { authz: null, reason: "shutdown" };
             const remaining = regionSize - off;
             const len = remaining < BigInt(CHUNK) ? Number(remaining) : CHUNK;
             const read = await readMemory(api, hProc, base + off, chunk, len, bytesReadBuf);
+            if (memoryReadsStopped) return { authz: null, reason: "shutdown" };
             if (read.failed) {
               if (read.bytesRead > 0) partialReads += 1;
               else failedReads += 1;
@@ -205,6 +230,8 @@ export async function readGameAuthzWin(apiOverride?: Win32): Promise<AuthzResult
       api.CloseHandle(hProc);
     }
   }
+
+  if (memoryReadsStopped) return { authz: null, reason: "shutdown" };
 
   if (openedProcesses === 0) return { authz: null, reason: `mem-open-${firstOpenError ?? 0}` };
 
