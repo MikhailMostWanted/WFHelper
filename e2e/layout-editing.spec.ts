@@ -305,7 +305,7 @@ test.describe("Per-view layout editing", () => {
   });
 
   test("a column with nothing left in it still takes a section back", async () => {
-    await setLayoutViewport(page, 1800, 950);
+    await setLayoutViewport(page, 2200, 950);
     const grid = page.locator('[data-layout-grid="stats"]');
     await expect(grid).toHaveAttribute("data-layout-breakpoint", "wide");
 

@@ -1225,6 +1225,10 @@
     border-radius: 0.9rem;
     background: var(--bg-deep);
   }
+  .mastery-progress-panel > div > svg {
+    width: 88px;
+    height: 88px;
+  }
   @media (max-width: 700px) {
     .mastery-pathways {
       grid-template-columns: 1fr;

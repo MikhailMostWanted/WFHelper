@@ -94,7 +94,7 @@ jobs:
           node-version: 22
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
       - run: npm install --prefix /tmp/wantedframe-ts typescript@5.9.3
       - run: node tests/bridge/build_fixture.cjs
         env:
@@ -109,6 +109,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     env:
+      VITE_APP_VERSION: "0.3.0-preview.2"
       SOURCE_REVISION: ${{ needs.prepare.outputs.sha }}
       HUSKY: "0"
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -143,7 +144,7 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          pkg.version = '0.2.0-preview.2';
+          pkg.version = '0.3.0-preview.2';
           fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           fs.writeFileSync('source-revision.txt', process.env.SOURCE_REVISION + '\n');
           fs.writeFileSync('build-info.json', JSON.stringify({version: pkg.version, revision: process.env.SOURCE_REVISION, runId: process.env.GITHUB_RUN_ID}, null, 2) + '\n');
@@ -153,15 +154,19 @@ jobs:
         run: |
           pnpm run verify:onnx-models
           pnpm run build
+          cp source-revision.txt .electron-build/source-revision.txt
+          cp build-info.json .electron-build/build-info.json
           pnpm exec electron-builder --win nsis --publish never
       - name: Packaged application smoke test
         run: pnpm run test:packaged release/win-unpacked/WantedFrame.exe
       - name: Upload Windows preview
         uses: actions/upload-artifact@v4
         with:
-          name: WantedFrame-0.2.0-preview.2-Windows
+          name: WantedFrame-0.3.0-preview.2-Windows
           path: |
-            release/WantedFrame-0.2.0-preview.2-Setup.exe
+            release/WantedFrame-0.3.0-preview.2-Setup.exe
+            release/WantedFrame-0.3.0-preview.2-Setup.exe.blockmap
+            release/latest.yml
             source-revision.txt
             build-info.json
           if-no-files-found: error

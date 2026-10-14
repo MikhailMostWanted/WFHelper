@@ -2,12 +2,6 @@
   "nav.dashboard": "Главная",
   "nav.runAnalysis": "Анализ забегов",
   "nav.resources": "Ресурсы",
-  "nav.test": "Тест",
-  "nav.overlay": "Оверлей",
-  "nav.loadJson": "Загрузить JSON",
-  "nav.testTitle": "Симулировать открытие реликвии (отладка)",
-  "nav.overlayTitle": "Показать или скрыть оверлей цен наград реликвии",
-
   "common.all": "Все",
   "common.allFiles": "Все файлы",
   "common.appearance": "Оформление",
@@ -130,7 +124,6 @@
   "common.enemy": "Противник",
   "common.noImageAvailable": "Изображение недоступно",
   "common.moreCount": "Ещё +{count}",
-
   "inventory.tab.allParts": "Все части",
   "inventory.tab.everything": "Всё",
   "inventory.tab.mods": "Моды",
@@ -148,7 +141,6 @@
   "inventory.value.allTradables": "Все торгуемые предметы",
   "inventory.value.title": "Примерная стоимость",
   "inventory.value.unpriced": "Без цены: {count}",
-
   "browse.avgPrice": "Средняя цена",
   "browse.col.buy": "Покупка",
   "browse.col.qty": "Кол-во",
@@ -173,7 +165,6 @@
   "browse.tabStatistics": "Статистика",
   "browse.volume": "Объём",
   "browse.whisperCopied": "Сообщение скопировано. Вставьте его в игровой чат.",
-
   "filters.any": "Любой",
   "filters.no": "Нет",
   "filters.yes": "Да",
@@ -182,7 +173,6 @@
   "filters.moveControlDown": "Переместить вниз",
   "filters.moveControlUp": "Переместить вверх",
   "filters.customizeTitle": "Настроить панель фильтров",
-
   "market.applyChanges": "Применить изменения",
   "market.applyNewPriceQty": "Применить новую цену/количество",
   "market.itemNotTradable": "Предмет нельзя передать.",
@@ -191,7 +181,6 @@
   "market.noRecentPriceData": "Нет свежих данных о цене.",
   "market.priceLoadFailed": "Не удалось загрузить данные о цене.",
   "market.ownedCount": "Есть: {count}",
-
   "relics.detail.bestOf": "лучшее из {count}",
   "relics.detail.loadingPrices": "Загрузка цен и дукатов...",
   "relics.detail.noneOwned": "Нет в наличии",
@@ -225,12 +214,10 @@
   "relics.neededRewardLabel": "Нужная награда",
   "relics.vaultedLabel": "Хранилище",
   "relics.vaultedTitle": "Статус хранилища",
-
   "overlay.hint.dragToMove": "перетащите для перемещения (позиция сохранится)",
   "overlay.hint.interact": "Нажмите {hotkey} для взаимодействия",
   "overlay.hint.interactPanel": "Нажмите {hotkey} для взаимодействия с оверлеем",
   "overlay.hint.rightClickDrag": "Перетаскивайте правой кнопкой мыши",
-  "overlay.hint.unlockThenDrag": "Нажмите {hotkey}, затем перетащите",
   "overlay.planner.eraUnknown": "Пока не удалось определить эру реликвии (OCR {elapsed} мс, уверенность {confidence}).",
   "overlay.planner.expectedDucats": "Ожидаемые дукаты",
   "overlay.planner.expectedPlatinum": "Ожидаемая платина",
@@ -256,7 +243,6 @@
   "overlay.reward.setParts": "Набор {owned}/{required}",
   "overlay.reward.setPrice": "Набор {value}",
   "overlay.reward.slot": "Слот {index}",
-
   "settings.languageTitle": "Язык",
   "settings.languageDesc": "Язык интерфейса приложения и язык названий предметов.",
   "settings.languageRow": "Язык интерфейса",
@@ -288,10 +274,8 @@
   "settings.keepRunningOnClose": "Продолжать работу после закрытия окна",
   "settings.redoSetup": "Повторить первоначальную настройку",
   "settings.showFeatureTour": "Показать обзор возможностей",
-
   "tray.show": "Показать WantedFrame",
   "tray.quit": "Выйти",
-
   "world.loading": "Загрузка данных мира...",
   "world.unavailable": "Данные мира недоступны",
   "world.fetchErrorTitle": "Состояние мира",

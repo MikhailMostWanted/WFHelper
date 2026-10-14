@@ -21,7 +21,7 @@ const spec = schemaJson as unknown as {
   $defs: Record<string, Schema>;
   sections: Record<string, { title: string; schema: Schema; note: string }>;
 };
-export interface BridgeSection {
+interface BridgeSection {
   id: string;
   title: string;
   source: string;
@@ -44,7 +44,7 @@ export interface AccountBridgeDocument {
   sections: BridgeSection[];
   unmappedCollections: string[];
 }
-export interface BridgeInputs {
+interface BridgeInputs {
   bindingId: string;
   gameItems?: Readonly<Record<string, unknown>>;
   gameNameRu?: (nameKey: string | null | undefined) => string | null;

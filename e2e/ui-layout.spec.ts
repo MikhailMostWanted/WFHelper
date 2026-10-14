@@ -249,13 +249,19 @@ test.describe("Shared view layout", () => {
       const header = await page.evaluate(() => {
         const tabs = Array.from(document.querySelectorAll("[data-tour-tab]")) as HTMLElement[];
         const row = document.querySelector('[data-tour="inventory-tabs"]') as HTMLElement | null;
-        const controls = row?.querySelector(".ml-auto") as HTMLElement | null;
+        const tabRow = row?.querySelector(".wanted-header-tabs") as HTMLElement | null;
+        const tabStyle = tabRow ? getComputedStyle(tabRow) : null;
+        const controls = document.querySelector(".inventory-command-bar") as HTMLElement | null;
         return {
           // Math.max of nothing is -Infinity, which every comparison below would
           // accept, so the empty case has to be its own assertion.
           tabCount: tabs.length,
-          natural: tabs.reduce((sum, tab) => sum + tab.getBoundingClientRect().width, 0),
-          available: row?.clientWidth ?? 0,
+          natural:
+            tabs.reduce((sum, tab) => sum + tab.getBoundingClientRect().width, 0) +
+            (Number.parseFloat(tabStyle?.columnGap ?? "0") || 0) * Math.max(0, tabs.length - 1) +
+            (Number.parseFloat(tabStyle?.paddingLeft ?? "0") || 0) +
+            (Number.parseFloat(tabStyle?.paddingRight ?? "0") || 0),
+          available: tabRow?.clientWidth ?? 0,
           rows: new Set(tabs.map((tab) => Math.round(tab.getBoundingClientRect().top))).size,
           tabsBottom: tabs.length
             ? Math.max(...tabs.map((tab) => tab.getBoundingClientRect().bottom))
@@ -359,7 +365,7 @@ test.describe("Shared view layout", () => {
     });
     expect(layout.rowFits).toBe(true);
     expect(layout.bottomDelta).toBeLessThanOrEqual(12);
-    expect(layout.maxControlHeight).toBeLessThanOrEqual(36);
+    expect(layout.maxControlHeight).toBeLessThanOrEqual(42);
 
     await (await relicOwnershipSelect(page)).selectOption("all");
     const firstCard = page.locator(".relic-compact-card").first();

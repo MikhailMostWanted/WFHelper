@@ -186,7 +186,7 @@
     background: var(--bg-surface);
     border: 1px solid var(--border-strong);
     border-radius: 1.1rem;
-    box-shadow: 0 28px 100px #0008;
+    box-shadow: 0 28px 100px color-mix(in srgb, var(--bg-deep) 53%, transparent);
     color: var(--text-primary);
   }
   header {

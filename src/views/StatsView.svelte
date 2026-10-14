@@ -628,6 +628,7 @@
                     role="img"
                     aria-label={dotLabel(expandedKey, bar, NaN)}
                     data-stats-date={bar.date}
+                    pointer-events="all"
                     x={bar.x}
                     y={bar.y}
                     width={exBw}
@@ -887,6 +888,7 @@
                                     role="img"
                                     aria-label={dotLabel(key, bar, NaN)}
                                     data-stats-date={bar.date}
+                                    pointer-events="all"
                                     data-stats-value={bar.value}
                                     x={bar.x}
                                     y={bar.y}

@@ -50,7 +50,7 @@ function date(value: unknown): number | null {
   const n = typeof v === "string" && /^\d{1,16}$/.test(v) ? Number(v) : num(v);
   return n != null && Number.isSafeInteger(n) && n <= 8.64e15 ? n : null;
 }
-export interface SnapshotItem {
+interface SnapshotItem {
   section: string;
   type: string;
   name: string | null;

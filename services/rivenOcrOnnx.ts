@@ -32,6 +32,49 @@ interface OrtInferenceSession {
   run(
     feeds: Record<string, unknown>,
   ): Promise<Record<string, { data: unknown; dims: readonly number[] }>>;
+  release(): Promise<void>;
+}
+
+let sessionsStopped = false;
+let stoppingSessions: Promise<void> | null = null;
+const activeRuns = new Set<Promise<unknown>>();
+
+function managedSession(session: OrtInferenceSession): OrtInferenceSession {
+  return {
+    inputNames: session.inputNames,
+    outputNames: session.outputNames,
+    release: () => session.release(),
+    run(feeds) {
+      if (sessionsStopped) return Promise.reject(new Error("OCR is shutting down"));
+      const pending = session.run(feeds);
+      activeRuns.add(pending);
+      void pending.then(
+        () => activeRuns.delete(pending),
+        () => activeRuns.delete(pending),
+      );
+      return pending;
+    },
+  };
+}
+
+/** Drain native initialization/inference and release its thread pools before Node teardown. */
+export function stopOnnxOcrSessions(): Promise<void> {
+  if (stoppingSessions) return stoppingSessions;
+  sessionsStopped = true;
+  stoppingSessions = (async () => {
+    const sessions = await Promise.allSettled(
+      [_yoloSessionPromise, _chRecSessionPromise].filter(
+        (session): session is Promise<OrtInferenceSession> => session !== null,
+      ),
+    );
+    await Promise.allSettled([...activeRuns]);
+    await Promise.allSettled(
+      sessions.flatMap((session) =>
+        session.status === "fulfilled" ? [session.value.release()] : [],
+      ),
+    );
+  })();
+  return stoppingSessions;
 }
 
 let _yoloSessionPromise: Promise<OrtInferenceSession> | null = null;
@@ -47,6 +90,7 @@ let _yoloSessionPermanentError: Error | null = null;
 let _chRecSessionPermanentError: Error | null = null;
 
 async function getYoloSession(): Promise<OrtInferenceSession> {
+  if (sessionsStopped) throw new Error("OCR is shutting down");
   if (_yoloSessionPermanentError) throw _yoloSessionPermanentError;
   if (_yoloSessionPromise) return _yoloSessionPromise;
 
@@ -67,7 +111,7 @@ async function getYoloSession(): Promise<OrtInferenceSession> {
     log.info(
       `[RivenOcrOnnx] YOLO detector loaded - input=${_yoloInputName} size=${_yoloInputSize}`,
     );
-    return session;
+    return managedSession(session);
   })().catch((err) => {
     _yoloSessionPromise = null;
     throw err;
@@ -77,6 +121,7 @@ async function getYoloSession(): Promise<OrtInferenceSession> {
 }
 
 async function getChRecSession(): Promise<OrtInferenceSession> {
+  if (sessionsStopped) throw new Error("OCR is shutting down");
   if (_chRecSessionPermanentError) throw _chRecSessionPermanentError;
   if (_chRecSessionPromise) return _chRecSessionPromise;
 
@@ -102,7 +147,7 @@ async function getChRecSession(): Promise<OrtInferenceSession> {
     const session = await ort.InferenceSession.create(modelPath, ortCpuSessionOptions());
 
     log.info(`[RivenOcrOnnx] PaddleOCR CH v3 loaded - ${_chDict.length} chars (incl. blank)`);
-    return session;
+    return managedSession(session);
   })().catch((err) => {
     _chRecSessionPromise = null;
     throw err;

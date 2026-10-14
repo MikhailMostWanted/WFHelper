@@ -98,10 +98,7 @@ test("personal profile renders cached data and follows refresh failures and acco
     await expect(income.locator("span").last()).toHaveText("0");
     await expect(deaths.locator("span").last()).toHaveText("Not reported");
     await expect(panel.locator('[data-profile-career="TimePlayedSec"]')).toContainText("2 h");
-    await expect(panel.locator("[data-profile-name]")).toHaveCSS(
-      "font-family",
-      "Barlow, sans-serif",
-    );
+    await expect(panel.locator("[data-profile-name]")).toHaveCSS("font-family", /Onest/);
     const strip = panel.locator('[data-summary-strip="grid"]');
     const inspectGrid = () =>
       strip.evaluate((grid) => {

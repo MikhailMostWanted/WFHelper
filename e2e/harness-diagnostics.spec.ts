@@ -66,3 +66,28 @@ test("a nonzero Electron exit fails teardown and retains its process status", as
     .at(-1);
   expect(fs.readFileSync(finalLog!.path!, "utf8")).toContain("[exit] code=23");
 });
+
+for (const warm of [false, true]) {
+  test(`native OCR drains before quitting with a ${warm ? "warm" : "cold"} session`, async () => {
+    const harness = await launchElectronTestHarness("wfh-onnx-shutdown-");
+    try {
+      await harness.app.evaluate(async ({ app }, warmSession) => {
+        const mainModule = process.mainModule;
+        if (!mainModule) throw new Error("Electron main module is missing");
+        const engine = mainModule.require(
+          `${app.getAppPath()}/.electron-build/services/rivenOcrOnnx.js`,
+        ) as {
+          recognizePaddleCrops(
+            crops: { data: Buffer; width: number; height: number }[],
+          ): Promise<unknown>;
+        };
+        // Blank pixels exercise native lifetime, not recognition accuracy.
+        const crops = [{ data: Buffer.alloc(160 * 48 * 3, 255), width: 160, height: 48 }];
+        if (warmSession) await engine.recognizePaddleCrops(crops);
+        void engine.recognizePaddleCrops(crops).catch(() => {});
+      }, warm);
+    } finally {
+      await closeElectronTestHarness(harness);
+    }
+  });
+}

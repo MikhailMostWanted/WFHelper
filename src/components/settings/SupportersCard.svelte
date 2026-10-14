@@ -89,17 +89,12 @@
     backdrop-filter: var(--ui-backdrop-blur);
   }
 
-  /* The settings content is capped at 1120px inside the .settings-shell
-     container; with enough dead space beside it the panel floats there
-     instead of joining the grid. Below that it flows underneath. */
-  @container (min-width: 1520px) {
+  /* Share the Settings grid so the panel stays inside the window at every width. */
+  @container (min-width: 1100px) {
     .supporters-panel {
-      position: absolute;
-      left: 100%;
-      top: 0.75rem;
+      position: static;
       margin-top: 0;
-      width: min(260px, calc((100cqw - 1120px) / 2 - 0.85rem));
-      margin-left: 0.85rem;
+      width: 100%;
     }
   }
 

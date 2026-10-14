@@ -49,7 +49,6 @@ const OVERLAY_MESSAGE_KEYS = [
   "overlay.hint.interact",
   "overlay.hint.interactPanel",
   "overlay.hint.rightClickDrag",
-  "overlay.hint.unlockThenDrag",
   "overlay.planner.eraUnknown",
   "overlay.planner.expectedDucats",
   "overlay.planner.expectedPlatinum",

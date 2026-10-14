@@ -9,10 +9,12 @@
   let {
     state: editState,
     onCommand,
+    onSelect = () => {},
     onCancel,
   }: {
     state: OverlayEditState;
     onCommand: (command: OverlayEditCommand) => Promise<OverlayEditState | undefined>;
+    onSelect?: (field: string) => void;
     onCancel: () => void;
   } = $props();
   const kind = $derived(editState.kind);
@@ -33,6 +35,7 @@
     const current = selection();
     if (!current?.field) return false;
     current.select(field);
+    onSelect(field);
     return true;
   }
   let context = $state<IpcInvokeMap["getOverlayPreview"]["return"]>();
@@ -124,6 +127,9 @@
       else if (message.type === "reward-preview-command" && Number.isSafeInteger(message.id)) {
         const destination = frame.contentWindow;
         if (!message.command || typeof message.command !== "object") return;
+        if (message.command.type === "select") {
+          onSelect(selection()?.field ?? message.command.field);
+        }
         const next = await onCommand(message.command as OverlayEditCommand);
         destination?.postMessage(
           {

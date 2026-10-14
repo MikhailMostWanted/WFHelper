@@ -22,6 +22,7 @@
   const variants = $derived(descriptor.variants);
   const previewCounts = $derived(descriptor.previewCounts);
   let editState = $state<OverlayEditState | null>(null);
+  let pendingSelection = $state<string | null>(null);
   let errorKey = $state<MessageKey | null>(null);
   let ending = $state(false);
   let canvas = $state<{
@@ -35,7 +36,9 @@
   let sessionId: string | null = null;
   let earlyState: OverlayEditState | null = null;
   let unsubscribe: (() => void) | null = null;
-  const selected = $derived(editState?.selectedField ?? descriptor.defaultSelectedField);
+  const selected = $derived(
+    pendingSelection ?? editState?.selectedField ?? descriptor.defaultSelectedField,
+  );
   const style = $derived(editState?.layout.fields[selected] ?? DEFAULT_OVERLAY_FIELD_STYLE);
 
   function accept(next: OverlayEditState): void {
@@ -50,7 +53,10 @@
       if (!ending) onClose();
       return;
     }
-    if (next.sessionId === sessionId) editState = next;
+    if (next.sessionId === sessionId) {
+      editState = next;
+      if (next.selectedField === pendingSelection) pendingSelection = null;
+    }
   }
 
   async function begin(): Promise<void> {
@@ -187,6 +193,7 @@
                         ? 'bg-accent/15 text-accent'
                         : 'text-text-secondary hover:bg-bg-hover'}"
                       onclick={() => {
+                        pendingSelection = field;
                         if (!canvas?.selectField(field)) edit({ type: "select", field });
                       }}
                     >
@@ -206,6 +213,7 @@
                   bind:this={canvas}
                   state={editState}
                   onCommand={update}
+                  onSelect={(field) => (pendingSelection = field)}
                   onCancel={() => void finish(false)}
                 />
               </div>

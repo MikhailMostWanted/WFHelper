@@ -108,7 +108,7 @@ test.describe.serial("First-run setup wizard", () => {
     await expect(page.locator("[data-setup-without-inventory]")).toBeVisible();
   });
 
-  test("no inventory completes setup, opens World and survives a reload", async () => {
+  test("no inventory completes setup, opens the dashboard on restart and survives a reload", async () => {
     const { page } = wizard;
     await page.locator('[data-setup-source="none"]').click();
     await page.locator("[data-setup-use-source]").click();
@@ -123,7 +123,7 @@ test.describe.serial("First-run setup wizard", () => {
       "page",
     );
     await page.reload();
-    await expect(page.locator('#sidebar [data-view="world"]')).toHaveAttribute(
+    await expect(page.locator('#sidebar [data-view="dashboard"]')).toHaveAttribute(
       "aria-current",
       "page",
       { timeout: 30_000 },
@@ -171,7 +171,7 @@ test("Settings can disconnect inventory while retaining its file and market acce
     );
     await expect(page.locator("#content.setup-active")).toHaveCount(0);
     await page.reload();
-    await expect(page.locator('#sidebar [data-view="world"]')).toHaveAttribute(
+    await expect(page.locator('#sidebar [data-view="dashboard"]')).toHaveAttribute(
       "aria-current",
       "page",
       { timeout: 30_000 },

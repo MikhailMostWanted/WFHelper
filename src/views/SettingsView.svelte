@@ -1306,6 +1306,7 @@
   }
   .settings-workbench-content {
     min-width: 0;
+    container-type: inline-size;
   }
   @media (max-width: 1100px) {
     .settings-workbench {
@@ -1341,6 +1342,14 @@
      space right of the 1120px view cap on wide windows. */
   .settings-general-layout {
     position: relative;
+  }
+  @container (min-width: 1100px) {
+    .settings-general-layout:has(> :global([data-supporters])) {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 230px;
+      gap: 0.85rem;
+      align-items: start;
+    }
   }
 
   .settings-input {

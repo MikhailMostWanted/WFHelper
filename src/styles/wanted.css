@@ -17,6 +17,7 @@
     padding-bottom: 2.5rem;
   }
   .wanted-workspace > #content > .view {
+    width: 100%;
     max-width: 1800px;
     margin: 0 auto;
     padding-top: 1.6rem;
@@ -119,13 +120,13 @@
   }
   .detail-panel {
     border-radius: 1.1rem;
-    box-shadow: 0 24px 80px #0006;
+    box-shadow: 0 24px 80px color-mix(in srgb, var(--bg-deep) 40%, transparent);
     border-color: var(--border-strong);
     padding: 1.6rem;
   }
   .detail-overlay {
     backdrop-filter: blur(7px);
-    background: #0005;
+    background: color-mix(in srgb, var(--bg-deep) 33%, transparent);
   }
   .empty-state {
     border: 1px dashed var(--border);

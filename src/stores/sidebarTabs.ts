@@ -144,7 +144,7 @@ export function resetSidebarLabels(): void {
 }
 
 /** Icon-rail width in px; matches the 3.75rem collapsed rail in responsive.css. */
-export const SIDEBAR_RAIL_WIDTH = 60;
+export const SIDEBAR_RAIL_WIDTH = 84;
 /** Matches the --sidebar-width token default in tokens.css. */
 export const SIDEBAR_WIDTH_DEFAULT = 300;
 export const SIDEBAR_WIDTH_MAX = 480;

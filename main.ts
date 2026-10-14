@@ -82,6 +82,7 @@ import * as relicService from "./services/relicService";
 import * as eeLogMonitor from "./services/eeLogMonitor";
 import * as rewardScanner from "./services/rewardScanner";
 import * as rewardOcrOnnx from "./services/rewardOcrOnnx";
+import { stopOnnxOcrSessions } from "./services/rivenOcrOnnx";
 import { shouldUseRussianRewardOcr } from "./services/rewardRussianOcr";
 import * as autoUpdater from "./services/autoUpdater";
 import * as rivenBestAttributes from "./services/rivenBestAttributes";
@@ -888,7 +889,11 @@ app.on("before-quit", (event) => {
   // The stop latch also prevents a late helper fallback from starting a scan.
   if (!_dbwinQuitDone) {
     event.preventDefault();
-    void Promise.all([eeLogMonitor.dbwinWorkerStopped(), stopGameMemoryReads()]).finally(() => {
+    void Promise.all([
+      eeLogMonitor.dbwinWorkerStopped(),
+      stopGameMemoryReads(),
+      stopOnnxOcrSessions(),
+    ]).finally(() => {
       _dbwinQuitDone = true;
       app.quit();
     });

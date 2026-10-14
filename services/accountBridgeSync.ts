@@ -13,7 +13,7 @@ type Settings = Pairing & {
   lastSentAt: number | null;
   lastRevision: string | null;
 };
-export interface BridgeSyncStatus {
+interface BridgeSyncStatus {
   connected: boolean;
   server: string | null;
   automatic: boolean;

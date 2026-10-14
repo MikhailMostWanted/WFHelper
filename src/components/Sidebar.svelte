@@ -20,8 +20,10 @@
   } from "../stores/sidebarTabs.js";
   import { VIEW_LABEL_KEYS } from "../lib/viewRegistry.js";
   import FeedbackModal from "./FeedbackModal.svelte";
+  import { invoke } from "../lib/ipc.js";
 
   let feedbackOpen = false;
+  let devMode = false;
   let dragWidth: number | null = null;
   let resizing = false;
   let dragStartX = 0;
@@ -33,7 +35,7 @@
   $: if (typeof document !== "undefined")
     document.documentElement.style.setProperty(
       "--sidebar-width",
-      `${collapsed ? 84 : effectiveWidth}px`,
+      `${collapsed ? SIDEBAR_RAIL_WIDTH : effectiveWidth}px`,
     );
 
   function startResize(e: PointerEvent): void {
@@ -70,8 +72,15 @@
     settingsTabRequest.set("chatgpt");
     currentView.set("settings");
   }
-  onMount(() => () => {
-    document.documentElement.style.removeProperty("--sidebar-width");
+  onMount(() => {
+    let mounted = true;
+    void invoke("getAppRuntimeInfo").then((info) => {
+      if (mounted) devMode = !info.isPackaged;
+    });
+    return () => {
+      mounted = false;
+      document.documentElement.style.removeProperty("--sidebar-width");
+    };
   });
 </script>
 
@@ -134,6 +143,15 @@
       ><img src={NAV_ICON_URLS.settings} alt="" /><span>{$tr("common.settings")}</span></button
     >
     <div class="rail-utility">
+      {#if devMode}
+        <button
+          type="button"
+          data-test-notification
+          title={$tr("nav.testNotificationTitle")}
+          aria-label={$tr("nav.testNotificationTitle")}
+          on:click={() => void invoke("sendTestNotification")}>♧</button
+        >
+      {/if}
       <button
         type="button"
         data-sidebar-collapse
