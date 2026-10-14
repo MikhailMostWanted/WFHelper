@@ -117,4 +117,26 @@ describe("mountWorldPolling", () => {
     expect(get(worldLoading)).toBe(false);
     stop();
   });
+  it("refreshes World after an in-flight dashboard request without dropping the forced refresh", async () => {
+    const { mountWorldPolling, mountWorldView } = await importModule();
+    const { worldData } = await importWorldStore();
+    let finish: ((value: unknown) => void) | undefined;
+    h.invoke.mockImplementation((channel: string) => {
+      if (channel !== "getWorldState") return Promise.resolve(null);
+      if (!finish)
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      return Promise.resolve({ voidTrader: { location: "fresh" } });
+    });
+    const stopDashboard = mountWorldPolling();
+    const stopWorld = mountWorldView();
+    expect(h.invoke.mock.calls.filter(([channel]) => channel === "getWorldState")).toHaveLength(1);
+    finish!({ voidTrader: { location: "old" } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.invoke.mock.calls.filter(([channel]) => channel === "getWorldState")).toHaveLength(2);
+    expect(get(worldData)?.voidTrader?.location).toBe("fresh");
+    stopDashboard();
+    stopWorld();
+  });
 });

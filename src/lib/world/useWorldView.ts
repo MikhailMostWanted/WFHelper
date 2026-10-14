@@ -66,8 +66,13 @@ export const FISSURE_MODE_OPTIONS: ReadonlyArray<{ value: FissureMode; labelKey:
   { value: "railjack", labelKey: "world.railjack" },
 ];
 
+let forcedWorldRefreshQueued = false;
+
 async function fetchWorldData(force: boolean = false): Promise<void> {
-  if (get(worldLoading)) return;
+  if (get(worldLoading)) {
+    forcedWorldRefreshQueued ||= force;
+    return;
+  }
 
   const now = Date.now();
   if (!force && get(worldData) && now - get(worldLastFetch) < WORLD_REFRESH_MS) return;
@@ -83,6 +88,10 @@ async function fetchWorldData(force: boolean = false): Promise<void> {
     console.error("[World] getWorldState failed:", error);
   } finally {
     worldLoading.set(false);
+    if (forcedWorldRefreshQueued) {
+      forcedWorldRefreshQueued = false;
+      void fetchWorldData(true);
+    }
   }
 }
 

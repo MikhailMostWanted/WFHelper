@@ -272,6 +272,14 @@ export async function stopElectron(app: ElectronApplication): Promise<void> {
       throw new Error(`Electron process exited with ${child.exitCode}/${child.signalCode}`);
     return;
   }
+  // Detach Playwright's inspector before quit tears down its TcpHolder.
+  // Keep normal app cleanup and the strict native exit check below.
+  await evaluateInMain(app, ({ app }) => {
+    const quit = app.quit.bind(app);
+    app.quit = () => {
+      setTimeout(quit, 50);
+    };
+  });
   const closed = app.close().then(
     () => true,
     () => false,

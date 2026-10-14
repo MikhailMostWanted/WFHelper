@@ -153,6 +153,8 @@ test("Nightwave offerings render the wiki tabs, prices and always-available mark
       },
       { world, channel: DB_GET_WORLD_STATE },
     );
+    await page.reload();
+    await expect(page.locator("#sidebar")).toBeVisible();
     await setLayoutViewport(page, 1440, 1100);
     await openView(page, "world");
 
@@ -244,6 +246,8 @@ test("World overview shares completion and scopes permanent Nightwave offers to 
       },
       { world, channel: DB_GET_WORLD_STATE },
     );
+    await page.reload();
+    await expect(page.locator("#sidebar")).toBeVisible();
     await setLayoutViewport(page, 1440, 1100);
     await openView(page, "world");
     const overview = page.locator("[data-world-week-overview]");

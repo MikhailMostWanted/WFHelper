@@ -177,6 +177,8 @@ test("Baro plans a combined basket, preserves wishes and separates recorded pric
       },
       { channel: DB_GET_WORLD_STATE, world },
     );
+    await page.reload();
+    await expect(page.locator("#sidebar")).toBeVisible();
     await setLayoutViewport(page, 1440, 1100);
     async function openPlanner(): Promise<void> {
       await openView(page, "world");

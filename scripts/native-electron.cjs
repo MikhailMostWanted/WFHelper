@@ -4,6 +4,13 @@ async function closeNativeElectron(app) {
   const child = app.process();
   let timer;
   try {
+    // Let the inspector disconnect before the native quit sequence begins.
+    await app.evaluate(({ app }) => {
+      const quit = app.quit.bind(app);
+      app.quit = () => {
+        setTimeout(quit, 50);
+      };
+    });
     await Promise.race([
       app.close(),
       new Promise((_, reject) => {

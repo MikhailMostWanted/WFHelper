@@ -43,6 +43,8 @@ test("Archon Hunt names the boss and its shard reward", async () => {
       },
       DB_GET_WORLD_STATE,
     );
+    await page.reload();
+    await expect(page.locator("#sidebar")).toBeVisible();
     await setLayoutViewport(page, 1440, 1000);
     await openView(page, "world");
     await page.locator('[data-tour-tab="dailies"]').click();
@@ -268,6 +270,8 @@ test("Nightwave objectives remove icon tokens and distinguish missing metadata",
       },
       DB_GET_WORLD_STATE,
     );
+    await page.reload();
+    await expect(page.locator("#sidebar")).toBeVisible();
     await setLayoutViewport(page, 1440, 1000);
     await openView(page, "world");
     await page.locator('[data-tour-tab="dailies"]').click();

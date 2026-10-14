@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { test, expect } from "@playwright/test";
 
 import {
@@ -33,8 +34,9 @@ function inventory() {
 async function tabImages(page: ElectronTestHarness["page"], tab: string): Promise<string[]> {
   await page.locator(`[data-tour="inventory-tabs"] [data-tour-tab="${tab}"]`).click();
   await expect(page.locator(".item-name").first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".item-img-wrap img").first()).toHaveAttribute("src", /\/mod-art\//);
   return page
-    .locator(".item-img")
+    .locator(".item-img-wrap img")
     .evaluateAll((els) => els.map((el) => (el as HTMLImageElement).src));
 }
 
@@ -42,7 +44,19 @@ test("mods and arcanes render the framed wiki card, not the market thumbnail", a
   test.setTimeout(180_000);
   let harness: ElectronTestHarness | undefined;
   try {
-    harness = await launchElectronTestHarness("wfh-cardart-", { inventory: inventory() });
+    harness = await launchElectronTestHarness("wfh-cardart-", {
+      inventory: inventory(),
+      onPage: async (page) => {
+        // This test pins the chosen source, independently of CDN availability.
+        await page.route("https://assets.wfhelper.com/**", (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "image/png",
+            body: fs.readFileSync("assets/logo.png"),
+          }),
+        );
+      },
+    });
     const { page } = harness;
     await page.locator('#sidebar [data-view="inventory"]').click();
 
@@ -72,7 +86,7 @@ test("every tauforged archon shard takes the wiki art over DE's faint plate", as
     const { page } = harness;
     await page.locator('#sidebar [data-view="inventory"]').click();
 
-    // Resources draw their own card, so the shared .item-img reader misses them.
+    // Resources draw their own card, so the shared card image reader misses them.
     await page.locator('[data-tour="inventory-tabs"] [data-tour-tab="resources"]').click();
     await expect(page.locator(".resource-card").first()).toBeVisible({ timeout: 15_000 });
     const resources = await page
