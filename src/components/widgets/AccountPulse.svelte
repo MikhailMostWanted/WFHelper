@@ -41,10 +41,20 @@
   }
 
   onMount(() => {
-    void refresh();
-    const removeInventory = on("inventory-updated", () => void refresh());
-    const removeAccount = on("profile-account-changed", () => void refresh());
+    // Let the shell paint before projecting the full account reference in main.
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    function scheduleRefresh(): void {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        void refresh();
+      }, 2000);
+    }
+    scheduleRefresh();
+    const removeInventory = on("inventory-updated", scheduleRefresh);
+    const removeAccount = on("profile-account-changed", scheduleRefresh);
     return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
       removeInventory();
       removeAccount();
     };
@@ -55,7 +65,11 @@
   <div class="pulse-heading">
     <span class="eyebrow">{copy.accountLabel}</span>
     <span class="connection-state" class:connected={bridge?.connected}>
-      <i aria-hidden="true"></i>{bridge?.connected ? copy.serverReady : copy.serverOff}
+      <i aria-hidden="true"></i>{loading
+        ? copy.reading
+        : bridge?.connected
+          ? copy.serverReady
+          : copy.serverOff}
     </span>
   </div>
   <div class="pulse-identity">

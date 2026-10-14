@@ -218,8 +218,8 @@ function run(): void {
   while (Atomics.load(stopFlag, 0) === 0) {
     while (Atomics.load(stopFlag, 0) === 0) {
       if (isWarframeRunning()) break;
-      // Atomics.wait sleeps up to WARFRAME_POLL_MS but wakes immediately
-      // (returning "not-equal") if the parent sets stopFlag != 0.
+      // The parent's notify wakes an existing wait; a stop flag already set
+      // before this call makes Atomics.wait return "not-equal" immediately.
       Atomics.wait(stopFlag, 0, 0, WARFRAME_POLL_MS);
     }
 

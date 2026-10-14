@@ -74,7 +74,9 @@ export function stopDbwinWorker(): void {
 
   // Signal the Worker to exit its WaitForSingleObject loop
   if (dbwinStopBuffer) {
-    Atomics.store(new Int32Array(dbwinStopBuffer), 0, 1);
+    const stopFlag = new Int32Array(dbwinStopBuffer);
+    Atomics.store(stopFlag, 0, 1);
+    Atomics.notify(stopFlag, 0);
     dbwinStopBuffer = null;
   }
 

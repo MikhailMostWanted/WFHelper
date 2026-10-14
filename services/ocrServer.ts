@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { withScope } from "./logger";
 import { resolveRuntimeResourcePath } from "./runtimeResources";
+import { nativeOcrProcessAvailable, recognizeNativeOcr } from "./nativeOcrProcess";
 
 const log = withScope("ocrServer");
 
@@ -461,24 +462,8 @@ class OcrServerPool {
 
 export const ocrServer = new OcrServerPool(OCR_SERVER_POOL_SIZE);
 
-// @napi-rs/system-ocr calls Windows Media.Ocr natively (no PowerShell pool
-// IPC); falls back to the pool when the native module fails to load.
-
-let _nativeRecognize:
-  | ((input: Buffer | string) => Promise<{ text: string; confidence: number }>)
-  | null = null;
-
-try {
-  const mod = require("@napi-rs/system-ocr") as {
-    recognize: (input: Buffer | string) => Promise<{ text: string; confidence: number }>;
-  };
-  _nativeRecognize = mod.recognize;
-  log.info("[OcrServer] Native OCR engine loaded (@napi-rs/system-ocr)");
-} catch {
-  log.info("[OcrServer] Native OCR engine not available, using PowerShell pool");
-}
-
-export const nativeOcrAvailable = !!_nativeRecognize;
+// Resolve availability without loading the native binding into main.
+export const nativeOcrAvailable = nativeOcrProcessAvailable();
 
 function withTimeout<T>(
   promise: Promise<T>,
@@ -505,15 +490,15 @@ function withTimeout<T>(
 }
 
 export async function nativeOcrBuffer(imageBuffer: Buffer, timeoutMs?: number): Promise<string> {
-  if (!_nativeRecognize) throw new Error("Native OCR not available");
-  const result = await withTimeout(_nativeRecognize(imageBuffer), timeoutMs, "nativeOcrBuffer");
+  if (!nativeOcrProcessAvailable()) throw new Error("Native OCR not available");
+  const result = await withTimeout(recognizeNativeOcr(imageBuffer), timeoutMs, "nativeOcrBuffer");
   _nativeOcrOkAt = Date.now();
   return result.text || "";
 }
 
 export async function nativeOcrFile(imagePath: string, timeoutMs?: number): Promise<string> {
-  if (!_nativeRecognize) throw new Error("Native OCR not available");
-  const result = await withTimeout(_nativeRecognize(imagePath), timeoutMs, "nativeOcrFile");
+  if (!nativeOcrProcessAvailable()) throw new Error("Native OCR not available");
+  const result = await withTimeout(recognizeNativeOcr(imagePath), timeoutMs, "nativeOcrFile");
   _nativeOcrOkAt = Date.now();
   return result.text || "";
 }

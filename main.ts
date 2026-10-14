@@ -148,6 +148,7 @@ import * as tradeTracker from "./services/tradeTracker";
 import * as apiHelperRunner from "./services/apiHelperRunner";
 import * as inventorySync from "./services/inventorySync";
 import { disposeLinuxStreamCapture } from "./services/linuxStreamCapture";
+import { stopNativeOcrProcess } from "./services/nativeOcrProcess";
 import { loadMainWindowState, saveMainWindowState } from "./services/mainWindowState";
 import { WIN_APP_USER_MODEL_ID } from "./config/shared/appMeta";
 import {
@@ -873,6 +874,7 @@ app.on("before-quit", (event) => {
   // Ahead of every teardown step: the close handler below must not read this
   // quit as a request to hide the window.
   markQuitting();
+  stopNativeOcrProcess();
   inventoryIpc.stopInventoryWatcher();
   apiHelperRunner.stopPolling();
   eeLogMonitor.stopWatching();
