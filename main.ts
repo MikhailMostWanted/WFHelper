@@ -280,7 +280,7 @@ function createWindow(): void {
   let mainWindowShowTimer: ReturnType<typeof setTimeout> | null = null;
   let windowShown = false;
   const showMainWindow = (via: string): void => {
-    if (windowShown || mainWindow.isDestroyed()) return;
+    if (windowShown || isQuitting() || mainWindow.isDestroyed()) return;
     windowShown = true;
     if (mainWindowShowTimer) clearTimeout(mainWindowShowTimer);
     mainWindowShowTimer = null;
@@ -289,7 +289,7 @@ function createWindow(): void {
     mainWindow.show();
   };
   const scheduleShow = (delayMs: number, via: string): void => {
-    if (windowShown) return;
+    if (windowShown || isQuitting() || mainWindow.isDestroyed()) return;
     if (mainWindowShowTimer) clearTimeout(mainWindowShowTimer);
     mainWindowShowTimer = setTimeout(() => showMainWindow(via), delayMs);
   };
@@ -302,6 +302,8 @@ function createWindow(): void {
   void mainWindow
     .loadFile(MAIN_WINDOW_ENTRY_FILE, SAFE_MODE_LAUNCH ? { query: { safe: "1" } } : {})
     .catch((error: unknown) => {
+      // Closing during the initial load cancels navigation before destruction.
+      if (isQuitting() || mainWindow.isDestroyed()) return;
       log.error("[Main] Failed to load the renderer:", error);
       showMainWindow("load-error");
     });
