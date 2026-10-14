@@ -2,6 +2,12 @@ const { execFileSync } = require("node:child_process");
 
 async function closeNativeElectron(app) {
   const child = app.process();
+  if (child.exitCode !== null || child.signalCode) {
+    if (child.exitCode !== 0 || child.signalCode) {
+      throw new Error(`Electron process exit: ${child.exitCode}/${child.signalCode}`);
+    }
+    return;
+  }
   let timer;
   try {
     // Let the inspector disconnect before the native quit sequence begins.
