@@ -7,7 +7,12 @@ import { writeFileAtomicSync } from "./atomicFile";
 import type { AccountBridgeDocument } from "./accountBridge";
 
 type Pairing = { format: "wantedframe.pairing.v1"; server: string; token: string };
-type Settings = Pairing & { automatic: boolean; bindingId: string | null };
+type Settings = Pairing & {
+  automatic: boolean;
+  bindingId: string | null;
+  lastSentAt: number | null;
+  lastRevision: string | null;
+};
 export interface BridgeSyncStatus {
   connected: boolean;
   server: string | null;
@@ -65,7 +70,24 @@ function load(): Settings | null {
       typeof raw.bindingId === "string" && /^(?:[a-f0-9]{64}|manual)$/.test(raw.bindingId)
         ? raw.bindingId
         : null;
-    settings = { ...pair, automatic: raw.automatic === true, bindingId: binding };
+    lastSentAt =
+      typeof raw.lastSentAt === "number" &&
+      Number.isSafeInteger(raw.lastSentAt) &&
+      raw.lastSentAt > 0 &&
+      raw.lastSentAt <= Date.now()
+        ? raw.lastSentAt
+        : null;
+    lastRevision =
+      typeof raw.lastRevision === "string" && /^[a-f0-9]{64}$/.test(raw.lastRevision)
+        ? raw.lastRevision
+        : null;
+    settings = {
+      ...pair,
+      automatic: raw.automatic === true,
+      bindingId: binding,
+      lastSentAt,
+      lastRevision,
+    };
   } catch {
     error = "Не удалось открыть сохранённое подключение; импортируй файл заново";
   }
@@ -95,7 +117,13 @@ export function bridgeSyncStatus(): BridgeSyncStatus {
 export function connectBridge(pair: Pairing): void {
   generation++;
   abortActive?.();
-  persist({ ...validatePairing(pair), automatic: false, bindingId: null });
+  persist({
+    ...validatePairing(pair),
+    automatic: false,
+    bindingId: null,
+    lastSentAt: null,
+    lastRevision: null,
+  });
   error = null;
   lastRevision = null;
   lastSentAt = null;
@@ -193,8 +221,16 @@ export function pushBridge(doc: AccountBridgeDocument): Promise<void> {
       request.end(body);
     });
     if (requestGeneration !== generation) return;
-    if (!cfg.bindingId) persist({ ...cfg, bindingId: doc.bindingId });
-    lastSentAt = Date.now();
+    const sentAt = Date.now();
+    const current = load();
+    if (!current) return;
+    persist({
+      ...current,
+      bindingId: current.bindingId ?? doc.bindingId,
+      lastSentAt: sentAt,
+      lastRevision: response.revision,
+    });
+    lastSentAt = sentAt;
     lastRevision = response.revision;
     error = null;
   })()

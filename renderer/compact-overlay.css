@@ -34,6 +34,23 @@ body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) #b
   padding: 3px 10px;
   min-height: 22px;
 }
+body.planner-mode:not(.overlay-interactive):not(.reward-layout-editing) #panel {
+  height: auto;
+  max-height: 260px;
+  min-height: 70px;
+  position: absolute;
+  top: 0;
+  border-radius: 8px;
+  backdrop-filter: none;
+}
+body.planner-mode:not(.overlay-interactive):not(.reward-layout-editing) #planner-grid {
+  max-height: 225px;
+  overflow-y: hidden;
+}
+body.planner-mode:not(.overlay-interactive):not(.reward-layout-editing)
+  .plan-card:nth-child(n + 7) {
+  display: none;
+}
 body.riven-compact:not(.overlay-interactive):not(.reward-layout-editing) #panel {
   top: 0;
   bottom: auto;

@@ -240,7 +240,55 @@ export interface MarketAlertStatusPayload extends MarketAlertEngineStatus {
   cooldowns: Record<string, number>;
 }
 
+export interface AccountBridgeSectionStatus {
+  id: string;
+  title: string;
+  source: string;
+  capturedAt: number | null;
+  status: "available" | "partial" | "missing";
+  rows: number;
+  originalRows: number;
+  omittedRows: number;
+  omittedFields: number;
+  note: string;
+}
+
+export interface AccountBridgeStatus {
+  bridge: {
+    connected: boolean;
+    server: string | null;
+    automatic: boolean;
+    busy: boolean;
+    lastSentAt: number | null;
+    lastRevision: string | null;
+    error: string | null;
+  };
+  snapshot: {
+    createdAt: number;
+    inventoryUpdatedAt: number | null;
+    revision: string;
+    source: string;
+    bindingConfirmed: boolean;
+    rows: number;
+    bytes: number;
+    sections: AccountBridgeSectionStatus[];
+    unmappedCollections: string[];
+  } | null;
+  error: string | null;
+}
+
+export type AccountBridgeAction = "export" | "send" | "connect" | "disconnect" | "automatic";
+export interface AccountBridgeActionResult {
+  outcome: "completed" | "cancelled" | "error";
+  message?: string;
+}
+
 export interface IpcInvokeMap {
+  getAccountBridgeStatus: { args: []; return: AccountBridgeStatus };
+  accountBridgeAction: {
+    args: [action: AccountBridgeAction, automatic?: boolean];
+    return: AccountBridgeActionResult;
+  };
   getAccountSnapshotStatus: {
     args: [];
     return: {

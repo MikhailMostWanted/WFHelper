@@ -13,6 +13,7 @@ import part12 from "./ru/part12.json";
 import part13 from "./ru/part13.json";
 import part14 from "./ru/part14.json";
 import part15 from "./ru/part15.json";
+import part16 from "./ru/part16.json";
 
 // Keep the catalogue split into reviewable JSON chunks. Later chunks intentionally
 // win when a catch-up translation fills a boundary gap or refines an older entry.
@@ -32,6 +33,7 @@ const ru = {
   ...part13,
   ...part14,
   ...part15,
+  ...part16,
 };
 
 export default ru;

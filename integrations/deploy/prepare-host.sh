@@ -28,6 +28,9 @@ fi
 [[ "$(id -gn wantedframe-mcp)" == wantedframe-mcp ]] || { printf '%s\n' 'Existing user has an unexpected primary group.' >&2; exit 1; }
 install -d -m 0755 /opt/wantedframe-mcp
 install -d -m 0700 -o wantedframe-mcp -g wantedframe-mcp /etc/wantedframe-mcp /var/lib/wantedframe-mcp
+# The root-owned runtime must be readable/executable by the service user.
+# Private configuration and state directories above keep their explicit 0700 modes.
+umask 022
 "$python_bin" -m venv /opt/wantedframe-mcp/venv
 /opt/wantedframe-mcp/venv/bin/python -m pip install "$source_dir"
 /opt/wantedframe-mcp/venv/bin/python -m pip freeze --all > /opt/wantedframe-mcp/requirements.lock.txt

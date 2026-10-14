@@ -5,6 +5,7 @@
     type OverlayLayoutKind,
   } from "../../config/shared/overlayLayout.js";
   import { onDestroy, onMount } from "svelte";
+  import { get } from "svelte/store";
   import {
     overlaySettings,
     overlaySettingsLoaded,
@@ -56,7 +57,7 @@
     showOwnedParentBadges,
   } from "../stores/preferences.js";
   import { startTour } from "../stores/tour.js";
-  import { currentView } from "../stores/app.js";
+  import { currentView, settingsTabRequest } from "../stores/app.js";
   import type { InventorySource, OverlaySettings, OverlayWindowKey } from "../types/ipc.js";
   import {
     DEFAULT_SOURCE_CHANNELS,
@@ -75,7 +76,9 @@
     showTradeNotification?: boolean;
   };
 
-  let settingsTab: "general" | "appearance" | "customization" | "overlay" = "general";
+  let settingsTab: "general" | "appearance" | "customization" | "overlay" | "chatgpt" =
+    get(settingsTabRequest) ?? "general";
+  settingsTabRequest.set(null);
   let customizationRevision = 0;
   // The store owns the language: the select only mirrors it, so an external
   // setLocale is not written back over.
@@ -503,6 +506,14 @@
     <div class="tab-bar">
       <button
         class="tab-item"
+        class:active={settingsTab === "chatgpt"}
+        data-tour-tab="chatgpt"
+        on:click={() => (settingsTab = "chatgpt")}
+      >
+        <span>{$tr("chatgpt.title")}</span>
+      </button>
+      <button
+        class="tab-item"
         class:active={settingsTab === "general"}
         data-tour-tab="general"
         on:click={() => (settingsTab = "general")}
@@ -923,7 +934,6 @@
             </SettingsSection>
           {/if}
 
-          <AccountSnapshotCard />
           <AboutCard />
         </div>
 
@@ -958,6 +968,8 @@
           </p>
         {/if}
       </div>
+    {:else if settingsTab === "chatgpt"}
+      <AccountSnapshotCard />
     {:else if settingsTab === "appearance"}
       <div class="settings-tab-grid settings-masonry py-3">
         <AppearanceCard />

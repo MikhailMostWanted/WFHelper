@@ -9,11 +9,20 @@ TGPT, Infra Control, MAX или общий конфиг прокси. Скрип
 - Отдельный HTTPS hostname с DNS на MAIN и доступ к действующему TLS-прокси.
 - Отдельный GitHub OAuth App: callback `https://HOST/auth/callback`, client ID и secret.
 - Числовой GitHub ID владельца (в CLI предложен `159386897`; проверить владельца).
-- Точный callback OAuth из настроек подключения ChatGPT для `redirectUris`.
+- Точный callback OAuth, фактически отправленный ChatGPT при регистрации DCR, для `redirectUris`.
 - Разрешённый способ доставить архив и выполнить установку только этого сервиса.
 
 Пароль Warframe не используется. Secret вводится скрыто через CLI на VPS; не
 передавать его в командной строке, чате, журнале или публичном репозитории.
+
+Callback GitHub OAuth App (`https://HOST/auth/callback`) и callback ChatGPT —
+разные адреса. Кроме того, показанный UI ChatGPT адрес вида
+`https://chatgpt.com/connector/oauth/<id>` может отличаться от адреса, который
+ChatGPT фактически присылает при Dynamic Client Registration. В проверенном
+подключении использовался `https://chatgpt.com/connector_platform_oauth_redirect`;
+этот точный адрес требуется в приватном `redirectUris`. Не расширять разрешение
+wildcard-шаблоном: добавлять только подтверждённые точные callback URI. Secret,
+authorization code и токены не нужны в диагностических журналах.
 
 ## Комплект и подготовка
 
@@ -94,6 +103,42 @@ curl --fail --silent --show-error https://HOST/.well-known/oauth-authorization-s
 `healthz` и OAuth discovery подтверждают доступность, но не передачу аккаунта или
 OAuth вход владельца. Внешний `/mcp` должен отклонять запрос с ingest-токеном.
 Проверки с токеном делать из приватного клиента; не печатать его в shell.
+
+## Продление отдельного сертификата на MAIN
+
+`wantedframe-tls-renew.service` и `.timer` обслуживают только certname
+`wantedframe-mcp`. Отдельный каталог `/etc/wantedframe-tls` смонтирован в Certbot
+как `/etc/letsencrypt`, webroot `/var/www/wantedframe-acme` — по тому же пути.
+Каталог сертификатов остаётся приватным у root; он не входит в серверный архив.
+В этом каталоге должно быть только TLS-состояние WantedFrame. Указанный образ
+`certbot/certbot:v5.4.0` должен быть заранее доступен локально: unit не скачивает
+и не обновляет образы. Рабочая HTTP ACME-маршрутизация уже должна обслуживать
+webroot; эти unit-файлы не изменяют конфиги Nginx или других сертификатов.
+
+Таймер проверяет срок ежедневно со случайной задержкой до 6 часов, в часовом
+поясе MAIN. `ExecCondition` пропускает сертификат со сроком больше 30 дней;
+повреждённый или отсутствующий сертификат завершает проверку ошибкой. Когда срок
+не превышает 30 дней, Certbot выполняет `renew --cert-name wantedframe-mcp`.
+Только после успешного renew выполняются последовательно `nginx -t` и reload;
+ошибка renew или проверки Nginx блокирует reload. Общего restart нет.
+
+После проверки файлов оператор устанавливает и включает только этот таймер:
+
+```sh
+sudo install -m 0644 deploy/wantedframe-tls-renew.service /etc/systemd/system/wantedframe-tls-renew.service
+sudo install -m 0644 deploy/wantedframe-tls-renew.timer /etc/systemd/system/wantedframe-tls-renew.timer
+sudo systemd-analyze verify /etc/systemd/system/wantedframe-tls-renew.service /etc/systemd/system/wantedframe-tls-renew.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now wantedframe-tls-renew.timer
+sudo systemctl start wantedframe-tls-renew.service
+systemctl list-timers wantedframe-tls-renew.timer
+```
+
+Ручной запуск с новым сертификатом должен завершиться пропуском по условию,
+без вызова Certbot и reload. Это проверка расписания и условия, а не доказательство
+успешного будущего продления. Для отключения: `systemctl disable --now
+wantedframe-tls-renew.timer`; это не удаляет сертификат и не затрагивает другие
+таймеры или сервисы.
 
 ## Одна практическая приёмка
 

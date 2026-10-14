@@ -1,0 +1,17 @@
+[Unit]
+Description=Renew only the WantedFrame MCP TLS certificate
+After=network-online.target docker.service nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+# Exit 1 skips a certificate valid for more than 30 days. Invalid input fails.
+ExecCondition=/bin/sh -c '/usr/bin/openssl x509 -in /etc/wantedframe-tls/live/wantedframe-mcp/cert.pem -noout >/dev/null 2>&1 || exit 255; ! /usr/bin/openssl x509 -in /etc/wantedframe-tls/live/wantedframe-mcp/cert.pem -checkend 2592000 -noout >/dev/null 2>&1'
+ExecStart=/usr/bin/docker run --rm --pull=never --name wantedframe-tls-renew --mount type=bind,src=/etc/wantedframe-tls,dst=/etc/letsencrypt --mount type=bind,src=/var/www/wantedframe-acme,dst=/var/www/wantedframe-acme certbot/certbot:v5.4.0 renew --cert-name wantedframe-mcp --webroot --webroot-path /var/www/wantedframe-acme --non-interactive --quiet --no-random-sleep-on-renew
+ExecStartPost=/usr/sbin/nginx -t
+ExecStartPost=/usr/bin/systemctl reload nginx.service
+TimeoutStartSec=10min

@@ -13,6 +13,9 @@ function getInitialView(): ViewName {
 
 export const currentView = writable<ViewName>(getInitialView());
 
+// Consumed once when Settings opens; normal sidebar navigation still starts at General.
+export const settingsTabRequest = writable<"chatgpt" | null>(null);
+
 type StatusMessage = {
   key: MessageKey;
   params?: Record<string, string | number>;

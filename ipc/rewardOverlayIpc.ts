@@ -108,7 +108,7 @@ export const plannerWindowsController = createOverlayWindowsController({
   windowWidth: getOverlayDescriptor("planner").canvas.width,
   windowHeight: getOverlayDescriptor("planner").canvas.height,
   fileSearch: "mode=planner",
-  transparent: false,
+  transparent: true,
   backgroundColor: "#060a12",
   windowTitle: "WFHelper Relic Planner",
   windowStateKey: "planner",

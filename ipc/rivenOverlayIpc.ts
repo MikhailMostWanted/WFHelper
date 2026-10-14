@@ -96,7 +96,7 @@ const rivenWindowBaseOptions = {
   minWindowWidth: RIVEN_CANVAS.width,
   minWindowHeight: RIVEN_CANVAS.height,
   topOffset: RIVEN_TOP_OFFSET,
-  transparent: false,
+  transparent: true,
   backgroundColor: "#060a12",
   preloadFileName: "preload-riven.js",
   hasShadow: false,

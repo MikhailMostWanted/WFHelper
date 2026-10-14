@@ -22,6 +22,7 @@
   import RecentRunsWidget from "../components/widgets/RecentRunsWidget.svelte";
   import TradeSummaryWidget from "../components/widgets/TradeSummaryWidget.svelte";
   import { tr } from "../lib/i18n.js";
+  import { currentView, settingsTabRequest } from "../stores/app.js";
   import { clockStore } from "../lib/timers.js";
   import { COARSE_CLOCK_MS, mountWorldPolling } from "../lib/world/useWorldView.js";
 
@@ -39,7 +40,18 @@
   <div class="mx-auto flex w-full max-w-[1280px] flex-col gap-4 py-4">
     <header class="view-header mb-0 items-end">
       <h2>{$tr("nav.dashboard")}</h2>
-      <EditLayoutBar view="dashboard" />
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <button
+          class="btn-secondary btn-sm"
+          data-chatgpt-quick-open
+          title={$tr("chatgpt.quickOpenHint")}
+          on:click={() => {
+            settingsTabRequest.set("chatgpt");
+            currentView.set("settings");
+          }}>{$tr("chatgpt.quickOpen")}</button
+        >
+        <EditLayoutBar view="dashboard" />
+      </div>
     </header>
 
     <LayoutGrid view="dashboard" gapClass="gap-4" columnGapClass="gap-4" let:sectionId>

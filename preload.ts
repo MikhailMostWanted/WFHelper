@@ -185,6 +185,8 @@ type Ret<K extends keyof IpcInvokeMap> = Promise<IpcInvokeMap[K]["return"]>;
 try {
   contextBridge.exposeInMainWorld("api", {
     platform: process.platform,
+    getAccountBridgeStatus: inv<"getAccountBridgeStatus">("account-bridge:status"),
+    accountBridgeAction: inv<"accountBridgeAction">("account-bridge:action"),
     getAccountSnapshotStatus: inv<"getAccountSnapshotStatus">("account-snapshot:status"),
     exportAccountSnapshot: inv<"exportAccountSnapshot">("account-snapshot:export"),
     getFeedbackContext: inv<"getFeedbackContext">(FEEDBACK_CONTEXT),

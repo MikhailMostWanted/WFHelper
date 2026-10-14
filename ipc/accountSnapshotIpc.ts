@@ -6,6 +6,11 @@ import { handleAuthorized, assertMainRendererSender } from "./ipcSecurity";
 import { getAccountSnapshotStatus, onAccountSnapshotSaved } from "../services/accountSnapshotStore";
 import { currentAccountBridge } from "../services/accountBridgeRuntime";
 import { bridgeExportZip } from "../services/bridgeExport";
+import type {
+  AccountBridgeAction,
+  AccountBridgeActionResult,
+  AccountBridgeStatus,
+} from "../src/types/ipc";
 import {
   bridgeSyncStatus,
   connectBridge,
@@ -38,12 +43,119 @@ function scheduleAutomatic(): void {
   );
   timer.unref();
 }
+
+async function bridgeStatus(): Promise<AccountBridgeStatus> {
+  if (getInventorySource() === "none" || !ctx.currentInventoryData)
+    return { bridge: bridgeSyncStatus(), snapshot: null, error: null };
+  try {
+    const doc = await currentAccountBridge();
+    return {
+      bridge: bridgeSyncStatus(),
+      snapshot: {
+        createdAt: doc.createdAt,
+        inventoryUpdatedAt: doc.inventoryUpdatedAt,
+        revision: doc.revision,
+        source: doc.source,
+        bindingConfirmed: doc.bindingId !== "manual",
+        rows: doc.sections.reduce((sum, section) => sum + section.rows.length, 0),
+        bytes: Buffer.byteLength(JSON.stringify(doc), "utf8"),
+        sections: doc.sections.map(({ rows, ...section }) => ({ ...section, rows: rows.length })),
+        unmappedCollections: doc.unmappedCollections,
+      },
+      error: null,
+    };
+  } catch (error) {
+    return {
+      bridge: bridgeSyncStatus(),
+      snapshot: null,
+      error: error instanceof Error ? error.message : "Не удалось подготовить снимок",
+    };
+  }
+}
+
+async function bridgeAction(
+  action: AccountBridgeAction,
+  automatic?: boolean,
+): Promise<AccountBridgeActionResult> {
+  const window = ctx.mainWindow;
+  if (!window || window.isDestroyed()) return { outcome: "cancelled" };
+  try {
+    if (action === "connect") {
+      const selected = await dialog.showOpenDialog(window, {
+        title: "Приватный файл подключения WantedFrame",
+        properties: ["openFile"],
+        filters: [{ name: "WantedFrame pairing", extensions: ["json"] }],
+      });
+      if (selected.canceled) return { outcome: "cancelled" };
+      const file = selected.filePaths[0];
+      if (!file || (await fs.stat(file)).size > 8192) throw new Error("Неверный файл подключения");
+      let raw: unknown;
+      try {
+        raw = JSON.parse(await fs.readFile(file, "utf8"));
+      } catch {
+        throw new Error("Неверный файл подключения");
+      }
+      const pair = validatePairing(raw);
+      const confirm = await dialog.showMessageBox(window, {
+        type: "warning",
+        message: `Подключить ${pair.server}?`,
+        detail:
+          "Этот сервер будет получать разрешённый снимок аккаунта: инвентарь, сборки, валюты и прогресс. Подтверди свой адрес. Автосинхронизация остаётся выключенной.",
+        buttons: ["Подключить", "Отмена"],
+        defaultId: 1,
+        cancelId: 1,
+      });
+      if (confirm.response !== 0) return { outcome: "cancelled" };
+      connectBridge(pair);
+    } else if (action === "disconnect") {
+      const confirm = await dialog.showMessageBox(window, {
+        type: "question",
+        message: "Отключить передачу?",
+        detail:
+          "Локальное подключение будет удалено. Уже переданные снимки и подключение ChatGPT удаляются отдельно на VPS и в ChatGPT.",
+        buttons: ["Отключить", "Отмена"],
+        defaultId: 1,
+        cancelId: 1,
+      });
+      if (confirm.response !== 0) return { outcome: "cancelled" };
+      await disconnectBridge();
+    } else if (action === "automatic") {
+      if (typeof automatic !== "boolean") throw new Error("Укажи состояние автосинхронизации");
+      setAutomaticBridge(automatic);
+      scheduleAutomatic();
+    } else if (action === "send") {
+      await pushBridge(await currentAccountBridge());
+    } else if (action === "export") {
+      const result = await dialog.showSaveDialog(window, {
+        title: "Комплект данных для ChatGPT",
+        defaultPath: "WantedFrame-ChatGPT.zip",
+        filters: [{ name: "ZIP", extensions: ["zip"] }],
+      });
+      if (result.canceled || !result.filePath) return { outcome: "cancelled" };
+      await fs.writeFile(result.filePath, bridgeExportZip(await currentAccountBridge()), {
+        mode: 0o600,
+      });
+    } else throw new Error("Неизвестное действие передачи");
+    return { outcome: "completed" };
+  } catch (error) {
+    return {
+      outcome: "error",
+      message: error instanceof Error ? error.message : "Действие не выполнено",
+    };
+  }
+}
 export function register(): void {
   onAccountSnapshotSaved(scheduleAutomatic);
   app.once("before-quit", () => {
     if (timer) clearTimeout(timer);
     timer = null;
   });
+  handleAuthorized("account-bridge:status", assertMainRendererSender, bridgeStatus);
+  handleAuthorized(
+    "account-bridge:action",
+    assertMainRendererSender,
+    (_event, action: AccountBridgeAction, automatic?: boolean) => bridgeAction(action, automatic),
+  );
   handleAuthorized("account-snapshot:status", assertMainRendererSender, () => {
     const { snapshot, error } = getAccountSnapshotStatus();
     const available = getInventorySource() !== "none" && !!ctx.currentInventoryData;

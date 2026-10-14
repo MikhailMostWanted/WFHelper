@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily expiry check for WantedFrame MCP TLS
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=6h
+AccuracySec=1h
+Persistent=true
+Unit=wantedframe-tls-renew.service
+
+[Install]
+WantedBy=timers.target

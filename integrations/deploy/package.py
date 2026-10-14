@@ -25,6 +25,8 @@ FILES = (
     "deploy/prepare-host.sh",
     "deploy/nginx.conf.example",
     "deploy/Caddyfile.example",
+    "deploy/wantedframe-tls-renew.service",
+    "deploy/wantedframe-tls-renew.timer",
 )
 
 
