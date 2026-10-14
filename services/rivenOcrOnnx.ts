@@ -38,6 +38,18 @@ interface OrtInferenceSession {
 let sessionsStopped = false;
 let stoppingSessions: Promise<void> | null = null;
 const activeRuns = new Set<Promise<unknown>>();
+const activeJobs = new Set<Promise<unknown>>();
+
+function trackOcrJob<T>(work: () => Promise<T>): Promise<T> {
+  if (sessionsStopped) return Promise.reject(new Error("OCR is shutting down"));
+  const job = Promise.resolve().then(work);
+  activeJobs.add(job);
+  void job.then(
+    () => activeJobs.delete(job),
+    () => activeJobs.delete(job),
+  );
+  return job;
+}
 
 function managedSession(session: OrtInferenceSession): OrtInferenceSession {
   return {
@@ -62,6 +74,8 @@ export function stopOnnxOcrSessions(): Promise<void> {
   if (stoppingSessions) return stoppingSessions;
   sessionsStopped = true;
   stoppingSessions = (async () => {
+    // A job can still be resizing pixels before it submits an ONNX run.
+    await Promise.allSettled([...activeJobs]);
     const sessions = await Promise.allSettled(
       [_yoloSessionPromise, _chRecSessionPromise].filter(
         (session): session is Promise<OrtInferenceSession> => session !== null,
@@ -377,7 +391,7 @@ export function paddleRecognizerAvailable(): boolean {
 
 /** Run the shared PaddleOCR recognizer on raw RGB crops (used by the reward scanner too). */
 export function recognizePaddleCrops(crops: RgbCrop[]): Promise<OcrLineResult[]> {
-  return recognizeCropsBatch(crops);
+  return trackOcrJob(() => recognizeCropsBatch(crops));
 }
 
 /** Greedy-decodes CTC output and returns text with mean softmax confidence. */
@@ -706,7 +720,11 @@ export interface RivenOcrResult {
 export const LOW_CONFIDENCE_THRESHOLD = 0.8;
 
 /** Runs detection and recognition on a raw RGBA stat-area image. */
-export async function recognizeStatArea(
+export function recognizeStatArea(rgbaBuf: Buffer, W: number, H: number): Promise<RivenOcrResult> {
+  return trackOcrJob(() => recognizeStatAreaJob(rgbaBuf, W, H));
+}
+
+async function recognizeStatAreaJob(
   rgbaBuf: Buffer,
   W: number,
   H: number,
