@@ -28,7 +28,8 @@
     relicGroupMatchesSearch,
   } from "../lib/relic.js";
   import { invoke, send } from "../lib/ipc.js";
-  import { tr, type MessageKey } from "../lib/i18n.js";
+  import { tr, locale, type MessageKey } from "../lib/i18n.js";
+  import WorkspaceIntro from "../components/WorkspaceIntro.svelte";
   import HeaderTabs from "../components/HeaderTabs.svelte";
   import RelicCompactCard from "../components/relics/RelicCompactCard.svelte";
   import SearchBox from "../components/SearchBox.svelte";
@@ -633,9 +634,13 @@
 </script>
 
 <section class="view active">
-  <h2 class="m-0 mb-2 font-display text-3xl font-semibold tracking-[0.03em] text-text-primary">
-    {$tr("relics.title", { count: groups.length })}
-  </h2>
+  <WorkspaceIntro
+    title={$tr("relics.title", { count: groups.length })}
+    eyebrow="WANTED / VOID ARCHIVE"
+    description={$locale === "ru"
+      ? "Что открыть дальше. Сравни награды, качество и ожидаемую стоимость своих реликвий."
+      : "Choose what to open next. Compare rewards, refinement and expected relic value."}
+  />
   <div class="view-sticky-filters mb-4" data-tour="relic-filters">
     <div
       class="flex flex-wrap items-end border-b border-border-subtle min-[1800px]:flex-nowrap"

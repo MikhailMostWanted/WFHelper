@@ -54,7 +54,7 @@
   }
 </script>
 
-<div class="item-grid">
+<div class="item-grid inventory-shelf-grid">
   {#if items.length === 0}
     <div class="empty-state col-span-full">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -85,3 +85,21 @@
     {/if}
   {/if}
 </div>
+
+<style>
+  .inventory-shelf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    gap: 0.85rem;
+    align-items: stretch;
+  }
+  .empty-state {
+    min-height: 16rem;
+    margin: 0;
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    font-size: 1rem;
+    color: var(--text-secondary);
+  }
+</style>

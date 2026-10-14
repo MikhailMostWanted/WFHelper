@@ -761,10 +761,10 @@
   }
 </script>
 
-<section class="view active">
+<section class="view active market-desk">
   {#if $marketViewState.typeTab === "browse"}
     <!-- Browse works logged out - the order book is public, only posting needs auth. -->
-    <div class="view-header">
+    <div class="view-header market-desk-heading">
       <h2>{$tr("market.browseTitle")}</h2>
       <div class="view-controls gap-2">
         {#if $marketSession.loggedIn && $marketSession.userName}
@@ -776,13 +776,16 @@
         <EditLayoutBar view="market" only={MARKET_BROWSE_SECTIONS} />
       </div>
     </div>
-    <div class="mb-2.5 flex items-end border-b border-border-subtle">
+    <div class="market-desk-navigation">
       <HeaderTabs
         options={orderTypeTabs}
         activeKey={$marketViewState.typeTab}
         onSelect={handleTypeTabSelect}
       />
     </div>
+    {#if $marketSession.loggedIn}
+      <div class="market-presence-workspace"><WfmPresenceBar /></div>
+    {/if}
     <LayoutGrid view="market" only={MARKET_BROWSE_SECTIONS} gapClass="gap-0" let:sectionId>
       {#if sectionId === "market.browse"}
         <MarketBrowseView />
@@ -790,13 +793,13 @@
     </LayoutGrid>
   {:else if $marketViewState.typeTab === "alerts"}
     <!-- Alerts work logged out too - auction and order searches are public. -->
-    <div class="view-header">
+    <div class="view-header market-desk-heading">
       <h2>{$tr("marketAlerts.title")}</h2>
       <div class="view-controls gap-2">
         <EditLayoutBar view="market" only={MARKET_ALERT_SECTIONS} />
       </div>
     </div>
-    <div class="mb-2.5 flex items-end border-b border-border-subtle">
+    <div class="market-desk-navigation">
       <HeaderTabs
         options={orderTypeTabs}
         activeKey={$marketViewState.typeTab}
@@ -809,15 +812,15 @@
       {/if}
     </LayoutGrid>
   {:else if !$marketSession.loggedIn}
-    <div class="mb-2.5 flex items-end border-b border-border-subtle">
+    <div class="market-desk-navigation">
       <HeaderTabs
         options={orderTypeTabs}
         activeKey={$marketViewState.typeTab}
         onSelect={handleTypeTabSelect}
       />
     </div>
-    <div class="flex flex-col items-center gap-3 py-3">
-      <div class="w-[min(560px,100%)] rounded-xl border border-border bg-bg-surface p-4">
+    <div class="market-signin-workspace">
+      <div class="market-signin-card">
         <div class="mb-2.5 text-accent">
           <svg
             viewBox="0 0 48 48"
@@ -883,7 +886,7 @@
     </div>
   {:else}
     <div>
-      <div class="view-header">
+      <div class="view-header market-desk-heading">
         <h2 data-market-orders-heading={isRivensTab ? "rivens" : "orders"}>
           {isRivensTab ? $tr("market.myRivens") : $tr("market.myOrders")}
         </h2>
@@ -909,6 +912,7 @@
             class="btn-secondary btn-sm"
             title={$tr("common.refresh")}
             on:click={refreshCurrentTab}
+            aria-label={$tr("common.refresh")}
           >
             <svg
               viewBox="0 0 24 24"
@@ -928,9 +932,9 @@
         </div>
       </div>
 
-      <div class="mb-2.5"><WfmPresenceBar /></div>
+      <div class="market-presence-workspace"><WfmPresenceBar /></div>
 
-      <div class="mb-2.5 flex items-end border-b border-border-subtle">
+      <div class="market-desk-navigation">
         <HeaderTabs
           options={orderTypeTabs}
           activeKey={$marketViewState.typeTab}
@@ -1136,3 +1140,68 @@
     onclose={() => (selectedContract = null)}
   />
 {/if}
+
+<style>
+  .market-desk {
+    min-width: 0;
+  }
+  .market-desk-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1.1rem;
+  }
+  .market-desk-heading h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.7rem, 2.1vw, 2.3rem);
+    font-weight: 650;
+    line-height: 1.2;
+    letter-spacing: -0.035em;
+    color: var(--text-primary);
+  }
+  .market-desk-navigation {
+    display: flex;
+    align-items: flex-end;
+    min-width: 0;
+    margin-bottom: 1rem;
+    padding: 0.2rem 0.85rem 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+  }
+  .market-presence-workspace {
+    margin-bottom: 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+  }
+  .market-signin-workspace {
+    display: grid;
+    justify-items: start;
+    padding: 0.4rem 0;
+  }
+  .market-signin-card {
+    width: min(42rem, 100%);
+    padding: clamp(1.2rem, 3vw, 2rem);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: radial-gradient(
+      ellipse at 0 0,
+      color-mix(in oklab, var(--accent) 6%, var(--bg-surface)),
+      var(--bg-surface) 65%
+    );
+  }
+  .market-signin-card p {
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+  .market-signin-card form {
+    display: grid;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+  }
+</style>

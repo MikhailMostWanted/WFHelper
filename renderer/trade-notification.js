@@ -22,6 +22,13 @@
 
   const notification = document.getElementById("notification");
   const itemThumb = document.getElementById("item-thumb");
+  itemThumb.onerror = () => {
+    itemThumb.style.display = "none";
+    delete itemThumb.dataset.loaded;
+  };
+  itemThumb.onload = () => {
+    itemThumb.dataset.loaded = "true";
+  };
   const tradeLabel = document.getElementById("trade-label");
   const tradeBadge = document.getElementById("trade-badge");
   const itemName = document.getElementById("item-name");

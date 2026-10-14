@@ -303,8 +303,10 @@ function updateBestPick() {
 
   for (let i = 0; i < SLOTS; i += 1) {
     slotElement(i).classList.remove("best-slot");
-    if (slotState[i].item && slotState[i].price != null && slotState[i].price > bestPrice) {
-      bestPrice = slotState[i].price;
+    slotElement(i).dataset.bestLabel = "";
+    const price = Number(slotState[i].price);
+    if (slotState[i].item && Number.isFinite(price) && price > 0 && price > bestPrice) {
+      bestPrice = price;
       bestIndex = i;
     }
   }
@@ -313,6 +315,7 @@ function updateBestPick() {
   bestEl.innerHTML = "";
   if (bestIndex >= 0) {
     slotElement(bestIndex).classList.add("best-slot");
+    slotElement(bestIndex).dataset.bestLabel = t("overlay.reward.bestLabel").replace(/:\s*$/, "");
     const name = document.createElement("span");
     name.textContent = `${slotState[bestIndex].item.displayName || slotState[bestIndex].item.name} - `;
     bestEl.appendChild(name);
@@ -384,6 +387,11 @@ function renderPlannerHint() {
   const label = prettyHotkey(dragHintInfo.hotkey);
   hint.textContent = label ? t("overlay.hint.interactPanel", { hotkey: label }) : "";
   hint.classList.toggle("is-hidden", !plannerHintWanted || !label);
+  const rewardHint = document.getElementById("reward-interaction-hint");
+  if (rewardHint) {
+    rewardHint.textContent = label ? t("overlay.hint.interact", { hotkey: label }) : "";
+    rewardHint.classList.toggle("is-hidden", overlayInteractiveMode || !label);
+  }
 }
 
 /* Header chip teaching the move mechanic; gone once the user has ever moved an overlay. */
@@ -395,12 +403,8 @@ function updateDragHint() {
   let text = "";
   if (rewardLayoutEditor?.isEditing()) {
     text = t("overlay.hint.editReward");
-  } else if (!dragHintInfo.dismissed) {
-    text = overlayInteractiveMode
-      ? t("overlay.hint.dragToMove")
-      : hotkeyLabel
-        ? t("overlay.hint.unlockThenDrag", { hotkey: hotkeyLabel })
-        : "";
+  } else if (!dragHintInfo.dismissed && overlayInteractiveMode && hotkeyLabel) {
+    text = t("overlay.hint.dragToMove");
   }
 
   hint.textContent = text;

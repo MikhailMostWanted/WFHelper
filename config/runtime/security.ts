@@ -93,7 +93,7 @@ export const MAIN_WINDOW_CSP = [
   "script-src 'self'",
   "style-src 'self' https://fonts.googleapis.com",
   "style-src-attr 'unsafe-inline'",
-  "font-src https://fonts.gstatic.com",
+  "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: https:",
   "media-src 'self' data:",
   `connect-src ${buildConnectSrcAllowlist()}`,

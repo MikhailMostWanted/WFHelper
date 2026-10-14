@@ -1,126 +1,62 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { currentView } from "../stores/app.js";
-  import { invoke, send } from "../lib/ipc.js";
-  import { tr } from "../lib/i18n.js";
-  import { NAV_ICON_URLS } from "../lib/assetUrls.js";
-  import { devMode } from "../stores/devMode.js";
+  import { currentView, settingsTabRequest } from "../stores/app.js";
+  import { launcherOpen } from "../stores/launcher.js";
+  import { locale, tr } from "../lib/i18n.js";
+  import { NAV_ICON_URLS, APP_LOGO_URL } from "../lib/assetUrls.js";
   import {
     hiddenTabs,
-    nudgeSidebarWidth,
-    resetSidebarWidth,
     sidebarCollapsed,
     sidebarLabels,
     sidebarOrder,
     sidebarWidth,
-    snapSidebarWidth,
     toggleSidebarCollapsed,
+    nudgeSidebarWidth,
+    resetSidebarWidth,
+    snapSidebarWidth,
     SIDEBAR_EXPAND_MIN,
     SIDEBAR_RAIL_WIDTH,
     SIDEBAR_WIDTH_MAX,
   } from "../stores/sidebarTabs.js";
-  import { resetTourAutoStart } from "../stores/tour.js";
-  import type { MessageKey } from "../lib/i18n.js";
-  import { VIEW_LABEL_KEYS, type SidebarViewName } from "../lib/viewRegistry.js";
+  import { VIEW_LABEL_KEYS } from "../lib/viewRegistry.js";
   import FeedbackModal from "./FeedbackModal.svelte";
 
-  $: showDevTools = $devMode;
   let feedbackOpen = false;
-
-  interface NavItem {
-    view: SidebarViewName;
-    labelKey: MessageKey;
-    icon: string;
-  }
-
-  $: navItems = $sidebarOrder.map(
-    (view): NavItem => ({ view, labelKey: VIEW_LABEL_KEYS[view], icon: NAV_ICON_URLS[view] }),
-  );
-
-  $: visibleNavItems = navItems.filter((item) => !$hiddenTabs.has(item.view));
-
-  // Live drag width, uncommitted: a pointer move must not hit localStorage per frame.
   let dragWidth: number | null = null;
   let resizing = false;
   let dragStartX = 0;
   let dragStartWidth = 0;
-
   $: effectiveWidth = dragWidth ?? $sidebarWidth;
-  // Follows the live drag, not the committed width: labels would otherwise stay
-  // rendered while the grip is already past the rail threshold.
   $: collapsed = dragWidth != null ? dragWidth < SIDEBAR_EXPAND_MIN : $sidebarCollapsed;
-
-  const narrowRail = typeof window === "undefined" ? null : window.matchMedia("(max-width: 800px)");
-
-  // Publish the width globally so the content area and any other consumer of
-  // var(--sidebar-width) reflow with it. Under 800px responsive.css pins the icon
-  // rail, so the inline value is dropped there rather than fighting its :root rule.
-  function writeWidthVar(px: number): void {
-    const root = document.documentElement.style;
-    if (narrowRail?.matches) root.removeProperty("--sidebar-width");
-    else root.setProperty("--sidebar-width", `${px}px`);
-  }
-
-  // One write per frame while the grip is held: each write relayouts the whole
-  // content area, which on the mastery tab is a four-figure card count.
-  let widthFrame: number | null = null;
-  let pendingWidth = 0;
-
-  function applyWidthVar(px: number): void {
-    if (typeof document === "undefined") return;
-    pendingWidth = px;
-    if (!resizing || typeof requestAnimationFrame !== "function") {
-      if (widthFrame !== null) cancelAnimationFrame(widthFrame);
-      widthFrame = null;
-      writeWidthVar(px);
-      return;
-    }
-    if (widthFrame !== null) return;
-    widthFrame = requestAnimationFrame(() => {
-      widthFrame = null;
-      writeWidthVar(pendingWidth);
-    });
-  }
-
-  $: applyWidthVar(effectiveWidth);
-
-  onMount(() => {
-    const onBreakpoint = (): void => applyWidthVar(effectiveWidth);
-    narrowRail?.addEventListener("change", onBreakpoint);
-    return () => {
-      narrowRail?.removeEventListener("change", onBreakpoint);
-      if (widthFrame !== null) cancelAnimationFrame(widthFrame);
-    };
-  });
+  $: visible = $sidebarOrder.filter((view) => !$hiddenTabs.has(view) && view !== "settings");
+  $: if ($hiddenTabs.has($currentView)) currentView.set("inventory");
+  $: if (typeof document !== "undefined")
+    document.documentElement.style.setProperty(
+      "--sidebar-width",
+      `${collapsed ? 84 : effectiveWidth}px`,
+    );
 
   function startResize(e: PointerEvent): void {
-    // Only the primary button drags; a right- or middle-click would otherwise
-    // capture the pointer and never see a matching pointerup.
     if (e.button !== 0) return;
     resizing = true;
     dragStartX = e.clientX;
     dragStartWidth = $sidebarWidth;
     dragWidth = dragStartWidth;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    // Stops the drag from starting a text selection in the content area.
     e.preventDefault();
   }
-
-  function onResize(e: PointerEvent): void {
-    if (!resizing) return;
-    dragWidth = snapSidebarWidth(dragStartWidth + (e.clientX - dragStartX));
+  function resize(e: PointerEvent): void {
+    if (resizing) dragWidth = snapSidebarWidth(dragStartWidth + e.clientX - dragStartX);
   }
-
   function endResize(e: PointerEvent): void {
     if (!resizing) return;
     resizing = false;
-    const grip = e.currentTarget as HTMLElement;
-    if (grip.hasPointerCapture?.(e.pointerId)) grip.releasePointerCapture(e.pointerId);
+    const el = e.currentTarget as HTMLElement;
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
     if (dragWidth != null) sidebarWidth.set(dragWidth);
     dragWidth = null;
   }
-
-  function onGripKey(e: KeyboardEvent): void {
+  function gripKey(e: KeyboardEvent): void {
     const step = e.shiftKey ? 48 : 16;
     if (e.key === "ArrowLeft") nudgeSidebarWidth(-step);
     else if (e.key === "ArrowRight") nudgeSidebarWidth(step);
@@ -130,265 +66,371 @@
     else return;
     e.preventDefault();
   }
-
-  // If the active tab gets hidden, fall back to inventory so we never strand
-  // the user on a view with no way back to it.
-  $: if ($hiddenTabs.has($currentView)) currentView.set("inventory");
-
-  async function loadInventoryFile(): Promise<void> {
-    // seeds the helper source without claiming it - Settings owns the switch
-    const result = await invoke("openInventoryFile", "helper");
-    if (result) currentView.set("inventory");
+  function chatGPT(): void {
+    settingsTabRequest.set("chatgpt");
+    currentView.set("settings");
   }
-
-  function toggleOverlay(): void {
-    send("toggle-overlay");
-  }
-
-  function testOverlay(): void {
-    send("simulate-relic-trigger");
-  }
-
-  function testNotification(): void {
-    void invoke("sendTestNotification");
-  }
+  onMount(() => () => {
+    document.documentElement.style.removeProperty("--sidebar-width");
+  });
 </script>
 
 <nav
   id="sidebar"
-  class="sidebar-shell flex min-h-0 w-[var(--sidebar-width)] shrink-0 flex-col justify-between gap-2 overflow-hidden border-r border-border bg-bg-base px-2.5 py-3.5"
+  class="wanted-sidebar"
   class:sidebar-collapsed={collapsed}
+  aria-label={$locale === "ru" ? "Разделы WantedFrame" : "WantedFrame sections"}
 >
-  <div class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
-    <button
-      class="nav-btn nav-btn-collapse relative flex w-full cursor-pointer items-center gap-3 rounded-md border-0 bg-transparent px-3.5 py-2.5 font-display text-base font-medium tracking-wide text-text-muted transition-colors duration-150 hover:bg-bg-hover hover:text-text-primary"
-      title={$sidebarCollapsed ? $tr("nav.expandSidebar") : $tr("nav.collapseSidebar")}
-      aria-label={$sidebarCollapsed ? $tr("nav.expandSidebar") : $tr("nav.collapseSidebar")}
-      data-sidebar-collapse
-      on:click={toggleSidebarCollapsed}
+  <button
+    type="button"
+    class="wanted-brand"
+    title="WantedFrame"
+    on:click={() => currentView.set("dashboard")}
+  >
+    <img src={APP_LOGO_URL} alt="" /><span
+      ><strong>WANTED</strong><small>FRAME / МИХАИЛ</small></span
     >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.75"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="h-5 w-5 shrink-0 transition-transform duration-150 {$sidebarCollapsed
-          ? 'rotate-180'
-          : ''}"
-      >
-        <polyline points="15 18 9 12 15 6" />
-      </svg>
-      <span>{$tr("nav.collapse")}</span>
-    </button>
-    {#each visibleNavItems as item (item.view)}
+  </button>
+  <button
+    type="button"
+    class="rail-launcher"
+    data-launcher-sidebar
+    title={$locale === "ru" ? "Быстрый переход · Ctrl+K" : "Quick launcher · Ctrl+K"}
+    on:click={() => launcherOpen.set(true)}
+    ><kbd>K</kbd><span>{$locale === "ru" ? "Быстрый переход" : "Quick launcher"}</span></button
+  >
+  <div class="wanted-navigation">
+    {#each visible as view (view)}
       <button
-        data-view={item.view}
-        class="nav-btn relative flex w-full cursor-pointer items-center gap-3 rounded-md border-0 px-3.5 py-2.5 font-display text-base font-medium tracking-wide transition-colors duration-150 {$currentView ===
-        item.view
-          ? "bg-[var(--view-accent-glow)] text-[var(--view-accent)] before:content-[''] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-r before:bg-[var(--view-accent)] max-[800px]:before:hidden"
-          : 'bg-transparent text-text-secondary hover:bg-bg-hover hover:text-text-primary'}"
-        aria-current={$currentView === item.view ? "page" : undefined}
-        on:click={() => currentView.set(item.view)}
+        type="button"
+        class="wanted-nav"
+        class:active={$currentView === view}
+        data-view={view}
+        aria-current={$currentView === view ? "page" : undefined}
+        title={$sidebarLabels[view] ?? $tr(VIEW_LABEL_KEYS[view])}
+        on:click={() => currentView.set(view)}
       >
-        <img src={item.icon} alt="" class="h-6 w-6 shrink-0 object-contain brightness-[0.85]" />
-        <span>{$sidebarLabels[item.view] ?? $tr(item.labelKey)}</span>
+        <img src={NAV_ICON_URLS[view]} alt="" /><span
+          >{$sidebarLabels[view] ?? $tr(VIEW_LABEL_KEYS[view])}</span
+        >
       </button>
     {/each}
   </div>
-
-  <div class="mt-auto flex shrink-0 flex-col gap-2">
-    {#if showDevTools}
-      <div class="mt-2 flex flex-col gap-0.5">
-        <button
-          class="nav-btn relative flex w-full cursor-pointer items-center gap-3 rounded-md border-0 bg-transparent px-3.5 py-2.5 font-display text-base font-medium tracking-wide text-text-muted transition-colors duration-150 hover:bg-bg-hover hover:text-text-secondary"
-          title={$tr("nav.previewSetupWizard")}
-          on:click={() => {
-            resetTourAutoStart();
-            currentView.set("setup");
-          }}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            class="h-6 w-6 shrink-0"
-          >
-            <rect x="4" y="5" width="16" height="14" rx="2" />
-            <path d="M8 9h8M8 13h5M16 13h1" />
-          </svg>
-          <span>{$tr("nav.setup")}</span>
-        </button>
-        <button
-          class="nav-btn relative flex w-full cursor-pointer items-center gap-3 rounded-md border-0 bg-transparent px-3.5 py-2.5 font-display text-base font-medium tracking-wide text-text-muted transition-colors duration-150 hover:bg-bg-hover hover:text-text-secondary"
-          title={$tr("nav.testTitle")}
-          on:click={testOverlay}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            class="h-6 w-6 shrink-0"
-          >
-            <path d="M9 3h6l1 6-3.5 2L16 21H8l3.5-10L8 9l1-6z" />
-          </svg>
-          <span>{$tr("nav.test")}</span>
-        </button>
-        <button
-          class="nav-btn relative flex w-full cursor-pointer items-center gap-3 rounded-md border-0 bg-transparent px-3.5 py-2.5 font-display text-base font-medium tracking-wide text-text-secondary transition-colors duration-150 hover:bg-bg-hover hover:text-text-primary"
-          title={$tr("nav.overlayTitle")}
-          on:click={toggleOverlay}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            class="h-6 w-6 shrink-0"
-          >
-            <polygon points="12,2 22,12 12,22 2,12" />
-            <line x1="12" y1="8" x2="12" y2="16" />
-            <line x1="8" y1="12" x2="16" y2="12" />
-          </svg>
-          <span>{$tr("nav.overlay")}</span>
-        </button>
-        <button
-          class="nav-btn relative flex w-full cursor-pointer items-center gap-3 rounded-md border-0 bg-transparent px-3.5 py-2.5 font-display text-base font-medium tracking-wide text-text-secondary transition-colors duration-150 hover:bg-bg-hover hover:text-text-primary"
-          title={$tr("nav.testNotificationTitle")}
-          data-test-notification
-          on:click={testNotification}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            class="h-6 w-6 shrink-0"
-          >
-            <path d="M18 16V11a6 6 0 10-12 0v5l-2 3h16l-2-3z" />
-            <path d="M10 21h4" />
-          </svg>
-          <span>{$tr("nav.testNotification")}</span>
-        </button>
-        <button
-          class="nav-btn relative flex w-full cursor-pointer items-center gap-3 rounded-md border-0 bg-transparent px-3.5 py-2.5 font-display text-base font-medium tracking-wide text-text-secondary transition-colors duration-150 hover:bg-bg-hover hover:text-text-primary"
-          on:click={loadInventoryFile}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            class="h-6 w-6 shrink-0"
-          >
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-          <span>{$tr("nav.loadJson")}</span>
-        </button>
-      </div>
-    {/if}
+  <div class="wanted-sidebar-bottom">
     <button
       type="button"
-      data-feedback-open
-      class="nav-btn relative flex w-full cursor-pointer items-center gap-3 rounded-md border-0 bg-transparent px-3.5 py-2.5 font-display text-base font-medium tracking-wide text-text-muted transition-colors duration-150 hover:bg-bg-hover hover:text-text-primary"
-      title={$tr("feedback.title")}
-      aria-label={$tr("feedback.title")}
-      on:click={() => (feedbackOpen = true)}
+      class="wanted-nav wanted-chat"
+      data-sidebar-chatgpt
+      title={$locale === "ru" ? "Мой аккаунт в ChatGPT" : "My account in ChatGPT"}
+      on:click={chatGPT}><span class="chat-glyph">AI</span><span>ChatGPT</span></button
     >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.75"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="h-6 w-6 shrink-0"
-        aria-hidden="true"
+    <button
+      type="button"
+      class="wanted-nav"
+      class:active={$currentView === "settings"}
+      data-view="settings"
+      title={$tr("common.settings")}
+      on:click={() => currentView.set("settings")}
+      ><img src={NAV_ICON_URLS.settings} alt="" /><span>{$tr("common.settings")}</span></button
+    >
+    <div class="rail-utility">
+      <button
+        type="button"
+        data-sidebar-collapse
+        on:click={toggleSidebarCollapsed}
+        title={$tr(collapsed ? "nav.expandSidebar" : "nav.collapseSidebar")}
+        aria-label={$tr(collapsed ? "nav.expandSidebar" : "nav.collapseSidebar")}
+        >{collapsed ? "›" : "‹"}</button
       >
-        <path d="M21 15a3 3 0 01-3 3H8l-5 4V6a3 3 0 013-3h12a3 3 0 013 3z" />
-        <path d="M8 10h8M8 14h5" />
-      </svg>
-      <span>{$tr("feedback.title")}</span>
-    </button>
+      <button
+        type="button"
+        data-feedback-open
+        on:click={() => (feedbackOpen = true)}
+        title={$tr("feedback.title")}
+        aria-label={$tr("feedback.title")}>?</button
+      >
+    </div>
   </div>
 </nav>
-
-{#if feedbackOpen}
-  <FeedbackModal onClose={() => (feedbackOpen = false)} />
-{/if}
-
-<!-- A flex sibling rather than an overlay: the nav scrolls, so an absolutely
-     positioned grip inside it would scroll away from the edge. -->
 <div
-  data-sidebar-grip
   class="sidebar-grip"
-  class:sidebar-grip-active={resizing}
+  class:resizing
   role="slider"
-  aria-orientation="horizontal"
   aria-label={$tr("nav.resizeSidebar")}
+  aria-orientation="horizontal"
   aria-valuenow={effectiveWidth}
   aria-valuemin={SIDEBAR_RAIL_WIDTH}
   aria-valuemax={SIDEBAR_WIDTH_MAX}
-  title={$tr("nav.resizeSidebarHint")}
   tabindex="0"
+  data-sidebar-grip
   on:pointerdown={startResize}
-  on:pointermove={onResize}
+  on:pointermove={resize}
   on:pointerup={endResize}
   on:pointercancel={endResize}
   on:lostpointercapture={endResize}
+  on:keydown={gripKey}
   on:dblclick={resetSidebarWidth}
-  on:keydown={onGripKey}
 ></div>
+{#if feedbackOpen}<FeedbackModal onClose={() => (feedbackOpen = false)} />{/if}
 
 <style>
-  /* At rest it must read as nothing at all. A transparent grip shows the shell's
-     --bg-deep, which paints a dark stripe beside the sidebar's gold border, so it
-     carries the same --bg-base as the sidebar and the content on either side. */
-  .sidebar-grip {
-    flex: 0 0 auto;
-    width: 5px;
-    margin-left: 0;
-    cursor: col-resize;
-    background: var(--bg-base);
+  .wanted-sidebar {
+    width: var(--sidebar-width);
+    flex-shrink: 0;
+    background: var(--bg-deep);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.9rem 0.65rem;
+    gap: 0.8rem;
+    box-sizing: border-box;
+  }
+  .wanted-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    text-align: left;
+    background: none;
     border: 0;
-    box-shadow: none;
-    transition: background-color 0.12s ease;
+    color: var(--text-primary);
+    padding: 0.4rem 0.5rem;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .wanted-brand img {
+    width: 2.3rem;
+    height: 2.3rem;
+    object-fit: contain;
+  }
+  .wanted-brand strong,
+  .wanted-brand small {
+    display: block;
+  }
+  .wanted-brand strong {
+    font-size: 1.02rem;
+    letter-spacing: 0.14em;
+    font-weight: 650;
+  }
+  .wanted-brand small {
+    color: var(--text-muted);
+    font-size: 0.52rem;
+    letter-spacing: 0.16em;
+    margin-top: 0.25rem;
+    white-space: nowrap;
+  }
+  .rail-launcher {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.55rem 0.75rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: 0.77rem;
+    text-align: left;
+  }
+  .rail-launcher:hover {
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+  kbd {
+    font-family: inherit;
+    font-size: 0.67rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-glow);
+    width: 1.3rem;
+    height: 1.3rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.3rem;
+  }
+  .wanted-navigation {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-hover) transparent;
+  }
+  .wanted-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.7rem 0.8rem;
+    min-height: 2.7rem;
+    box-sizing: border-box;
+    text-align: left;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 0.7rem;
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    font-weight: 480;
+    cursor: pointer;
+    transition:
+      background-color 0.15s,
+      color 0.15s,
+      border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .wanted-nav img {
+    width: 1.35rem;
+    height: 1.35rem;
+    object-fit: contain;
+    opacity: 0.62;
+    flex-shrink: 0;
+  }
+  .wanted-nav:hover {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+  }
+  .wanted-nav:hover img,
+  .wanted-nav.active img {
+    opacity: 1;
+  }
+  .wanted-nav.active {
+    background: var(--accent-glow);
+    border-color: var(--border-strong);
+    color: var(--accent);
+  }
+  .wanted-sidebar-bottom {
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex-shrink: 0;
+  }
+  .wanted-chat {
+    color: var(--accent);
+  }
+  .chat-glyph {
+    display: grid;
+    place-items: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.35rem;
+    background: var(--accent-glow);
+    flex-shrink: 0;
+  }
+  .rail-utility {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+  }
+  .rail-utility button {
+    background: none;
+    border: 0;
+    border-radius: 0.35rem;
+    color: var(--text-muted);
+    width: 1.6rem;
+    height: 1.6rem;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  .rail-utility button:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+  .sidebar-collapsed {
+    width: 84px;
+    gap: 0.65rem;
+    padding: 0.8rem 0.55rem;
+  }
+  .sidebar-collapsed .wanted-brand {
+    justify-content: center;
+    padding: 0;
+  }
+  .sidebar-collapsed .wanted-brand span,
+  .sidebar-collapsed .rail-launcher span {
+    display: none;
+  }
+  .sidebar-collapsed .rail-launcher {
+    justify-content: center;
+    padding: 0.6rem;
+  }
+  .sidebar-collapsed .wanted-nav {
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.55rem 0.15rem;
+    min-height: 3.15rem;
+    font-size: 0.56rem;
+    text-align: center;
+    line-height: 1.15;
+  }
+  .sidebar-collapsed .wanted-nav span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sidebar-collapsed .wanted-nav img {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+  .sidebar-grip {
+    width: 4px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background: var(--bg-deep);
   }
   .sidebar-grip:hover,
   .sidebar-grip:focus-visible,
-  .sidebar-grip-active {
+  .sidebar-grip.resizing {
     background: var(--accent);
-    outline: none;
   }
-  /* Under 800px responsive.css pins the rail, so a drag here would do nothing. */
   @media (max-width: 800px) {
+    .wanted-sidebar {
+      width: 70px;
+      padding: 0.65rem 0.4rem;
+      gap: 0.5rem;
+    }
+    .wanted-brand {
+      justify-content: center;
+      padding: 0;
+    }
+    .wanted-brand span,
+    .rail-launcher span {
+      display: none;
+    }
+    .rail-launcher {
+      justify-content: center;
+    }
+    .wanted-nav {
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.5rem 0.1rem;
+      font-size: 0.55rem;
+      min-height: 3rem;
+      text-align: center;
+    }
+    .wanted-nav span {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .wanted-nav img {
+      width: 1.2rem;
+      height: 1.2rem;
+    }
     .sidebar-grip {
       display: none;
-    }
-  }
-
-  .sidebar-collapsed :global(.nav-btn span) {
-    display: none;
-  }
-  .sidebar-collapsed :global(.nav-btn) {
-    justify-content: center;
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-    gap: 0;
-  }
-  @media (max-width: 800px) {
-    .nav-btn :global(span) {
-      display: none;
-    }
-    .nav-btn {
-      justify-content: center;
-      padding-left: 0.625rem;
-      padding-right: 0.625rem;
     }
   }
 </style>

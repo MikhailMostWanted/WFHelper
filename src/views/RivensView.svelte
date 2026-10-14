@@ -21,6 +21,7 @@
   import RivenDetailModal from "../modals/RivenDetailModal.svelte";
   import RivenFinder from "../components/RivenFinder.svelte";
   import HeaderTabs from "../components/HeaderTabs.svelte";
+  import WorkspaceIntro from "../components/WorkspaceIntro.svelte";
   import SegmentedControl from "../components/SegmentedControl.svelte";
   import SharedFilterBar from "../components/SharedFilterBar.svelte";
   import RivenPolarityIcon from "../components/RivenPolarityIcon.svelte";
@@ -31,7 +32,7 @@
   import { marketContracts } from "../stores/market.js";
   import { addToast } from "../stores/toasts.js";
   import { readStorage, writeStorage } from "../lib/persistence.js";
-  import { tr } from "../lib/i18n.js";
+  import { tr, locale } from "../lib/i18n.js";
   import {
     RIVEN_ATTR_GRADE_KEYS,
     RIVEN_ATTR_GRADE_ORDER,
@@ -371,9 +372,14 @@
 {/snippet}
 
 <section class="view active">
-  <div class="view-header mb-2">
-    <h2>{$tr("common.rivens")}</h2>
-  </div>
+  <WorkspaceIntro
+    title={$tr("common.rivens")}
+    eyebrow="WANTED / MOD LAB"
+    description={$locale === "ru"
+      ? "Твоя коллекция. Характеристики, качество роллов и предложения рынка в одном месте."
+      : "Your collection. Stats, roll quality and market listings in one place."}
+    icon={NAV_ICON_URLS.rivens}
+  />
 
   <div class="mb-4 flex items-end border-b border-border-subtle" data-tour="riven-view-tabs">
     <HeaderTabs
@@ -464,7 +470,7 @@
         <!-- The compact tile drops the rank pips and the dissolve-endo badge on purpose:
              there is no room at this size and both are in the detail modal. -->
         <div
-          class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3"
+          class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-4 wanted-riven-grid"
           data-riven-card-size={$rivenCardSize}
         >
           {#each filteredRivens as riven (riven.itemId)}
@@ -472,7 +478,7 @@
             {@const suffix = rivenNameSuffix(riven.rivenName, riven.weaponName)}
             <div class="relative" data-riven-card={riven.itemId}>
               <button
-                class="block w-full cursor-pointer rounded-lg border border-border-subtle bg-surface-card p-2 text-left transition-[border-color] duration-150 hover:border-border-strong focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                class="wanted-riven-tile block w-full cursor-pointer rounded-lg border border-border-subtle bg-bg-surface p-4 text-left transition-[border-color] duration-150 hover:border-border-strong focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
                 onclick={() => (selectedRiven = riven)}
                 oncontextmenu={(event) => openCardMenu(event, riven)}
               >
@@ -506,7 +512,7 @@
                 <div class="mt-1.5 flex flex-col gap-0.5">
                   {@render statRows(
                     riven,
-                    "flex items-baseline gap-[0.25em] overflow-hidden whitespace-nowrap font-display text-xs leading-[1.15]",
+                    "flex items-baseline gap-[0.5em] overflow-hidden whitespace-nowrap font-display text-sm leading-[1.7]",
                     "h-3 w-3 shrink-0 self-center align-middle",
                   )}
                 </div>

@@ -26,6 +26,8 @@
   import { itemLabel } from "../lib/itemLabel.js";
   import { SvelteMap } from "svelte/reactivity";
   import EditLayoutBar from "../components/layout/EditLayoutBar.svelte";
+  import WorkspaceIntro from "../components/WorkspaceIntro.svelte";
+  import { NAV_ICON_URLS } from "../lib/assetUrls.js";
   import LayoutGrid from "../components/layout/LayoutGrid.svelte";
 
   import { masteryData } from "../stores/mastery.js";
@@ -638,8 +640,15 @@
 </script>
 
 <section class="view active">
+  <WorkspaceIntro
+    title={$tr("mastery.title")}
+    eyebrow="WANTED / PROGRESSION"
+    description={$locale === "ru"
+      ? "Следующий ранг начинается с плана. Сравни освоение, доступные проекты и предметы, которые хочешь прокачать."
+      : "Your next rank starts with a plan. Compare your mastery, available projects and the items you want to level."}
+    icon={NAV_ICON_URLS.mastery}
+  />
   <div class="view-header">
-    <h2>{$tr("mastery.title")}</h2>
     <div class="ml-auto"><EditLayoutBar view="mastery" /></div>
   </div>
 
@@ -663,6 +672,37 @@
     </div>
   {/each}
 
+  <div class="mastery-pathways">
+    <button
+      type="button"
+      class="mastery-pathway"
+      class:selected={viewTab === "roadmap"}
+      aria-pressed={viewTab === "roadmap"}
+      on:click={() => selectViewTab("roadmap")}
+    >
+      <span class="pathway-index">01 / {$locale === "ru" ? "НАЙТИ МАРШРУТ" : "FIND A ROUTE"}</span>
+      <strong>{$tr("mastery.viewRoadmap")} <span aria-hidden="true">↗</span></strong>
+      <small
+        >{$locale === "ru"
+          ? "Что собрать и освоить следующим"
+          : "What to build and master next"}</small
+      >
+    </button>
+    <button
+      type="button"
+      class="mastery-pathway"
+      class:selected={viewTab === "planned"}
+      aria-pressed={viewTab === "planned"}
+      on:click={() => selectViewTab("planned")}
+    >
+      <span class="pathway-index">02 / {$locale === "ru" ? "СОБРАТЬ ПЛАН" : "MAKE A PLAN"}</span>
+      <strong>{$tr("mastery.viewPlanned")} <span aria-hidden="true">↗</span></strong>
+      <small
+        >{$locale === "ru" ? "Выбранные предметы" : "Selected items"} · {$masteryPins.length}</small
+      >
+    </button>
+  </div>
+
   <div class="mb-3 flex items-end border-b border-border-subtle" data-tour="mastery-view-tabs">
     <HeaderTabs options={VIEW_TABS} activeKey={viewTab} onSelect={selectViewTab} />
   </div>
@@ -676,7 +716,7 @@
     <LayoutGrid view="mastery" gapClass="gap-0" let:sectionId>
       {#if sectionId === "mastery.summary"}
         <div class="grid gap-3 mb-3.5">
-          <div class="flex items-center gap-3.5" data-mastery-summary>
+          <div class="mastery-progress-panel flex items-center gap-3.5" data-mastery-summary>
             <div class="shrink-0">
               <svg class="h-[120px] w-[120px]" viewBox="0 0 120 120">
                 <circle
@@ -692,7 +732,7 @@
                   cy="60"
                   r={RING_R}
                   fill="none"
-                  stroke="var(--accent-blue)"
+                  stroke="var(--accent)"
                   stroke-width="8"
                   stroke-dasharray={RING_C}
                   stroke-dashoffset={RING_C * (1 - stats.mastered / Math.max(stats.total, 1))}
@@ -706,7 +746,7 @@
                   fill="var(--text-primary)"
                   font-size="22"
                   font-weight="700"
-                  font-family="Rajdhani">{masteredPct}%</text
+                  font-family="var(--font-display)">{masteredPct}%</text
                 >
                 <text
                   class="ring-caption"
@@ -715,7 +755,7 @@
                   text-anchor="middle"
                   fill="var(--text-muted)"
                   font-size="10"
-                  font-family="Barlow">{$tr("common.mastered")}</text
+                  font-family="var(--font-body)">{$tr("common.mastered")}</text
                 >
               </svg>
             </div>
@@ -1135,6 +1175,64 @@
 </section>
 
 <style>
+  .mastery-pathways {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.2rem;
+  }
+  .mastery-pathway {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 0.9rem;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+  }
+  .mastery-pathway:hover,
+  .mastery-pathway.selected {
+    border-color: var(--accent);
+    background: var(--bg-surface);
+  }
+  .mastery-pathway:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .pathway-index {
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+  }
+  .mastery-pathway strong {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    font-size: 1rem;
+    font-weight: 550;
+  }
+  .mastery-pathway small {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+  }
+  .mastery-progress-panel {
+    padding: 1.2rem;
+    border: 1px solid var(--border);
+    border-radius: 0.9rem;
+    background: var(--bg-deep);
+  }
+  @media (max-width: 700px) {
+    .mastery-pathways {
+      grid-template-columns: 1fr;
+    }
+    .mastery-progress-panel {
+      flex-wrap: wrap;
+    }
+  }
   .ring-caption {
     text-transform: uppercase;
   }

@@ -58,9 +58,9 @@
 >
   <ul class="m-0 max-h-[340px] flex-1 list-none overflow-y-auto p-0">
     {#each shown as row (row.key)}
-      <li class="flex items-baseline gap-2 py-1 text-sm">
-        <span class="min-w-0 flex-1 truncate text-text-secondary">{row.name}</span>
-        <span class="shrink-0 text-[0.68rem] uppercase tracking-[0.06em] text-text-muted">
+      <li class="foundry-row flex items-center gap-3 text-sm">
+        <span class="min-w-0 flex-1 truncate text-text-secondary" title={row.name}>{row.name}</span>
+        <span class="foundry-state" class:claimable={row.claimable}>
           {row.claimable
             ? $tr("mastery.roadmap.accessClaimable")
             : $tr("foundry.status.readyToBuild")}
@@ -69,3 +69,27 @@
     {/each}
   </ul>
 </WidgetFrame>
+
+<style>
+  .foundry-row {
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .foundry-row:last-child {
+    border-bottom: 0;
+  }
+  .foundry-state {
+    flex-shrink: 0;
+    max-width: 45%;
+    padding: 0.22rem 0.45rem;
+    border-radius: var(--radius-sm);
+    background: var(--bg-base);
+    color: var(--text-muted);
+    font-size: 0.67rem;
+    line-height: 1.4;
+  }
+  .foundry-state.claimable {
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-base));
+    color: var(--accent);
+  }
+</style>

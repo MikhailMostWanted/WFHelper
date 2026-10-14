@@ -35,6 +35,7 @@ test.describe("WFM status pill (fixture mode)", () => {
     env.LOCALAPPDATA = localAppData;
     env.APPDATA = path.join(sandboxDir, "roaming");
     env.WFHELPER_USER_DATA = path.join(sandboxDir, "user-data");
+    env.WFHELPER_EE_LOG = path.join(sandboxDir, "EE.log");
     env.WFHELPER_WFM_FIXTURES = fixturePath;
 
     app = await electron.launch({ args: ["--no-sandbox", "--lang=en-US", "."], env });
@@ -43,9 +44,13 @@ test.describe("WFM status pill (fixture mode)", () => {
     await expect(page.locator("#app")).toBeVisible({ timeout: 90_000 });
     await page.evaluate(() => {
       localStorage.setItem("setup-completed-v2", "1");
+      localStorage.setItem("app-language", "en");
     });
     await page.reload();
     await expect(page.locator("#sidebar")).toBeVisible({ timeout: 90_000 });
+    await page.locator('#sidebar [data-view="settings"]').click();
+    await page.locator('[data-tour-tab="appearance"]').click();
+    await page.locator("[data-apply-wanted-appearance]").click();
     await page.locator('#sidebar [data-view="inventory"]').click();
     await expect(page.locator("#content")).toHaveAttribute("data-view", "inventory");
   });
@@ -86,6 +91,14 @@ test.describe("WFM status pill (fixture mode)", () => {
     await page.screenshot({ path: test.info().outputPath("wfm-status-pill-menu.png") });
 
     await panel.locator('[data-wfm-status-option="invisible"]').click();
+    await expect(panel.locator('[data-wfm-status-option="invisible"]')).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(panel.locator('[data-wfm-status-option="online"]')).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     await expect(current).toHaveAttribute("data-wfm-status-current", "invisible");
     // A settings panel stays open while the pill behind it updates.
     await expect(panel).toBeVisible();
@@ -103,6 +116,16 @@ test.describe("WFM status pill (fixture mode)", () => {
     await expect(bar).toHaveCount(1, { timeout: 30_000 });
     await expect(bar.locator("[data-wfm-status-option]")).toHaveCount(3);
     await expect(bar.locator(".presence-chip")).toHaveCount(8);
+    await page.locator('#content [data-tour-tab="browse"]').click();
+    const browse = page.locator('[data-tour="market-browse"]');
+    await expect(browse.locator('[data-browse-state="welcome"]')).toBeVisible();
+    await expect(page.locator("#content [data-wfm-presence-bar]")).toHaveCount(1);
+    const search = browse.getByRole("combobox");
+    await search.fill("keyboard-clear-fixture");
+    await browse.getByRole("button", { name: "Clear search", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await expect(search).toHaveValue("");
+    await expect(search).toBeFocused();
     const shot = test.info().outputPath("wfm-presence-market-header.png");
     await page.screenshot({ path: shot });
     await test.info().attach("market header", { path: shot, contentType: "image/png" });

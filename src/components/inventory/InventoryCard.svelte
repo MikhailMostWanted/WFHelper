@@ -107,11 +107,11 @@
 
 <div
   data-inventory-card={item.internalName}
-  class="item-card group relative {mastered ? 'border-success/25' : ''} {item.isPrime
-    ? 'border-accent/30'
-    : ''} {selectionMode && !selectable ? 'opacity-45' : ''} {selected
-    ? 'outline outline-2 outline-offset-[-2px] outline-[color:var(--accent)]'
-    : ''}"
+  class="item-card inventory-collection-card group relative {mastered
+    ? 'border-success/25'
+    : ''} {item.isPrime ? 'border-accent/30' : ''} {selectionMode && !selectable
+    ? 'opacity-45'
+    : ''} {selected ? 'outline outline-2 outline-offset-[-2px] outline-[color:var(--accent)]' : ''}"
   role="button"
   tabindex="0"
   aria-label={!selectionMode
@@ -122,7 +122,12 @@
   aria-pressed={selectionMode ? selected : undefined}
   aria-disabled={selectionMode && !selectable ? true : undefined}
   on:click={selectCard}
-  on:keydown={(event) => (event.key === "Enter" || event.key === " ") && selectCard(event)}
+  on:keydown={(event) => {
+    if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " "))
+      return;
+    event.preventDefault();
+    selectCard(event);
+  }}
   bind:this={cardEl}
 >
   {#if selectionMode}
@@ -158,6 +163,7 @@
       fallbackSrc={item.imageUrl !== item.displayImageUrl ? item.imageUrl : null}
       alt={itemLabel(item)}
       auditKey={item.name}
+      cls="inventory-art"
     />
     {#if item.vaulted || ($showMasteredBadges && marks.mastered) || ($showOwnedParentBadges && marks.crafted)}
       <span class="item-mark-row">
@@ -302,14 +308,118 @@
 </div>
 
 <style>
+  .inventory-collection-card {
+    display: grid;
+    grid-template-columns: 6.8rem minmax(0, 1fr);
+    min-width: 0;
+    min-height: 11rem;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    box-shadow: 0 2px 12px color-mix(in oklab, var(--bg-deep) 35%, transparent);
+    transition:
+      border-color 150ms ease,
+      background 150ms ease,
+      box-shadow 150ms ease;
+  }
+  .inventory-collection-card:hover {
+    border-color: color-mix(in oklab, var(--accent) 45%, var(--border-subtle));
+    background: var(--bg-raised);
+    box-shadow: 0 5px 20px color-mix(in oklab, var(--bg-deep) 50%, transparent);
+  }
+  .inventory-collection-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .inventory-collection-card:focus-within .expand-link {
+    opacity: 1;
+  }
+  .item-img-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    min-height: 100%;
+    padding: 2.3rem 0.45rem 2.2rem;
+    overflow: hidden;
+    border-right: 1px solid var(--border-subtle);
+    background: radial-gradient(
+      ellipse at 50% 45%,
+      color-mix(in oklab, var(--accent) 8%, var(--bg-soft)),
+      var(--bg-deep)
+    );
+  }
+  .item-img-wrap :global(.inventory-art) {
+    width: auto;
+    height: auto;
+    max-width: 5.8rem;
+    max-height: 8rem;
+    object-fit: contain;
+    filter: drop-shadow(0 5px 10px color-mix(in oklab, var(--bg-deep) 65%, transparent));
+  }
+  .item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+    padding: 1rem 0.9rem 0.85rem;
+  }
+  .item-name {
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    font-weight: 650;
+    line-height: 1.35;
+    letter-spacing: -0.018em;
+    color: var(--text-primary);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .item-type {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+  }
+  .inventory-rank-order-box {
+    min-height: 2.25rem;
+    padding: 0.4rem 0.45rem;
+    border-color: var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--bg-deep);
+  }
   .inventory-rank-order-label {
-    color: color-mix(in oklab, var(--accent-bright) 80%, white);
+    font-size: 0.74rem;
+    font-weight: 500;
+    color: var(--text-muted);
   }
   .inventory-rank-order-box :global(strong) {
     font-family: var(--font-display);
     color: var(--accent-bright);
-    font-size: 0.86rem;
-    line-height: 1.05;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.25;
     letter-spacing: 0.01em;
+  }
+  .item-rank-bar {
+    margin-top: auto;
+  }
+  .item-rank-text {
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+  .expand-link {
+    top: 0.5rem;
+    right: 0.5rem;
+    min-height: 1.7rem;
+    font-size: 0.72rem;
+    background: var(--bg-deep);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .inventory-collection-card {
+      transition: none;
+    }
   }
 </style>

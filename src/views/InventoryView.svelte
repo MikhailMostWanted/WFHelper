@@ -735,7 +735,7 @@
   ];
 </script>
 
-<section class="view active">
+<section class="view active inventory-collection">
   <InventoryHeader
     totalCount={filteredTotalCount}
     filters={FILTERS}
@@ -823,11 +823,11 @@
         <ResourcesView resources={filteredResources} />
       {:else}
         <div
-          class="grid grid-cols-1 items-start gap-3 {orderBookPanelOpen
+          class="inventory-collection-body grid grid-cols-1 items-start gap-4 {orderBookPanelOpen
             ? 'min-[1101px]:grid-cols-[minmax(0,1fr)_360px]'
             : ''}"
         >
-          <div class="min-w-0" data-tour="inventory-grid">
+          <div class="inventory-shelf min-w-0" data-tour="inventory-grid">
             {#if filter === "everything"}
               <ChipToggleRow
                 rowName="everything-sources"
@@ -926,6 +926,12 @@
 </section>
 
 <style>
+  .inventory-collection {
+    min-width: 0;
+  }
+  .inventory-shelf :global(.chip-toggle-row) {
+    margin-bottom: 0.85rem;
+  }
   .inventory-filter-popover :global(.shared-filter-bar) {
     margin-bottom: 0;
   }

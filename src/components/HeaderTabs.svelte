@@ -4,11 +4,12 @@
   export let onSelect: (key: string) => void;
 </script>
 
-<div class="flex flex-wrap">
+<div class="wanted-header-tabs flex flex-wrap">
   {#each options as option (option.key)}
     <button
-      class="flex items-center whitespace-nowrap border-0 border-b-[3px] border-b-transparent bg-transparent px-4 py-2 -mb-px font-display text-base text-text-secondary transition-[border-color,color] duration-150 hover:text-text-body data-[active]:border-b-text-heading data-[active]:text-text-heading"
+      class="wanted-header-tab flex items-center whitespace-nowrap font-display text-sm text-text-secondary"
       data-active={activeKey === option.key || undefined}
+      aria-pressed={activeKey === option.key}
       data-tour-tab={option.key}
       on:click={() => onSelect(option.key)}
     >
@@ -16,3 +17,39 @@
     </button>
   {/each}
 </div>
+
+<style>
+  .wanted-header-tabs {
+    gap: 0.3rem;
+    padding: 0.4rem;
+    align-items: center;
+  }
+  .wanted-header-tab {
+    padding: 0.65rem 0.9rem;
+    border: 1px solid transparent;
+    border-radius: 0.55rem;
+    background: none;
+    cursor: pointer;
+    transition:
+      color 0.15s,
+      background-color 0.15s,
+      border-color 0.15s;
+    line-height: 1.25;
+    font-weight: 500;
+  }
+  .wanted-header-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+  .wanted-header-tab[data-active] {
+    color: var(--accent);
+    border-color: var(--border-strong);
+    background: var(--accent-glow);
+  }
+  @media (max-width: 800px) {
+    .wanted-header-tab {
+      padding: 0.55rem 0.65rem;
+      font-size: 0.75rem;
+    }
+  }
+</style>

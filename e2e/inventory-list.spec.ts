@@ -41,6 +41,9 @@ test.describe("Inventory list view", () => {
   test.beforeAll(async () => {
     harness = await launchElectronTestHarness("wfh-inventory-list-", { inventory: inventory() });
     page = harness.page;
+    await openView(page, "settings");
+    await page.locator('[data-tour-tab="appearance"]').click();
+    await page.locator("[data-apply-wanted-appearance]").click();
     await openView(page, "inventory");
     await page.locator('[data-tour-tab="all_parts"]').click();
     await expect(page.locator(".item-card").first()).toBeVisible({ timeout: 30_000 });
@@ -55,6 +58,17 @@ test.describe("Inventory list view", () => {
     await cards.nth(0).hover();
     await expect(cards.nth(0).locator(".expand-link")).toHaveCSS("opacity", "1");
     await expect(cards.nth(1).locator(".expand-link")).toHaveCSS("opacity", "0");
+    await page.mouse.move(0, 0);
+    await cards.nth(1).focus();
+    const details = cards.nth(1).locator(".expand-link");
+    await expect(details).toHaveCSS("opacity", "1");
+    await details.focus();
+    await expect(details).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("[data-item-detail]")).toBeVisible();
+    await expect(page.locator("[data-orderbook-panel]")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await page.screenshot({ path: test.info().outputPath("inventory-collection-design.png") });
   });
 
   function modeButton(mode: "cards" | "list") {

@@ -81,68 +81,87 @@
   }
 </script>
 
-<div class="flex flex-wrap items-center gap-1.5" data-wfm-presence-bar>
-  {#each statusOptions as [statusKey, label] (statusKey)}
+<div class="presence-workspace" data-wfm-presence-bar>
+  <div class="presence-status-group" role="group" aria-label={$tr("browse.status")}>
+    {#each statusOptions as [statusKey, label] (statusKey)}
+      <button
+        type="button"
+        class="presence-status"
+        class:statusOnlineActive={statusKey === "online" && $marketViewState.status === statusKey}
+        class:statusIngameActive={statusKey === "ingame" && $marketViewState.status === statusKey}
+        class:statusInvisibleActive={statusKey === "invisible" &&
+          $marketViewState.status === statusKey}
+        data-wfm-status-option={statusKey}
+        aria-pressed={$marketViewState.status === statusKey}
+        onclick={() => setWfmStatus(statusKey)}>{label}</button
+      >
+    {/each}
+  </div>
+
+  <div class="presence-automations">
     <button
-      class="rounded-md border border-border bg-bg-surface px-2 py-1 font-display text-xs font-semibold text-text-secondary transition-all duration-[0.14s] hover:border-text-secondary hover:text-text-primary"
-      class:statusOnlineActive={statusKey === "online" && $marketViewState.status === statusKey}
-      class:statusIngameActive={statusKey === "ingame" && $marketViewState.status === statusKey}
-      class:statusInvisibleActive={statusKey === "invisible" &&
-        $marketViewState.status === statusKey}
-      data-wfm-status-option={statusKey}
-      onclick={() => setWfmStatus(statusKey)}>{label}</button
+      type="button"
+      class="presence-chip"
+      class:presenceChipActive={autoIngameEnabled}
+      aria-pressed={autoIngameEnabled}
+      title={$tr("market.autoIngameTitle")}
+      onclick={() => saveAutoIngame(!autoIngameEnabled)}
     >
-  {/each}
+      {$tr("market.autoInGame")}{autoIngameEnabled ? $tr("market.stateOn") : $tr("market.stateOff")}
+    </button>
 
-  <span class="mx-1 h-4 w-px bg-surface-hover"></span>
+    <div class="presence-idle-control" role="group" aria-label={$tr("market.awayIdleTitle")}>
+      <button
+        type="button"
+        class="presence-chip"
+        class:presenceChipActive={awayIdleEnabled}
+        aria-pressed={awayIdleEnabled}
+        title={$tr("market.awayIdleTitle")}
+        onclick={() => saveAwayIdle(!awayIdleEnabled)}
+      >
+        {$tr("market.awayIdle", { minutes: awayIdleMinutes })}{awayIdleEnabled
+          ? $tr("market.stateOn")
+          : $tr("market.stateOff")}
+      </button>
+      <input
+        class="presence-minutes"
+        type="number"
+        min="1"
+        max="60"
+        value={awayIdleMinutes}
+        disabled={!awayIdleEnabled}
+        title={$tr("market.awayIdleTitle")}
+        aria-label={$tr("market.awayIdle", { minutes: awayIdleMinutes })}
+        onchange={(event) => saveAwayIdleMinutes(event.currentTarget.value)}
+      />
+    </div>
 
-  <button
-    class="presence-chip"
-    class:presenceChipActive={autoIngameEnabled}
-    title={$tr("market.autoIngameTitle")}
-    onclick={() => saveAutoIngame(!autoIngameEnabled)}
-  >
-    {$tr("market.autoInGame")}{autoIngameEnabled ? $tr("market.stateOn") : $tr("market.stateOff")}
-  </button>
-
-  <button
-    class="presence-chip"
-    class:presenceChipActive={awayIdleEnabled}
-    title={$tr("market.awayIdleTitle")}
-    onclick={() => saveAwayIdle(!awayIdleEnabled)}
-  >
-    {$tr("market.awayIdle", { minutes: awayIdleMinutes })}{awayIdleEnabled
-      ? $tr("market.stateOn")
-      : $tr("market.stateOff")}
-  </button>
-  <input
-    class="presence-minutes"
-    type="number"
-    min="1"
-    max="60"
-    value={awayIdleMinutes}
-    disabled={!awayIdleEnabled}
-    title={$tr("market.awayIdleTitle")}
-    aria-label={$tr("market.awayIdle", { minutes: awayIdleMinutes })}
-    onchange={(event) => saveAwayIdleMinutes(event.currentTarget.value)}
-  />
-
-  <button
-    class="presence-chip"
-    class:presenceChipActive={awayClosedEnabled}
-    title={$tr("market.awayClosedTitle")}
-    onclick={() => saveAwayClosed(!awayClosedEnabled)}
-  >
-    {$tr("market.awayClosed")}{awayClosedEnabled ? $tr("market.stateOn") : $tr("market.stateOff")}
-  </button>
+    <button
+      type="button"
+      class="presence-chip"
+      class:presenceChipActive={awayClosedEnabled}
+      aria-pressed={awayClosedEnabled}
+      title={$tr("market.awayClosedTitle")}
+      onclick={() => saveAwayClosed(!awayClosedEnabled)}
+    >
+      {$tr("market.awayClosed")}{awayClosedEnabled ? $tr("market.stateOn") : $tr("market.stateOff")}
+    </button>
+  </div>
 
   <!-- Warframe.market disables this too; a hidden status cannot expire. -->
-  <div class="flex flex-wrap items-center gap-1.5" class:presenceHoldIdle={holdIdle}>
-    <span class="ml-1 font-display text-xs text-text-muted">{$tr("market.keepStatusFor")}</span>
+  <div
+    class="presence-hold-group"
+    class:presenceHoldIdle={holdIdle}
+    role="group"
+    aria-label={$tr("market.keepStatusFor")}
+  >
+    <span class="presence-label">{$tr("market.keepStatusFor")}</span>
     {#each WFM_STATUS_HOLD_MINUTES as minutes, index (minutes)}
       <button
+        type="button"
         class="presence-chip"
         class:presenceChipActive={statusHoldMinutes === minutes && !holdIdle}
+        aria-pressed={statusHoldMinutes === minutes && !holdIdle}
         disabled={holdIdle}
         onclick={() => saveHoldMinutes(minutes)}>{holdLabels[index]}</button
       >
@@ -150,9 +169,7 @@
   </div>
 
   {#if holdRemaining}
-    <span class="font-display text-xs text-text-secondary"
-      >{$tr("market.holdLeft", { time: holdRemaining })}</span
-    >
+    <span class="presence-countdown">{$tr("market.holdLeft", { time: holdRemaining })}</span>
   {/if}
   {#if $marketViewState.statusAutoActive}
     <span class="font-display text-xs text-text-muted">{$tr("market.followingGame")}</span>
@@ -162,6 +179,49 @@
 </div>
 
 <style>
+  .presence-workspace {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem 0.9rem;
+  }
+  .presence-status-group,
+  .presence-automations,
+  .presence-hold-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .presence-idle-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: 100%;
+  }
+  .presence-status-group {
+    padding: 0.25rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--bg-deep);
+  }
+  .presence-status {
+    min-height: 2rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .presence-status:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
   .statusOnlineActive {
     border-color: var(--success-dim);
     background: var(--success-bg);
@@ -178,47 +238,80 @@
     color: var(--text-primary);
   }
   .presence-chip {
-    border: 1px solid var(--border);
-    border-radius: 999px;
+    min-height: 2rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
     background: var(--bg-surface);
-    padding: 0.15rem 0.6rem;
+    padding: 0.35rem 0.65rem;
     font-family: var(--font-display);
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    color: var(--text-muted);
-    transition: all 0.14s;
+    line-height: 1.3;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition:
+      border-color 140ms,
+      background 140ms,
+      color 140ms;
   }
   .presence-chip:hover {
     border-color: var(--text-secondary);
     color: var(--text-primary);
   }
   .presenceChipActive {
-    border-color: var(--info-dim);
-    background: var(--info-bg);
-    color: var(--info);
+    border-color: var(--accent-dim);
+    background: var(--accent-glow);
+    color: var(--accent-bright);
   }
-  .presenceHoldIdle {
-    opacity: 0.4;
+  .presence-label {
+    margin-right: 0.25rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+  }
+  .presenceHoldIdle .presence-label {
+    color: var(--text-muted);
   }
   .presence-chip:disabled {
     cursor: default;
+    color: var(--text-muted);
   }
   .presence-chip:disabled:hover {
     border-color: var(--border);
     color: var(--text-muted);
   }
   .presence-minutes {
-    width: 3.2rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--bg-surface);
-    padding: 0.15rem 0.5rem;
+    width: 3.6rem;
+    min-height: 2rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--bg-deep);
+    padding: 0.35rem 0.5rem;
     font-family: var(--font-display);
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: var(--text-primary);
   }
   .presence-minutes:disabled {
-    opacity: 0.4;
+    opacity: 0.55;
+  }
+  .presence-countdown {
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--accent-dim);
+    border-radius: var(--radius-md);
+    background: var(--accent-glow);
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-bright);
+  }
+  button:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .presence-chip {
+      transition: none;
+    }
   }
 </style>

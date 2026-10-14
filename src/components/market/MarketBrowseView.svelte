@@ -550,102 +550,112 @@
   }
 </script>
 
-<div class="grid gap-3" data-tour="market-browse">
-  <div class="mx-auto flex w-[min(640px,100%)] items-center gap-2">
-    <div class="relative min-w-0 flex-1">
-      <div
-        class="flex items-stretch overflow-hidden rounded-lg border border-border bg-bg-surface focus-within:border-accent focus-within:shadow-[0_0_0_2px_color-mix(in_oklab,var(--accent)_28%,transparent)]"
-      >
-        <input
-          class="min-w-0 flex-1 border-0 bg-transparent px-3.5 py-2.5 text-base text-text-primary outline-none placeholder:text-text-muted"
-          type="text"
-          placeholder={$translate("browse.searchPlaceholder")}
-          bind:value={query}
-          bind:this={searchEl}
-          on:input={() => (showSuggestions = true)}
-          on:focus={() => (showSuggestions = true)}
-          on:keydown={onSearchKeydown}
-          on:blur={onSearchBlur}
-          role="combobox"
-          aria-expanded={suggestionsOpen}
-          aria-controls={SUGGESTION_LIST_ID}
-          aria-activedescendant={suggestionsOpen
-            ? `${SUGGESTION_LIST_ID}-${activeSuggestion}`
-            : undefined}
-          data-search-focus
-        />
-        {#if query}
-          <button
-            type="button"
-            class="flex cursor-pointer items-center border-0 bg-transparent px-2 text-base leading-none text-text-muted hover:text-text-primary"
-            aria-label={$translate("common.clearSearch")}
-            on:mousedown|preventDefault={clearSearch}>&times;</button
-          >
-        {/if}
-        <div class="flex items-center border-l border-border bg-accent-glow px-3 text-accent">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            class="h-4 w-4"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.35-4.35" />
-          </svg>
-        </div>
-      </div>
-      {#if suggestionsOpen}
+<div class="market-browse-desk" data-tour="market-browse">
+  <div class="browse-search-workspace">
+    <div class="browse-search-label">
+      <span>warframe.market</span>
+      <label for="market-browse-search">{$translate("common.item")}</label>
+    </div>
+    <div class="browse-search-row">
+      <div class="relative min-w-0 flex-1">
         <div
-          class="absolute inset-x-0 top-full z-30 mt-1 max-h-[22rem] overflow-y-auto rounded-lg border border-border bg-bg-raised"
-          role="listbox"
-          id={SUGGESTION_LIST_ID}
+          class="flex items-stretch overflow-hidden rounded-lg border border-border bg-bg-surface focus-within:border-accent focus-within:shadow-[0_0_0_2px_color-mix(in_oklab,var(--accent)_28%,transparent)]"
         >
-          {#each suggestions as suggestion, suggestionIndex (suggestion.slug)}
+          <input
+            class="min-w-0 flex-1 border-0 bg-transparent px-3.5 py-2.5 text-base text-text-primary outline-none placeholder:text-text-muted"
+            type="text"
+            id="market-browse-search"
+            placeholder={$translate("browse.searchPlaceholder")}
+            bind:value={query}
+            bind:this={searchEl}
+            on:input={() => (showSuggestions = true)}
+            on:focus={() => (showSuggestions = true)}
+            on:keydown={onSearchKeydown}
+            on:blur={onSearchBlur}
+            role="combobox"
+            aria-expanded={suggestionsOpen}
+            aria-controls={SUGGESTION_LIST_ID}
+            aria-activedescendant={suggestionsOpen
+              ? `${SUGGESTION_LIST_ID}-${activeSuggestion}`
+              : undefined}
+            data-search-focus
+          />
+          {#if query}
             <button
               type="button"
-              class="flex w-full items-center gap-2.5 border-0 bg-transparent px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-hover"
-              class:is-active={suggestionIndex === activeSuggestion}
-              bind:this={suggestionEls[suggestionIndex]}
-              role="option"
-              id={`${SUGGESTION_LIST_ID}-${suggestionIndex}`}
-              aria-selected={suggestionIndex === activeSuggestion}
-              on:mouseenter={() => (activeSuggestion = suggestionIndex)}
-              on:mousedown|preventDefault={() => pick(suggestion)}
+              class="flex cursor-pointer items-center border-0 bg-transparent px-2 text-base leading-none text-text-muted hover:text-text-primary"
+              aria-label={$translate("common.clearSearch")}
+              on:click={clearSearch}>&times;</button
             >
-              <span
-                class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surface-card"
-              >
-                <ItemImage
-                  src={suggestion.thumb}
-                  fallbackSrc={suggestion.gameRef
-                    ? ($itemDb[suggestion.gameRef]?.imageUrl ?? null)
-                    : null}
-                  alt={catalogLabel(suggestion, $itemDb)}
-                  cls="max-h-full max-w-full"
-                />
-              </span>
-              <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-                >{catalogLabel(suggestion, $itemDb)}</span
-              >
-            </button>
-          {/each}
+          {/if}
+          <div class="flex items-center border-l border-border bg-accent-glow px-3 text-accent">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              class="h-4 w-4"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
+          </div>
         </div>
-      {/if}
+        {#if suggestionsOpen}
+          <div
+            class="absolute inset-x-0 top-full z-30 mt-1 max-h-[22rem] overflow-y-auto rounded-lg border border-border bg-bg-raised"
+            role="listbox"
+            id={SUGGESTION_LIST_ID}
+          >
+            {#each suggestions as suggestion, suggestionIndex (suggestion.slug)}
+              <button
+                type="button"
+                class="flex w-full items-center gap-2.5 border-0 bg-transparent px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-hover"
+                class:is-active={suggestionIndex === activeSuggestion}
+                bind:this={suggestionEls[suggestionIndex]}
+                role="option"
+                id={`${SUGGESTION_LIST_ID}-${suggestionIndex}`}
+                aria-selected={suggestionIndex === activeSuggestion}
+                on:mouseenter={() => (activeSuggestion = suggestionIndex)}
+                on:mousedown|preventDefault={() => pick(suggestion)}
+              >
+                <span
+                  class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surface-card"
+                >
+                  <ItemImage
+                    src={suggestion.thumb}
+                    fallbackSrc={suggestion.gameRef
+                      ? ($itemDb[suggestion.gameRef]?.imageUrl ?? null)
+                      : null}
+                    alt={catalogLabel(suggestion, $itemDb)}
+                    cls="max-h-full max-w-full"
+                  />
+                </span>
+                <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                  >{catalogLabel(suggestion, $itemDb)}</span
+                >
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      <button
+        type="button"
+        class="shrink-0 rounded-lg border px-3 py-2 text-base disabled:cursor-default disabled:opacity-40 {currentSaved
+          ? 'border-accent/50 bg-accent-glow text-accent'
+          : 'border-border bg-bg-soft text-text-secondary hover:text-text-primary'}"
+        disabled={!selected}
+        aria-label={currentSaved
+          ? $translate("browse.alreadySaved")
+          : $translate("browse.saveItem")}
+        title={currentSaved ? $translate("browse.alreadySaved") : $translate("browse.saveItem")}
+        on:click={saveCurrent}>★</button
+      >
     </div>
-    <button
-      type="button"
-      class="shrink-0 rounded-lg border px-3 py-2 text-base disabled:cursor-default disabled:opacity-40 {currentSaved
-        ? 'border-accent/50 bg-accent-glow text-accent'
-        : 'border-border bg-bg-soft text-text-secondary hover:text-text-primary'}"
-      disabled={!selected}
-      title={currentSaved ? $translate("browse.alreadySaved") : $translate("browse.saveItem")}
-      on:click={saveCurrent}>★</button
-    >
   </div>
 
   {#if $savedStore.length > 0}
-    <div class="mx-auto flex w-[min(640px,100%)] flex-wrap items-center gap-1.5">
+    <div class="flex flex-wrap items-center gap-1.5">
       <span class="text-xs uppercase tracking-[0.05em] text-text-muted"
         >{$translate("common.saved")}</span
       >
@@ -682,18 +692,21 @@
   {/if}
 
   {#if !selected}
-    <div
-      class="mx-auto w-[min(640px,100%)] rounded-xl border border-dashed border-border bg-bg-soft px-4 py-8 text-center text-sm text-text-secondary"
-    >
-      {$translate("browse.emptyHint")}
+    <div class="browse-welcome" data-browse-state="welcome">
+      <div class="browse-welcome-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="m16 16 4.5 4.5M7 10.5h7M10.5 7v7" />
+        </svg>
+      </div>
+      <div>
+        <h3>{$translate("browse.tabOrders")}</h3>
+        <p>{$translate("browse.emptyHint")}</p>
+      </div>
     </div>
   {:else}
-    <div
-      class="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-bg-surface p-4"
-    >
-      <div
-        class="flex h-[84px] w-[84px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-accent bg-surface-card"
-      >
+    <div class="browse-item-workspace">
+      <div class="browse-item-art">
         <ItemImage
           src={selected.thumb}
           fallbackSrc={selected.gameRef ? ($itemDb[selected.gameRef]?.imageUrl ?? null) : null}
@@ -702,9 +715,7 @@
         />
       </div>
       <div class="min-w-0 flex-1">
-        <h3
-          class="m-0 font-display text-2xl font-bold uppercase tracking-[0.04em] text-text-primary"
-        >
+        <h3 class="browse-item-title">
           {catalogLabel(selected, $itemDb)}
         </h3>
         <div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-text-secondary">
@@ -757,11 +768,13 @@
       <button
         class="filter-tab"
         class:active={contentView === "orders"}
+        aria-pressed={contentView === "orders"}
         on:click={() => (contentView = "orders")}>{$translate("browse.tabOrders")}</button
       >
       <button
         class="filter-tab"
         class:active={contentView === "stats"}
+        aria-pressed={contentView === "stats"}
         disabled={subtype === "atragraph"}
         on:click={() => (contentView = "stats")}>{$translate("browse.tabStatistics")}</button
       >
@@ -770,7 +783,7 @@
     {#if contentView === "stats" && subtype !== "atragraph"}
       <MarketBrowseStats slug={selected.slug} />
     {:else}
-      <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
+      <div class="browse-filter-workspace">
         {#if subtypeOptions.length > 0}
           <div class="grid gap-1">
             <label for="browse-variant" class="text-xs uppercase tracking-[0.05em] text-text-muted"
@@ -802,11 +815,13 @@
             <button
               class="filter-tab browse-side-sell"
               class:active={side === "sell"}
+              aria-pressed={side === "sell"}
               on:click={() => setSide("sell")}>WTS</button
             >
             <button
               class="filter-tab browse-side-buy"
               class:active={side === "buy"}
+              aria-pressed={side === "buy"}
               on:click={() => setSide("buy")}>WTB</button
             >
           </div>
@@ -819,16 +834,19 @@
             <button
               class="filter-tab"
               class:active={statusFilter === "ingame"}
+              aria-pressed={statusFilter === "ingame"}
               on:click={() => (statusFilter = "ingame")}>{$translate("common.inGame")}</button
             >
             <button
               class="filter-tab"
               class:active={statusFilter === "onsite"}
+              aria-pressed={statusFilter === "onsite"}
               on:click={() => (statusFilter = "onsite")}>{$translate("browse.onSite")}</button
             >
             <button
               class="filter-tab"
               class:active={statusFilter === "all"}
+              aria-pressed={statusFilter === "all"}
               on:click={() => (statusFilter = "all")}>{$translate("common.all")}</button
             >
           </div>
@@ -842,11 +860,13 @@
               <button
                 class="filter-tab"
                 class:active={rankFilter === "all"}
+                aria-pressed={rankFilter === "all"}
                 on:click={() => setRankFilter("all")}>{$translate("common.all")}</button
               >
               <button
                 class="filter-tab"
                 class:active={rankFilter === "maxed"}
+                aria-pressed={rankFilter === "maxed"}
                 on:click={() => setRankFilter("maxed")}>{$translate("browse.maxed")}</button
               >
             </div>
@@ -862,6 +882,7 @@
               type="number"
               min="0"
               placeholder={$translate("common.min")}
+              aria-label={`${$translate("common.price")} · ${$translate("common.min")}`}
               bind:value={minPrice}
             />
             <span class="text-xs text-text-muted">-</span>
@@ -870,6 +891,7 @@
               type="number"
               min="0"
               placeholder={$translate("common.max")}
+              aria-label={`${$translate("common.price")} · ${$translate("common.max")}`}
               bind:value={maxPrice}
             />
           </div>
@@ -877,27 +899,23 @@
       </div>
 
       {#if loading}
-        <div
-          class="rounded-xl border border-dashed border-border bg-bg-soft px-4 py-6 text-center text-sm text-text-secondary"
-        >
+        <div class="browse-state" role="status" aria-live="polite" data-browse-state="loading">
+          <span class="browse-loading-marker" aria-hidden="true"></span>
           {$translate("common.loadingListings")}
         </div>
       {:else if errorKey}
-        <div
-          class="rounded-xl border border-dashed border-danger/40 bg-bg-soft px-4 py-6 text-center text-sm text-danger"
-        >
+        <div class="browse-state browse-state-error" role="alert" data-browse-state="error">
           {$translate(errorKey)}
+          <button type="button" class="btn-secondary btn-sm" on:click={refresh}
+            >{$translate("common.refresh")}</button
+          >
         </div>
       {:else if noData || !orderBook}
-        <div
-          class="rounded-xl border border-dashed border-border bg-bg-soft px-4 py-6 text-center text-sm text-text-secondary"
-        >
+        <div class="browse-state" data-browse-state="empty">
           {$translate("browse.noListings")}
         </div>
       {:else if rows.length === 0}
-        <div
-          class="rounded-xl border border-dashed border-border bg-bg-soft px-4 py-6 text-center text-sm text-text-secondary"
-        >
+        <div class="browse-state" data-browse-state="filtered-empty">
           {side === "sell" ? $translate("browse.noOrdersSell") : $translate("browse.noOrdersBuy")}
         </div>
       {:else}
@@ -1003,6 +1021,172 @@
 </div>
 
 <style>
+  .market-browse-desk {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+  }
+  .browse-search-workspace {
+    padding: 1.2rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+  }
+  .browse-search-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.8rem;
+    margin-bottom: 0.85rem;
+  }
+  .browse-search-label span {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--accent-dim);
+    border-radius: var(--radius-sm);
+    background: var(--accent-glow);
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--accent-bright);
+  }
+  .browse-search-label label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+  .browse-search-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+  }
+  .browse-search-row input {
+    min-height: 3rem;
+    font-family: var(--font-display);
+    font-size: 1rem;
+  }
+  .browse-welcome {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    min-height: 15rem;
+    padding: clamp(1.5rem, 4vw, 3rem);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: radial-gradient(
+      ellipse at 0% 50%,
+      color-mix(in oklab, var(--accent) 5%, var(--bg-surface)),
+      var(--bg-surface) 65%
+    );
+  }
+  .browse-welcome-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 5rem;
+    height: 5rem;
+    border: 1px solid var(--accent-dim);
+    border-radius: var(--radius-lg);
+    background: var(--accent-glow);
+    color: var(--accent);
+  }
+  .browse-welcome-icon svg {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+  .browse-welcome h3 {
+    margin: 0 0 0.65rem;
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+  }
+  .browse-welcome p {
+    max-width: 45rem;
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+  .browse-item-workspace {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.2rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+  }
+  .browse-item-art {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 5.6rem;
+    height: 5.6rem;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--bg-deep);
+  }
+  .browse-item-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    font-weight: 650;
+    line-height: 1.35;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+  }
+  .browse-filter-workspace {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 1rem;
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+  }
+  .browse-state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    min-height: 9rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .browse-state-error {
+    border-color: var(--danger-dim);
+    color: var(--danger);
+  }
+  .browse-loading-marker {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: browse-loading 900ms linear infinite;
+  }
+  @keyframes browse-loading {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .market-browse-desk button:focus-visible,
+  .market-browse-desk select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
   /* Sell/buy sides mirror the Post WTS (green) / Post WTB (red) buttons. */
   .browse-side-sell {
     color: color-mix(in oklab, var(--success) 65%, var(--text-secondary));
@@ -1027,13 +1211,14 @@
     color: var(--danger);
   }
   .browse-price-input {
-    width: 4.2rem;
+    width: 5rem;
+    min-height: 2.2rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     background: var(--bg-raised);
     color: var(--text-primary);
     padding: 0.3rem 0.4rem;
-    font-size: 0.78rem;
+    font-size: 0.88rem;
   }
   .browse-price-input:focus {
     outline: none;
@@ -1042,5 +1227,17 @@
   }
   .is-active {
     background: color-mix(in oklab, var(--accent) 16%, transparent);
+  }
+  @media (max-width: 720px) {
+    .browse-welcome {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .browse-loading-marker {
+      animation: none;
+    }
   }
 </style>

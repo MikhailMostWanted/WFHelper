@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Onest";
+  src: url("../assets/fonts/Onest-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 @layer base {
   html,
   body,
@@ -47,5 +55,27 @@
   a:hover {
     color: var(--accent-bright);
     text-decoration: underline;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

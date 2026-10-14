@@ -56,12 +56,12 @@
       {allTradables ? $tr("inventory.value.allTradables") : $tr("inventory.value.scopePrime")}
     </p>
   {/snippet}
-  <dl class="m-0 grid grid-cols-2 gap-2">
+  <dl class="inventory-worth m-0 grid grid-cols-2 gap-4">
     <div class="min-w-0">
       <dt class="text-[0.68rem] uppercase tracking-[0.06em] text-text-muted">
         {$tr("common.platinum")}
       </dt>
-      <dd class="m-0 font-display text-lg tabular-nums text-text-primary">
+      <dd class="m-0 font-display tabular-nums text-text-primary">
         {totals.platinum.toLocaleString()}
       </dd>
     </div>
@@ -69,7 +69,7 @@
       <dt class="text-[0.68rem] uppercase tracking-[0.06em] text-text-muted">
         {$tr("common.ducats")}
       </dt>
-      <dd class="m-0 font-display text-lg tabular-nums text-text-primary">
+      <dd class="m-0 font-display tabular-nums text-text-primary">
         {totals.ducats.toLocaleString()}
       </dd>
     </div>
@@ -80,3 +80,23 @@
     </p>
   {/if}
 </WidgetFrame>
+
+<style>
+  .inventory-worth {
+    padding: 0.3rem 0 0.6rem;
+  }
+  .inventory-worth dt {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+  }
+  .inventory-worth dd {
+    margin-top: 0.25rem;
+    font-size: 2rem;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.04em;
+  }
+  .inventory-worth > div:first-child dd {
+    color: var(--accent);
+  }
+</style>

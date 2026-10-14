@@ -26,6 +26,36 @@ function definePreset(
 }
 
 export const THEME_PRESETS: Record<string, ThemePreset> = {
+  wantedMikhail: definePreset(
+    "Wanted · Михаил",
+    {
+      bgDeep: "#0b0d10",
+      bgBase: "#101216",
+      bgSurface: "#181b21",
+      bgRaised: "#20242c",
+      bgHover: "#292e38",
+      accent: "#e1b777",
+      accentDim: "#a57b45",
+      accentBright: "#f4d6a5",
+      textPrimary: "#f1f2f5",
+      textSecondary: "#adb4c1",
+      textMuted: "#8993a4",
+      success: "#82d9b1",
+      warning: "#ebbf79",
+      danger: "#f18b98",
+      info: "#9cbef5",
+      border: "rgba(190, 201, 220, 0.1)",
+      borderStrong: "rgba(225, 183, 119, 0.42)",
+      gradeS: "#82d9b1",
+      gradeA: "#a4d1b5",
+      gradeB: "#ebbf79",
+      gradeC: "#e8a075",
+      gradeD: "#d9917d",
+      gradeF: "#f18b98",
+      gradeDefault: "#adb4c1",
+    },
+    { cornerStyle: "round", relicCardStyle: "plain", surfaceStyle: "full" },
+  ),
   default: definePreset("Orokin Gold"),
 
   midnight: definePreset("Midnight Blue", {

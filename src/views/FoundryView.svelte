@@ -42,7 +42,8 @@
     isFoundryRecipeReady,
   } from "../lib/inventory/foundryResources.js";
   import { sharedFilters, updateSharedFilters } from "../stores/filters.js";
-  import { tr } from "../lib/i18n.js";
+  import { tr, locale } from "../lib/i18n.js";
+  import WorkspaceIntro from "../components/WorkspaceIntro.svelte";
   import type { MessageKey } from "../lib/i18n.js";
   import ItemImage from "../components/ItemImage.svelte";
   import HeaderTabs from "../components/HeaderTabs.svelte";
@@ -364,9 +365,13 @@
 </script>
 
 <section class="view active">
-  <div class="view-header">
-    <h2>{$tr("common.foundry")}</h2>
-  </div>
+  <WorkspaceIntro
+    title={$tr("common.foundry")}
+    eyebrow="WANTED / WORKSHOP"
+    description={$locale === "ru"
+      ? "Твои проекты. Посмотри готовое производство и найди, что собрать из имеющихся ресурсов."
+      : "Your projects. Check completed production and what your resources can build."}
+  />
 
   <div class="view-sticky-filters mb-3">
     <SharedFilterBar
@@ -454,7 +459,7 @@
   {/if}
 
   <!-- Unified grid -->
-  <div class="grid grid-cols-[repeat(auto-fill,minmax(380px,1fr))] gap-3">
+  <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,380px),1fr))] gap-4">
     {#if sorted.length === 0}
       <!-- Nothing to filter is not a filter miss: only blame the filters when
            the unfiltered list actually had rows. -->

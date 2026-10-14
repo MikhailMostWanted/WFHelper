@@ -112,7 +112,7 @@
 </script>
 
 <header
-  class="z-50 flex h-[var(--titlebar-height)] select-none items-center justify-between border-b border-border bg-bg-deep app-region-drag"
+  class="wanted-titlebar z-50 flex h-[var(--titlebar-height)] select-none items-center justify-between border-b border-border bg-bg-deep app-region-drag"
 >
   <div class="flex min-w-0 items-center gap-2 pl-3.5">
     <img

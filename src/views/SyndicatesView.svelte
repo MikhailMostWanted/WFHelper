@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { CREDITS_ICON_URL } from "../lib/assetUrls.js";
+  import { CREDITS_ICON_URL, NAV_ICON_URLS } from "../lib/assetUrls.js";
+  import WorkspaceIntro from "../components/WorkspaceIntro.svelte";
   import { formatNumber } from "../lib/format.js";
   import { locale, tr, type MessageKey } from "../lib/i18n.js";
   import { send } from "../lib/ipc.js";
@@ -108,8 +109,15 @@
 </script>
 
 <section class="view active" data-syndicates-view>
+  <WorkspaceIntro
+    title={$tr("common.syndicates")}
+    eyebrow="WANTED / ALLIANCES"
+    description={$locale === "ru"
+      ? "Выбери, с кем двигаться дальше. Репутация, цели рангов и ресурсы для подношений — рядом."
+      : "Choose your next alliance. Standing, rank goals and sacrifice resources side by side."}
+    icon={NAV_ICON_URLS.syndicates}
+  />
   <div class="view-header">
-    <h2>{$tr("common.syndicates")}</h2>
     <span class="text-xs text-text-muted">{$tr("syndicates.hint")}</span>
     <div class="ml-auto flex items-center gap-2">
       <ThemedButton disabled={!hasGoals} onClick={clearSyndicateGoals}>

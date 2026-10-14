@@ -46,8 +46,8 @@
   --color-surface-tooltip: var(--surface-tooltip);
   --color-riven-pip: var(--riven-pip);
   --color-riven-reroll: var(--riven-reroll);
-  --font-display: "Rajdhani", sans-serif;
-  --font-body: "Barlow", sans-serif;
+  --font-display: "Onest", "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-body: "Onest", "Segoe UI Variable", "Segoe UI", sans-serif;
 
   --animate-fade-in: fade-in 0.18s ease;
   --animate-detail-slide-in: detail-slide-in 0.15s ease-out;
@@ -82,6 +82,7 @@
 @import "./styles/components.css";
 
 @import "./styles/responsive.css";
+@import "./styles/wanted.css";
 
 @media (prefers-reduced-motion: reduce) {
   *,

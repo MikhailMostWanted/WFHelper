@@ -1,0 +1,211 @@
+/* The workspace shell stays separate from the scrollable game views and popouts. */
+@layer components {
+  :root {
+    --content-gutter: 2rem;
+    --statusbar-height: 30px;
+  }
+  .wanted-workspace {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .wanted-workspace > #content {
+    min-height: 0;
+    background: var(--bg-base);
+    padding-bottom: 2.5rem;
+  }
+  .wanted-workspace > #content > .view {
+    max-width: 1800px;
+    margin: 0 auto;
+    padding-top: 1.6rem;
+  }
+  .view-header {
+    gap: 1rem;
+    margin-bottom: 1.4rem;
+  }
+  .view-header h2 {
+    font-size: var(--font-heading-size, 1.9rem);
+    font-weight: 550;
+    letter-spacing: -0.04em;
+    line-height: 1.2;
+  }
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-success {
+    border-radius: 0.55rem;
+    min-height: 2.35rem;
+    letter-spacing: 0;
+    font-weight: 550;
+    padding: 0.6rem 0.9rem;
+  }
+  .btn-sm {
+    min-height: 1.9rem;
+    padding: 0.4rem 0.65rem;
+  }
+  .btn-primary {
+    box-shadow: 0 3px 12px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  .btn-secondary {
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+  }
+  .search-box input {
+    height: 2.65rem;
+    font-size: 0.86rem;
+    border-radius: 0.6rem;
+    background: var(--bg-deep);
+  }
+  .filter-tab {
+    font-size: 0.78rem;
+    letter-spacing: 0;
+    padding: 0.55rem 0.85rem;
+    border-radius: 0.55rem;
+    background: transparent;
+  }
+  .filter-tab.active {
+    background: var(--accent-glow);
+    border-color: var(--border-strong);
+    font-weight: 600;
+  }
+  .filter-tabs {
+    gap: 0.3rem;
+  }
+  .shared-filter-select {
+    height: 2.45rem;
+    line-height: 2.45rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    background: var(--bg-deep);
+    border-radius: 0.55rem;
+  }
+  .sort-control {
+    border-radius: 0.55rem;
+    background: var(--bg-deep);
+  }
+  .sort-control-direction {
+    width: 2.45rem;
+    border-left-color: var(--border);
+    background: var(--bg-raised);
+  }
+  .shared-filter-sort span,
+  .shared-sort-label {
+    letter-spacing: 0;
+    font-size: 0.7rem;
+  }
+  .item-grid,
+  #relic-grid {
+    gap: 1rem;
+  }
+  .resource-card {
+    padding: 0.8rem;
+    background: var(--bg-surface);
+    border-radius: 0.85rem;
+  }
+  .resource-img-wrap {
+    border: 0;
+    background: var(--bg-raised);
+    border-radius: 0.7rem;
+  }
+  .resource-count {
+    font-variant-numeric: tabular-nums;
+  }
+  .item-name,
+  .resource-name,
+  .order-item-name {
+    letter-spacing: -0.015em;
+  }
+  .detail-panel {
+    border-radius: 1.1rem;
+    box-shadow: 0 24px 80px #0006;
+    border-color: var(--border-strong);
+    padding: 1.6rem;
+  }
+  .detail-overlay {
+    backdrop-filter: blur(7px);
+    background: #0005;
+  }
+  .empty-state {
+    border: 1px dashed var(--border);
+    border-radius: 0.9rem;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    gap: 0.5rem;
+  }
+  .empty-state p {
+    margin: 0.3rem 0;
+  }
+  .empty-state svg {
+    opacity: 0.6;
+    color: var(--accent);
+  }
+  .tab-bar {
+    border-bottom-color: var(--border);
+    gap: 0.4rem;
+    padding-bottom: 0.45rem;
+  }
+  .tab-bar .tab-btn {
+    letter-spacing: 0;
+    border-radius: 0.5rem;
+  }
+  .wanted-titlebar {
+    background: var(--bg-deep);
+  }
+  .wanted-titlebar > div:first-child > span:first-of-type {
+    font-size: 0.66rem;
+    letter-spacing: 0.09em;
+  }
+  .wanted-titlebar > div:first-child > span:last-of-type {
+    font-size: 0.65rem;
+    border-color: transparent;
+    background: transparent;
+  }
+  .wanted-statusbar {
+    font-size: 0.68rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-deep);
+  }
+  .wanted-statusbar > span:last-child {
+    font-size: 0.62rem;
+  }
+  .wanted-settings-section {
+    padding: 1.3rem;
+  }
+  .wanted-settings-section h3 {
+    font-size: 1rem;
+    letter-spacing: 0;
+    font-weight: 550;
+  }
+  .wanted-settings-section > div > p {
+    margin: 0.5rem 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  .wanted-riven-tile {
+    min-height: 12rem;
+    border-radius: 0.9rem;
+  }
+  .wanted-riven-tile > div:first-child {
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.9rem;
+  }
+  .wanted-riven-tile > div:last-child {
+    margin-top: 1.1rem;
+  }
+  @media (max-width: 1100px) {
+    :root {
+      --content-gutter: 1.3rem;
+    }
+  }
+  @media (max-width: 800px) {
+    :root {
+      --content-gutter: 1rem;
+    }
+    .view-header h2 {
+      font-size: 1.55rem;
+    }
+  }
+}

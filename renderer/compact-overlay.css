@@ -1,14 +1,13 @@
 /* Passive HUD. The interaction key restores detail; the editor retains its coordinates. */
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) #panel {
   height: auto;
-  max-height: 150px;
+  max-height: 180px;
   min-height: 90px;
   position: absolute;
   bottom: 0;
   border-radius: 8px;
   backdrop-filter: none;
 }
-body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-player,
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-set-parts,
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-meta-chip.set,
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing)
@@ -16,23 +15,20 @@ body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing)
   display: none;
 }
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .reward-slot {
-  padding: 8px 10px;
+  padding: 10px 12px;
 }
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-name {
-  font:
-    600 14px/1.2 "Segoe UI",
-    system-ui,
-    sans-serif;
+  font: 600 13px/1.3 var(--overlay-font);
   min-height: 34px;
   max-height: 34px;
   overflow: hidden;
 }
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) .slot-price {
-  font-size: 18px;
+  font-size: 22px;
 }
 body:not(.planner-mode):not(.overlay-interactive):not(.reward-layout-editing) #best-footer {
-  padding: 3px 10px;
-  min-height: 22px;
+  padding: 7px 12px;
+  min-height: 30px;
 }
 body.planner-mode:not(.overlay-interactive):not(.reward-layout-editing) #panel {
   height: auto;

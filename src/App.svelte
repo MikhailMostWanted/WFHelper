@@ -3,6 +3,9 @@
   import type { Component } from "svelte";
 
   import Titlebar from "./components/Titlebar.svelte";
+  import WorkspaceHeader from "./components/WorkspaceHeader.svelte";
+  import CommandLauncher from "./components/CommandLauncher.svelte";
+  import { launcherOpen, rememberView } from "./stores/launcher.js";
   import CustomCssHost from "./components/CustomCssHost.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import StatusBar from "./components/StatusBar.svelte";
@@ -114,6 +117,10 @@
   });
 
   function handleViewChange(view: ViewName): void {
+    if (view !== "setup" && !isPopoutWindow) rememberView(view);
+    void tick().then(() => {
+      if ($currentView === view) document.querySelector("#content")?.scrollTo({ top: 0 });
+    });
     if (isLazyView(view)) {
       activeLazyView = view;
       if (lastRequestedLazyView === view) return;
@@ -218,6 +225,18 @@
   }
 
   function onKeyDown(e: KeyboardEvent): void {
+    if (
+      !isPopoutWindow &&
+      (e.ctrlKey || e.metaKey) &&
+      !e.shiftKey &&
+      !e.altKey &&
+      e.key.toLowerCase() === "k"
+    ) {
+      if ($currentView === "setup" || document.querySelector('[role="dialog"]')) return;
+      e.preventDefault();
+      launcherOpen.set(true);
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
       const target = findSearchTarget();
       if (target) {
@@ -327,50 +346,55 @@
           <Sidebar />
         {/if}
 
-        <main
-          id="content"
-          data-view={$currentView}
-          style={viewScopeStyle}
-          class:stats-active={$currentView === "stats"}
-          class:setup-active={$currentView === "setup"}
-        >
-          {#if $currentView === "setup"}
-            <SetupView />
-          {:else if $currentView === "inventory"}
-            <InventoryView />
-          {:else if $currentView === "foundry"}
-            <FoundryView />
-          {:else if $currentView === "mastery"}
-            <MasteryView />
-          {:else if $currentView === "stats"}
-            <StatsView />
-          {:else if $currentView === "rivens"}
-            <RivensView />
-          {:else if $currentView === "settings"}
-            <SettingsView />
-          {:else if activeLazyView}
-            {#if lazyViewLoading || activeLazyView !== lastRequestedLazyView}
-              <section class="view active">
-                <div class="empty-state">
-                  <p>{$tr("app.loadingView", { view: $tr(VIEW_LABEL_KEYS[activeLazyView]) })}</p>
-                </div>
-              </section>
-            {:else if lazyViewError}
-              <section class="view active">
-                <div class="empty-state gap-3">
-                  <p>{$tr("app.failedLoadView", { view: $tr(VIEW_LABEL_KEYS[activeLazyView]) })}</p>
-                  <p class="text-sm text-text-muted">{lazyViewError}</p>
-                  <button
-                    class="cursor-pointer rounded border border-border bg-bg-soft px-3 py-1 text-sm text-text-secondary transition-[border-color,color] duration-150 hover:border-border-strong hover:text-text-primary"
-                    on:click={retryLazyViewLoad}>{$tr("common.retry")}</button
-                  >
-                </div>
-              </section>
-            {:else if lazyViewComponent}
-              <svelte:component this={lazyViewComponent} />
+        <div class="wanted-workspace">
+          {#if $currentView !== "setup"}<WorkspaceHeader />{/if}
+          <main
+            id="content"
+            data-view={$currentView}
+            style={viewScopeStyle}
+            class:stats-active={$currentView === "stats"}
+            class:setup-active={$currentView === "setup"}
+          >
+            {#if $currentView === "setup"}
+              <SetupView />
+            {:else if $currentView === "inventory"}
+              <InventoryView />
+            {:else if $currentView === "foundry"}
+              <FoundryView />
+            {:else if $currentView === "mastery"}
+              <MasteryView />
+            {:else if $currentView === "stats"}
+              <StatsView />
+            {:else if $currentView === "rivens"}
+              <RivensView />
+            {:else if $currentView === "settings"}
+              <SettingsView />
+            {:else if activeLazyView}
+              {#if lazyViewLoading || activeLazyView !== lastRequestedLazyView}
+                <section class="view active">
+                  <div class="empty-state">
+                    <p>{$tr("app.loadingView", { view: $tr(VIEW_LABEL_KEYS[activeLazyView]) })}</p>
+                  </div>
+                </section>
+              {:else if lazyViewError}
+                <section class="view active">
+                  <div class="empty-state gap-3">
+                    <p>
+                      {$tr("app.failedLoadView", { view: $tr(VIEW_LABEL_KEYS[activeLazyView]) })}
+                    </p>
+                    <p class="text-sm text-text-muted">{lazyViewError}</p>
+                    <button
+                      class="cursor-pointer rounded border border-border bg-bg-soft px-3 py-1 text-sm text-text-secondary transition-[border-color,color] duration-150 hover:border-border-strong hover:text-text-primary"
+                      on:click={retryLazyViewLoad}>{$tr("common.retry")}</button
+                    >
+                  </div>
+                </section>
+              {:else if lazyViewComponent}
+                <svelte:component this={lazyViewComponent} />
+              {/if}
             {/if}
-          {/if}
-        </main>
+          </main>
+        </div>
       </div>
 
       {#if $currentView !== "setup"}
@@ -378,6 +402,7 @@
       {/if}
 
       <ModalHost />
+      {#if $launcherOpen && $currentView !== "setup"}<CommandLauncher />{/if}
       {#if $bulkSellOpen}
         <BulkSellModal onClose={() => bulkSellOpen.set(false)} />
       {/if}

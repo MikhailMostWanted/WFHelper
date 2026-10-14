@@ -16,7 +16,9 @@
   } from "../lib/relic/relicInventory.js";
   import { buildParsedItemFromDb } from "../lib/parsedItemFromDb.js";
   // Aliased: a store named `tr` makes svelte-check flag every <tr> row as a lowercase component.
-  import { tr as t, type MessageKey } from "../lib/i18n.js";
+  import { locale, tr as t, type MessageKey } from "../lib/i18n.js";
+  import WorkspaceIntro from "../components/WorkspaceIntro.svelte";
+  import { NAV_ICON_URLS } from "../lib/assetUrls.js";
   import { stripQuantityPrefix } from "../../config/shared/quantityPrefix.js";
   import WikiButton from "../components/WikiButton.svelte";
   import type { DropKind, DropRow, DropSearchMode } from "../../config/shared/dropTypes.js";
@@ -228,17 +230,17 @@
 </script>
 
 <section class="view active">
-  <div class="mx-auto flex w-full max-w-[1040px] flex-col gap-4 py-4">
-    <header class="view-header mb-0">
-      <div class="flex flex-col gap-1">
-        <h2>{$t("wiki.title")}</h2>
-        <p class="m-0 text-sm text-text-secondary">
-          {$t("wiki.description")}
-        </p>
-      </div>
-    </header>
+  <div class="mx-auto flex w-full max-w-[1280px] flex-col gap-4">
+    <WorkspaceIntro
+      title={$t("wiki.title")}
+      eyebrow="WANTED / FIELD GUIDE"
+      description={$locale === "ru"
+        ? "Найди цель и место охоты. Предметы, противники, источники наград и сохранённые поиски."
+        : "Find your target and where to hunt. Items, enemies, reward sources and saved searches."}
+      icon={NAV_ICON_URLS.wiki}
+    />
 
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="wiki-research-controls flex flex-wrap items-center gap-2">
       <div class="relative min-w-[240px] flex-1">
         <input
           type="search"
@@ -425,3 +427,12 @@
     {/if}
   </div>
 </section>
+
+<style>
+  .wiki-research-controls {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.9rem;
+    background: var(--bg-deep);
+  }
+</style>

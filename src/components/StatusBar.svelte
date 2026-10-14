@@ -137,7 +137,7 @@
 </script>
 
 <footer
-  class="flex h-[var(--statusbar-height)] select-none items-center justify-between border-t border-border bg-bg-deep px-3.5 text-[12px] text-text-muted"
+  class="wanted-statusbar flex h-[var(--statusbar-height)] select-none items-center justify-between border-t border-border bg-bg-deep px-3.5 text-[12px] text-text-muted"
 >
   <span class="flex min-w-0 items-center gap-2">
     <span class="truncate">{statusLabel}</span>

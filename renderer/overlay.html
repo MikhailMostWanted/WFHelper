@@ -4,11 +4,12 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none';"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: https:; connect-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none';"
     />
     <title data-i18n="settings.overlayTitle">Relic Overlay</title>
     <link rel="stylesheet" href="overlay.css" />
     <link rel="stylesheet" href="overlay-layout.css" />
+    <link rel="stylesheet" href="overlay-polish.css" />
     <link rel="stylesheet" href="compact-overlay.css" />
   </head>
   <body>
@@ -70,6 +71,7 @@
       <div id="best-footer" class="is-hidden">
         <span id="best-label" data-i18n="overlay.reward.bestLabel">Best:</span>
         <span id="best-value">Detecting...</span>
+        <span id="reward-interaction-hint" class="is-hidden"></span>
       </div>
     </div>
     <script src="reward-editor-bridge.js"></script>

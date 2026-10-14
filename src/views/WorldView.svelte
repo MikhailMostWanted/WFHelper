@@ -97,6 +97,8 @@
   import { itemLabel } from "../lib/itemLabel.js";
   import { onMount } from "svelte";
   import EditLayoutBar from "../components/layout/EditLayoutBar.svelte";
+  import WorkspaceIntro from "../components/WorkspaceIntro.svelte";
+  import { NAV_ICON_URLS } from "../lib/assetUrls.js";
   import LayoutGrid from "../components/layout/LayoutGrid.svelte";
   import OpenInWindowButton from "../components/layout/OpenInWindowButton.svelte";
   import { worldData, worldLoading, worldFissureMode } from "../stores/world.js";
@@ -144,7 +146,7 @@
   import WorldWeekOverview from "../components/world/WorldWeekOverview.svelte";
   import NightwaveShop from "../components/world/NightwaveShop.svelte";
   import VendorRotations from "../components/world/VendorRotations.svelte";
-  import { tr, type Translator } from "../lib/i18n.js";
+  import { locale, tr, type Translator } from "../lib/i18n.js";
   import InvasionItem from "../components/world/InvasionItem.svelte";
   import BaroInventoryCard from "../components/world/BaroInventoryCard.svelte";
   import BaroPlanner from "../components/world/BaroPlanner.svelte";
@@ -390,11 +392,19 @@
 </script>
 
 <section class="view active">
+  {#if !isPopoutWindow}
+    <WorkspaceIntro
+      title={$tr("common.world")}
+      eyebrow="WANTED / OPERATIONS"
+      description={$locale === "ru"
+        ? "Твой маршрут на сегодня. Циклы, разломы, арбитражи и торговцы — в одном месте."
+        : "Your route for today. Cycles, fissures, arbitrations and traders in one place."}
+      icon={NAV_ICON_URLS.world}
+    />
+  {/if}
   <div class="mb-4">
     <div class="mb-2 flex items-center justify-between gap-3">
-      <h2 class="m-0 font-display text-3xl font-semibold tracking-[0.03em] text-text-primary">
-        {$tr("common.world")}
-      </h2>
+      {#if isPopoutWindow}<h2 class="m-0 text-lg text-text-primary">{$tr("common.world")}</h2>{/if}
       <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
         {#if !isPopoutWindow}
           <OpenInWindowButton
@@ -427,6 +437,35 @@
       {/if}
     </div>
   </div>
+
+  {#if !isPopoutWindow && worldTab === "world" && wd}
+    <div class="operation-pulse">
+      <div class="operation-reading">
+        <span>{$tr("world.voidFissures")}</span>
+        <strong>{wd.fissures ? fissureFlat.length : "—"}</strong>
+        <small>{$locale === "ru" ? "По выбранному фильтру" : "With the selected filter"}</small>
+      </div>
+      <div class="operation-reading">
+        <span>{$tr("world.dailyReset")}</span>
+        <strong class:world-timer-urgent={resetUrgency.daily}>{times.daily}</strong>
+        <small>{$tr("world.weeklyResets")} · {times.weekly}</small>
+      </div>
+      <button
+        type="button"
+        class="operation-reading operation-link"
+        on:click={() => setWorldTab("baro")}
+      >
+        <span>{$tr("world.baroKiteer")} <span aria-hidden="true">↗</span></span>
+        <strong
+          >{baroActive ? ($locale === "ru" ? "В системе" : "In the system") : times.baro}</strong
+        >
+        <small
+          >{baroLocation ||
+            ($locale === "ru" ? "План покупок и коллекция" : "Shopping plan and collection")}</small
+        >
+      </button>
+    </div>
+  {/if}
 
   {#if worldTab === "baro"}
     <BaroPlanner />
@@ -1059,6 +1098,69 @@
 </section>
 
 <style>
+  .operation-pulse {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 0.9rem;
+    background: var(--bg-deep);
+  }
+  .operation-reading {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 1.15rem 1.3rem;
+    border: 0;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+  }
+  .operation-reading + .operation-reading {
+    border-left: 1px solid var(--border);
+  }
+  .operation-reading > span {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+  }
+  .operation-reading strong {
+    font-size: 1.45rem;
+    font-weight: 550;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+  .operation-reading small {
+    color: var(--text-muted);
+    font-size: 0.65rem;
+  }
+  .operation-link {
+    cursor: pointer;
+  }
+  .operation-link > span {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .operation-link:hover,
+  .operation-link:focus-visible {
+    background: var(--bg-surface);
+  }
+  .operation-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  @media (max-width: 800px) {
+    .operation-pulse {
+      grid-template-columns: 1fr;
+    }
+    .operation-reading + .operation-reading {
+      border-left: 0;
+      border-top: 1px solid var(--border);
+    }
+  }
   .world-section {
     padding: 0.85rem 0;
     border-top: 1px solid var(--border);

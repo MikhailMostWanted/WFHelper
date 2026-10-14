@@ -8,13 +8,14 @@ import type { ViewName } from "../types/views.js";
 export const SETUP_COMPLETED_KEY = "setup-completed-v2";
 
 function getInitialView(): ViewName {
-  return readStorage(SETUP_COMPLETED_KEY) === "1" ? "inventory" : "setup";
+  return readStorage(SETUP_COMPLETED_KEY) === "1" ? "dashboard" : "setup";
 }
 
 export const currentView = writable<ViewName>(getInitialView());
 
 // Consumed once when Settings opens; normal sidebar navigation still starts at General.
-export const settingsTabRequest = writable<"chatgpt" | null>(null);
+export type SettingsTab = "general" | "appearance" | "customization" | "overlay" | "chatgpt";
+export const settingsTabRequest = writable<SettingsTab | null>(null);
 
 type StatusMessage = {
   key: MessageKey;

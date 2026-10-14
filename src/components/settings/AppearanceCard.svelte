@@ -8,6 +8,7 @@
   import FontSizeSection from "./FontSizeSection.svelte";
   import AppScaleSection from "./AppScaleSection.svelte";
   import ThemedControlCard from "../ThemedControlCard.svelte";
+  import WantedAppearance from "./WantedAppearance.svelte";
 
   const panelClass =
     "w-full rounded-[var(--radius-xl)] border border-[var(--ui-panel-border)] bg-[var(--ui-panel-bg)] p-4 shadow-[var(--ui-panel-shadow)] [backdrop-filter:var(--ui-backdrop-blur)]";
@@ -16,6 +17,7 @@
 </script>
 
 <!-- Clear sibling card stacking contexts. -->
+<WantedAppearance />
 <article class="appearance-card relative z-20 {panelClass}">
   <div class="mb-2.5">
     <h3

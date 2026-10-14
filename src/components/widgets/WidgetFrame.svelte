@@ -67,13 +67,13 @@
 </script>
 
 <section
-  class="relative flex min-h-[160px] min-w-0 flex-col gap-2 overflow-hidden rounded-[var(--radius-lg)] border border-[color:var(--ui-panel-border)] bg-[var(--ui-panel-bg)] p-3"
+  class="dashboard-widget relative flex min-w-0 flex-col overflow-hidden"
   style={accentStyle}
   data-widget={widgetId}
 >
-  <header class="flex items-center gap-2">
-    <img src={NAV_ICON_URLS[homeView]} alt="" class="h-4 w-4 object-contain brightness-[0.85]" />
-    <h3 class="m-0 truncate font-display text-sm font-semibold tracking-wide text-text-primary">
+  <header class="widget-heading flex items-center gap-2.5">
+    <span class="widget-icon"><img src={NAV_ICON_URLS[homeView]} alt="" /></span>
+    <h3 class="m-0 min-w-0 font-display font-medium text-text-primary">
       {$tr(labelKey)}
     </h3>
     <div class="ml-auto flex items-center gap-1">
@@ -173,14 +173,14 @@
 
   {#snippet placeholder(text: string, attribute: "error" | "empty")}
     <div
-      class="flex flex-1 flex-col items-center justify-center gap-2 py-3 text-center text-xs text-text-muted"
+      class="widget-placeholder flex flex-1 flex-col items-start justify-center gap-3 text-text-secondary"
       data-widget-error={attribute === "error" ? widgetId : undefined}
       data-widget-empty={attribute === "empty" ? widgetId : undefined}
     >
       <p class="m-0">{text}</p>
       <button
         type="button"
-        class="cursor-pointer border-0 bg-transparent p-0 text-xs text-accent underline-offset-2 hover:underline"
+        class="cursor-pointer border-0 bg-transparent p-0 text-[0.78rem] text-accent underline-offset-2 hover:underline"
         data-widget-open-empty={widgetId}
         onclick={() => currentView.set(homeView)}
       >
@@ -214,3 +214,60 @@
     {/if}
   {/if}
 </section>
+
+<style>
+  .dashboard-widget {
+    gap: 0.85rem;
+    min-height: 150px;
+    padding: 1.2rem 1.25rem;
+    border: 1px solid var(--ui-panel-border);
+    border-radius: var(--radius-xl);
+    background: var(--ui-panel-bg);
+  }
+  .widget-heading {
+    padding-bottom: 0.1rem;
+  }
+  .widget-heading h3 {
+    font-size: 0.94rem;
+    line-height: 1.35;
+    letter-spacing: -0.015em;
+  }
+  .widget-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 0.55rem;
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+  }
+  .widget-icon img {
+    width: 1.1rem;
+    height: 1.1rem;
+    object-fit: contain;
+    opacity: 0.85;
+  }
+  .widget-placeholder {
+    min-height: 3.6rem;
+    padding: 0.2rem 0;
+    font-size: 0.83rem;
+    line-height: 1.55;
+  }
+  .widget-heading :global(button) {
+    display: grid;
+    place-items: center;
+    min-width: 1.65rem;
+    min-height: 1.65rem;
+    border-color: transparent;
+    border-radius: 0.45rem;
+  }
+  .widget-heading :global(button:hover) {
+    border-color: var(--border);
+    background: var(--bg-raised);
+  }
+  @media (max-width: 600px) {
+    .dashboard-widget {
+      padding: 1rem;
+    }
+  }
+</style>

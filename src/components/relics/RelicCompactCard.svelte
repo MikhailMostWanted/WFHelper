@@ -198,7 +198,7 @@
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.9rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     background:
@@ -212,7 +212,7 @@
         color-mix(in oklab, var(--bg-surface) 88%, black) 0%,
         color-mix(in oklab, var(--bg-base) 94%, black) 100%
       );
-    padding: 0.6rem;
+    padding: 1.1rem;
     cursor: default;
     text-align: left;
     color: var(--text-primary);
@@ -241,11 +241,12 @@
     background: var(--ui-panel-bg);
   }
   .relic-compact-card.plain:hover {
-    background: var(--bg-hover);
+    background: var(--bg-raised);
+    border-color: var(--border-strong);
   }
   .relic-compact-card :global(.relic-icon) {
-    width: 1.85rem;
-    height: 1.85rem;
+    width: 2.45rem;
+    height: 2.45rem;
   }
   .relic-compact-card :global(.relic-icon-img) {
     transform: scale(1.06);
@@ -290,6 +291,18 @@
   .relic-quality-inline-pill.notSelectable {
     cursor: default;
     opacity: 0.86;
+  }
+  .relic-reward-preview-icon {
+    min-height: 3rem;
+    border-radius: 0.6rem;
+  }
+  .relic-quality-inline-pill {
+    padding: 0.5rem 0.25rem;
+    font-weight: 500;
+  }
+  .relic-quality-inline-pill.emptyCount {
+    background: var(--bg-base);
+    border-color: var(--border);
   }
   .relic-quality-inline-value.emptyCount {
     color: var(--text-muted);
