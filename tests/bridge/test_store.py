@@ -106,6 +106,34 @@ def test_store_survives_restart(doc, store):
     assert restarted.overview()["snapshotRevision"] == doc["revision"]
 
 
+def test_legacy_manifest_preserves_revision_and_marks_extension_unknown(doc, store):
+    legacy = copy.deepcopy(doc)
+    legacy["sections"] = [s for s in legacy["sections"] if s["id"] != "extra.Consumables"]
+    original = canonical(legacy)
+    assert len(legacy["sections"]) == 51
+    assert validate(legacy) is legacy
+    store.accept(original)
+    restarted = Store(store.directory)
+    extension = next(s for s in restarted.sections()["sections"] if s["id"] == "extra.Consumables")
+    assert (extension["status"], extension["capturedAt"], extension["source"], extension["rows"]) == ("missing", None, "legacy-exporter", 0)
+    assert "неизвестно" in extension["note"]
+    assert canonical(restarted.snapshot()) == original
+    assert restarted.accept(original)["duplicate"] is True
+    page = restarted.read("extra.Consumables")
+    assert page["snapshotRevision"] == legacy["revision"]
+    assert page["coverage"][0]["status"] == "missing"
+    cursor = restarted.read("inventory.MiscItems", limit=2)["nextCursor"]
+    newer = copy.deepcopy(doc); newer["revision"] = "2" * 64; newer["createdAt"] += 100
+    restarted.accept(canonical(newer))
+    assert restarted.read("inventory.MiscItems", cursor=cursor)["snapshotRevision"] == legacy["revision"]
+    with pytest.raises(DataError, match="not exported"):
+        restarted.compare("extra.Consumables")
+    broken = copy.deepcopy(doc)
+    broken["sections"] = [s for s in broken["sections"] if s["id"] != "inventory.MiscItems"]
+    with pytest.raises(DataError, match="Incomplete section manifest"):
+        validate(broken)
+
+
 def test_world_unavailable_is_not_no_events(monkeypatch):
     import asyncio
     from wantedframe_mcp.world import World

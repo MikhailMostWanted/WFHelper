@@ -22,6 +22,8 @@ MAX_BYTES = SPEC["maxBytes"]
 MAX_OUTPUT = 48 * 1024
 HEX = re.compile(r"^[a-f0-9]{64}$")
 VALIDATORS = {key: Draft202012Validator({"$defs": SPEC["$defs"], **value["schema"]}) for key, value in SPEC["sections"].items()}
+LEGACY_EXTENSION = "extra.Consumables"
+LEGACY_NOTE = "Этот снимок старой версии не экспортирует Consumables; количество неизвестно. Обнови WantedFrame и отправь новый снимок."
 
 class DataError(ValueError):
     """Safe to show to the user; never include private input values."""
@@ -90,9 +92,21 @@ def validate(doc: Any) -> dict:
         for row in rows:
             if row is None or not VALIDATORS[key].is_valid(row):
                 raise DataError("Unexpected or invalid fields in section " + key)
-    if seen != set(SPEC["sections"]):
+    current_sections = set(SPEC["sections"])
+    legacy_manifest = len(seen) == 51 and seen == current_sections - {LEGACY_EXTENSION}
+    if seen != current_sections and not legacy_manifest:
         raise DataError("Incomplete section manifest; missing sections must be explicitly marked missing")
     return doc
+
+
+def readable_sections(doc: dict) -> list[dict]:
+    # Virtual catalog coverage only. Never amend the persisted legacy bundle or its revision.
+    sections = doc["sections"]
+    if any(section["id"] == LEGACY_EXTENSION for section in sections):
+        return sections
+    return [*sections, {"id": LEGACY_EXTENSION, "source": "legacy-exporter", "capturedAt": None,
+                        "status": "missing", "originalRows": 0, "omittedRows": 0,
+                        "omittedFields": 0, "note": LEGACY_NOTE, "rows": []}]
 
 
 def normalize(query: str) -> list[str]:
@@ -200,12 +214,13 @@ class Store:
     def sections(self, revision: str | None = None) -> dict:
         doc = self.snapshot(revision)
         result = []
-        for section in doc["sections"]:
+        legacy_extension_missing = not any(s["id"] == LEGACY_EXTENSION for s in doc["sections"])
+        for section in readable_sections(doc):
             key = section["id"]; definition = SPEC["sections"][key]
             schema = definition["schema"]
             if "$ref" in schema: schema = SPEC["$defs"][schema["$ref"].split("/")[-1]]
             result.append({**{k: section[k] for k in ("id", "capturedAt", "source", "status", "originalRows", "omittedRows", "omittedFields")},
-                           "title": definition["title"], "note": definition["note"], "rows": len(section["rows"]),
+                           "title": definition["title"], "note": LEGACY_NOTE if legacy_extension_missing and key == LEGACY_EXTENSION else definition["note"], "rows": len(section["rows"]),
                            "fields": list(schema.get("properties", {})), "readWith": "read_account_section"})
         return {**self.provenance(doc), "sections": result, "unmappedCollections": doc["unmappedCollections"]}
 
@@ -241,7 +256,7 @@ class Store:
             except (ValueError, TypeError) as exc:
                 raise DataError("Invalid cursor or changed filters") from exc
         doc = self.snapshot(revision); matches = []; coverage = []
-        for source in doc["sections"]:
+        for source in readable_sections(doc):
             key = source["id"]
             if section and key != section: continue
             if inventory_only and not key.startswith(("inventory.", "extra.")): continue
@@ -288,7 +303,9 @@ class Store:
             if current["bindingId"] == "manual": raise DataError("Account identity is not verified; comparisons could mix accounts")
             a = next((s for s in previous["sections"] if s["id"] == section), None)
             b = next((s for s in current["sections"] if s["id"] == section), None)
-            if not a or not b: raise DataError("Unknown section")
+            if section not in SPEC["sections"]: raise DataError("Unknown section")
+            if not a or not b:
+                raise DataError("Section was not exported by one snapshot; send two snapshots that support this section before comparing")
             ah = Counter(hashlib.sha256(canonical(r)).hexdigest() for r in a["rows"])
             bh = Counter(hashlib.sha256(canonical(r)).hexdigest() for r in b["rows"])
             return {"previousRevision": previous["revision"], "currentRevision": current["revision"], "previousCapturedAt": a["capturedAt"], "currentCapturedAt": b["capturedAt"],
