@@ -12,6 +12,7 @@ let stopPromise: Promise<void> | null = null;
 let exitPromise: Promise<number> | null = null;
 let initializationError: Error | null = null;
 let runtimeError: Error | null = null;
+let drained = false;
 const pending = new Map<
   number,
   {
@@ -50,6 +51,8 @@ function ensureWorker(): UtilityProcess {
   exitPromise = new Promise((resolve) =>
     process.once("exit", (code) => {
       if (code !== 0) runtimeError = new Error(`Windows OCR exited with ${code}`);
+      else if (!drained)
+        runtimeError = new Error("Windows OCR exited before acknowledging shutdown");
       if (worker === process) worker = null;
       for (const job of pending.values()) job.reject(new Error(`Windows OCR exited with ${code}`));
       pending.clear();
@@ -66,6 +69,13 @@ function ensureWorker(): UtilityProcess {
       confidence?: number;
       error?: string;
     };
+    if (reply.type === "drained" && stopping && pending.size === 0) {
+      drained = true;
+      // This read-only helper has acknowledged every result. Terminate its
+      // idle process without re-entering the addon’s unsafe N-API finalizers.
+      process.kill();
+      return;
+    }
     if (reply.type === "fatal") {
       initializationError = new Error(reply.error ?? "Windows OCR initialization failed");
       for (const job of pending.values()) job.reject(initializationError);
@@ -131,6 +141,7 @@ export function stopWindowsOcr(): Promise<void> {
           process.postMessage({ type: "shutdown" });
           const code = await exitPromise;
           if (code !== 0) throw new Error(`Windows OCR shutdown exit: ${code}`);
+          if (runtimeError) throw runtimeError;
         })(),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error("Windows OCR shutdown timed out")), 10_000);

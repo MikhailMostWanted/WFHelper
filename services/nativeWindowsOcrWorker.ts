@@ -29,7 +29,9 @@ parentPort.on("message", (event: { data: unknown }) => {
   };
   if (request.type === "shutdown") {
     closing = true;
-    void Promise.allSettled([...active]).then(() => setImmediate(() => process.exit(0)));
+    void Promise.allSettled([...active]).then(() =>
+      setImmediate(() => parentPort.postMessage({ type: "drained" })),
+    );
     return;
   }
   if (closing || request.type !== "recognize" || !Number.isSafeInteger(request.id)) return;
