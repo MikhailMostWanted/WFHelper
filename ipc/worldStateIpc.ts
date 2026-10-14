@@ -172,7 +172,7 @@ function ensureStartMenuShortcut(): void {
       "Start Menu",
       "Programs",
     );
-    const lnkPath = path.join(startMenuDir, "WFHelper.lnk");
+    const lnkPath = path.join(startMenuDir, "WantedFrame.lnk");
 
     // Read existing shortcut to check if it already has the correct target + AUMID.
     let needWrite = true;
@@ -191,7 +191,7 @@ function ensureStartMenuShortcut(): void {
       shell.writeShortcutLink(lnkPath, "create", {
         target: process.execPath,
         appUserModelId: APP_USER_MODEL_ID,
-        description: "WFHelper",
+        description: "WantedFrame",
       });
       log.info("[WorldState] created/updated Start Menu shortcut for notifications");
     }
