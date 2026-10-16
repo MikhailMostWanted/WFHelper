@@ -7,6 +7,7 @@ import type {
 import type { WfmStatus } from "./market.js";
 
 export interface PreloadAPI {
+  getResourceTracking: () => Promise<IpcInvokeMap["getResourceTracking"]["return"]>;
   getAccountBridgeStatus: () => Promise<IpcInvokeMap["getAccountBridgeStatus"]["return"]>;
   accountBridgeAction: (
     ...args: IpcInvokeMap["accountBridgeAction"]["args"]

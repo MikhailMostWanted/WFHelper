@@ -332,6 +332,84 @@
     }
   },
   "sections": {
+    "resources.balances": {
+      "title": "Остатки ресурсов и валют: события и изменения",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "count": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "multipleOf": 1
+          },
+          "previousCount": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "multipleOf": 1
+          },
+          "delta": {
+            "type": ["number", "null"],
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "multipleOf": 1
+          },
+          "capturedAt": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 8640000000000000
+          },
+          "previousCapturedAt": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 8640000000000000
+          },
+          "name": {
+            "type": ["string", "null"],
+            "maxLength": 512
+          },
+          "nameRu": {
+            "type": ["string", "null"],
+            "maxLength": 512
+          },
+          "event": {
+            "type": "boolean"
+          },
+          "eventName": {
+            "type": ["string", "null"],
+            "maxLength": 512
+          },
+          "missionGain": {
+            "type": "null"
+          },
+          "missionGainReason": {
+            "type": "string",
+            "enum": ["no-itemized-mission-reward-source"]
+          }
+        },
+        "required": [
+          "type",
+          "count",
+          "previousCount",
+          "delta",
+          "capturedAt",
+          "previousCapturedAt",
+          "name",
+          "nameRu",
+          "event",
+          "eventName",
+          "missionGain",
+          "missionGainReason"
+        ],
+        "additionalProperties": false
+      },
+      "note": "Разрешённые количества MiscItems и известных валют. delta — изменение остатка между локальными снимками previousCapturedAt и capturedAt, включая траты; это НЕ добыча. Первый снимок, неизвестная привязка, другая учётная запись/источник или неполные данные не дают достоверной разницы. missionGain=null: отдельного подтверждённого состава наград миссии источник не предоставляет. event — подсказка каталога/игрового пути, не доказательство текущего события. Названия неизвестных предметов могут отсутствовать."
+    },
     "account": {
       "title": "Аккаунт: ранг мастерства и валюты",
       "schema": {

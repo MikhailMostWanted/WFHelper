@@ -24,6 +24,8 @@ HEX = re.compile(r"^[a-f0-9]{64}$")
 VALIDATORS = {key: Draft202012Validator({"$defs": SPEC["$defs"], **value["schema"]}) for key, value in SPEC["sections"].items()}
 LEGACY_EXTENSION = "extra.Consumables"
 LEGACY_NOTE = "Этот снимок старой версии не экспортирует Consumables; количество неизвестно. Обнови WantedFrame и отправь новый снимок."
+OPTIONAL_EXTENSIONS = {LEGACY_EXTENSION, "resources.balances"}
+RESOURCE_LEGACY_NOTE = "Эта версия снимка не экспортирует историю остатков ресурсов; изменения и добыча неизвестны. Отправь снимок новой версии WantedFrame."
 
 class DataError(ValueError):
     """Safe to show to the user; never include private input values."""
@@ -93,8 +95,7 @@ def validate(doc: Any) -> dict:
             if row is None or not VALIDATORS[key].is_valid(row):
                 raise DataError("Unexpected or invalid fields in section " + key)
     current_sections = set(SPEC["sections"])
-    legacy_manifest = len(seen) == 51 and seen == current_sections - {LEGACY_EXTENSION}
-    if seen != current_sections and not legacy_manifest:
+    if not current_sections - OPTIONAL_EXTENSIONS <= seen:
         raise DataError("Incomplete section manifest; missing sections must be explicitly marked missing")
     return doc
 
@@ -102,11 +103,11 @@ def validate(doc: Any) -> dict:
 def readable_sections(doc: dict) -> list[dict]:
     # Virtual catalog coverage only. Never amend the persisted legacy bundle or its revision.
     sections = doc["sections"]
-    if any(section["id"] == LEGACY_EXTENSION for section in sections):
-        return sections
-    return [*sections, {"id": LEGACY_EXTENSION, "source": "legacy-exporter", "capturedAt": None,
+    seen = {section["id"] for section in sections}
+    return [*sections, *[{"id": key, "source": "legacy-exporter", "capturedAt": None,
                         "status": "missing", "originalRows": 0, "omittedRows": 0,
-                        "omittedFields": 0, "note": LEGACY_NOTE, "rows": []}]
+                        "omittedFields": 0, "note": LEGACY_NOTE if key == LEGACY_EXTENSION else RESOURCE_LEGACY_NOTE,
+                        "rows": []} for key in SPEC["sections"] if key in OPTIONAL_EXTENSIONS and key not in seen]]
 
 
 def normalize(query: str) -> list[str]:
@@ -214,13 +215,12 @@ class Store:
     def sections(self, revision: str | None = None) -> dict:
         doc = self.snapshot(revision)
         result = []
-        legacy_extension_missing = not any(s["id"] == LEGACY_EXTENSION for s in doc["sections"])
         for section in readable_sections(doc):
             key = section["id"]; definition = SPEC["sections"][key]
             schema = definition["schema"]
             if "$ref" in schema: schema = SPEC["$defs"][schema["$ref"].split("/")[-1]]
             result.append({**{k: section[k] for k in ("id", "capturedAt", "source", "status", "originalRows", "omittedRows", "omittedFields")},
-                           "title": definition["title"], "note": LEGACY_NOTE if legacy_extension_missing and key == LEGACY_EXTENSION else definition["note"], "rows": len(section["rows"]),
+                           "title": definition["title"], "note": section["note"] if section["source"] == "legacy-exporter" else definition["note"], "rows": len(section["rows"]),
                            "fields": list(schema.get("properties", {})), "readWith": "read_account_section"})
         return {**self.provenance(doc), "sections": result, "unmappedCollections": doc["unmappedCollections"]}
 
@@ -259,7 +259,7 @@ class Store:
         for source in readable_sections(doc):
             key = source["id"]
             if section and key != section: continue
-            if inventory_only and not key.startswith(("inventory.", "extra.")): continue
+            if inventory_only and section is None and not key.startswith(("inventory.", "extra.")): continue
             if inventory_only and not include_history and key in ("inventory.XPInfo", "inventory.PendingRecipes"): continue
             coverage.append({k: source[k] for k in ("id", "status", "capturedAt", "omittedRows", "omittedFields")})
             for index, row in enumerate(source["rows"]):
@@ -308,7 +308,22 @@ class Store:
                 raise DataError("Section was not exported by one snapshot; send two snapshots that support this section before comparing")
             ah = Counter(hashlib.sha256(canonical(r)).hexdigest() for r in a["rows"])
             bh = Counter(hashlib.sha256(canonical(r)).hexdigest() for r in b["rows"])
-            return {"previousRevision": previous["revision"], "currentRevision": current["revision"], "previousCapturedAt": a["capturedAt"], "currentCapturedAt": b["capturedAt"],
+            result = {"previousRevision": previous["revision"], "currentRevision": current["revision"], "previousCapturedAt": a["capturedAt"], "currentCapturedAt": b["capturedAt"],
                     "section": section, "beforeCoverage": a["status"], "afterCoverage": b["status"], "changed": ah != bh,
                     "newOrChangedRows": sum((bh-ah).values()), "removedOrChangedRows": sum((ah-bh).values()),
                     "note": "Row changes, not purchases/sales. Use read_account_section with each revision for exact values."}
+            if section == "resources.balances":
+                comparable = previous["bindingId"] == current["bindingId"] and previous["source"] == current["source"] and a["capturedAt"] is not None and b["capturedAt"] is not None and b["capturedAt"] > a["capturedAt"]
+                old = {r["type"]: r for r in a["rows"]}
+                new = {r["type"]: r for r in b["rows"]}
+                changes = []
+                for key in sorted(old.keys() | new.keys()):
+                    before = old.get(key, {}).get("count")
+                    after = new.get(key, {}).get("count")
+                    if before == after: continue
+                    delta = after - before if comparable and before is not None and after is not None else None
+                    row = new.get(key, old.get(key))
+                    changes.append({"type": key, "name": row.get("name"), "nameRu": row.get("nameRu"), "before": before, "after": after, "balanceDelta": delta, "missionGain": None})
+                result.update({"balanceChanges": changes[:100], "totalBalanceChanges": len(changes), "truncated": len(changes) > 100, "comparable": comparable,
+                               "note": "balanceDelta is net balance change between these two server snapshots, including spending; NOT mission loot. Missing rows/counts or incomparable dates remain unknown. Local delta in a row may cover different snapshots; use its own previousCapturedAt. Read both revisions for further rows."})
+            return result

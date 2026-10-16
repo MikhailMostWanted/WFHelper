@@ -4,7 +4,7 @@ import ctx from "./context";
 import { getInventorySource, getLoadedInventoryModifiedAt } from "./inventoryIpc";
 import { handleAuthorized, assertMainRendererSender } from "./ipcSecurity";
 import { getAccountSnapshotStatus, onAccountSnapshotSaved } from "../services/accountSnapshotStore";
-import { currentAccountBridge } from "../services/accountBridgeRuntime";
+import { currentAccountBridge, currentResourceTracking } from "../services/accountBridgeRuntime";
 import { bridgeExportZip } from "../services/bridgeExport";
 import type {
   AccountBridgeAction,
@@ -151,6 +151,7 @@ export function register(): void {
     timer = null;
   });
   handleAuthorized("account-bridge:status", assertMainRendererSender, bridgeStatus);
+  handleAuthorized("resources:tracking", assertMainRendererSender, currentResourceTracking);
   handleAuthorized(
     "account-bridge:action",
     assertMainRendererSender,

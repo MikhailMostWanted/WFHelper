@@ -108,7 +108,7 @@ def test_store_survives_restart(doc, store):
 
 def test_legacy_manifest_preserves_revision_and_marks_extension_unknown(doc, store):
     legacy = copy.deepcopy(doc)
-    legacy["sections"] = [s for s in legacy["sections"] if s["id"] != "extra.Consumables"]
+    legacy["sections"] = [s for s in legacy["sections"] if s["id"] not in ("extra.Consumables", "resources.balances")]
     original = canonical(legacy)
     assert len(legacy["sections"]) == 51
     assert validate(legacy) is legacy
@@ -139,3 +139,50 @@ def test_world_unavailable_is_not_no_events(monkeypatch):
     from wantedframe_mcp.world import World
     w = World(); w.attempt_at = 10**15
     with pytest.raises(DataError, match="unavailable"): asyncio.run(w.read("",0,10))
+
+
+def test_previous_52_section_export_is_readable_without_rewriting_it(doc, store):
+    legacy = copy.deepcopy(doc)
+    legacy["sections"] = [s for s in legacy["sections"] if s["id"] != "resources.balances"]
+    original = canonical(legacy)
+    assert len(legacy["sections"]) == 52
+    store.accept(original)
+    assert canonical(store.snapshot()) == original
+    assert store.read("resources.balances")["coverage"][0]["status"] == "missing"
+
+
+def test_balance_comparison_uses_server_snapshot_interval_and_never_claims_loot(doc, store):
+    store.accept(canonical(doc))
+    newer = copy.deepcopy(doc)
+    newer["revision"] = "4" * 64
+    newer["createdAt"] += 100
+    newer["inventoryUpdatedAt"] += 100
+    section = next(s for s in newer["sections"] if s["id"] == "resources.balances")
+    section["capturedAt"] += 100
+    row = next(r for r in section["rows"] if r["type"] == "/Lotus/Test/Resource0")
+    row.update(count=40, delta=-959, previousCount=999)
+    store.accept(canonical(newer))
+    result = store.compare("resources.balances")
+    assert result["comparable"] is True
+    assert result["balanceChanges"] == [{"type": row["type"], "name": row["name"], "nameRu": row["nameRu"], "before": 0, "after": 40, "balanceDelta": 40, "missionGain": None}]
+    bad = copy.deepcopy(newer)
+    next(s for s in bad["sections"] if s["id"] == "resources.balances")["rows"][0]["missionGain"] = 40
+    with pytest.raises(DataError, match="Unexpected or invalid"):
+        validate(bad)
+
+
+def test_balance_section_rejects_private_fields_and_incomparable_times(doc, store):
+    bad = copy.deepcopy(doc)
+    next(s for s in bad["sections"] if s["id"] == "resources.balances")["rows"][0]["authToken"] = "private"
+    with pytest.raises(DataError): validate(bad)
+    store.accept(canonical(doc))
+    newer = copy.deepcopy(doc)
+    newer["revision"] = "5" * 64
+    newer["createdAt"] += 100
+    section = next(s for s in newer["sections"] if s["id"] == "resources.balances")
+    section["capturedAt"] = None
+    section["rows"][0]["count"] = 12
+    store.accept(canonical(newer))
+    result = store.compare("resources.balances")
+    assert result["comparable"] is False
+    assert all(r["balanceDelta"] is None and r["missionGain"] is None for r in result["balanceChanges"])

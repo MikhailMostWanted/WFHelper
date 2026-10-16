@@ -109,7 +109,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     env:
-      VITE_APP_VERSION: "0.3.0-preview.2"
+      VITE_APP_VERSION: "0.3.0-preview.3"
       SOURCE_REVISION: ${{ needs.prepare.outputs.sha }}
       HUSKY: "0"
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -144,7 +144,7 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          pkg.version = '0.3.0-preview.2';
+          pkg.version = '0.3.0-preview.3';
           fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           fs.writeFileSync('source-revision.txt', process.env.SOURCE_REVISION + '\n');
           fs.writeFileSync('build-info.json', JSON.stringify({version: pkg.version, revision: process.env.SOURCE_REVISION, runId: process.env.GITHUB_RUN_ID}, null, 2) + '\n');
@@ -162,10 +162,10 @@ jobs:
       - name: Upload Windows preview
         uses: actions/upload-artifact@v4
         with:
-          name: WantedFrame-0.3.0-preview.2-Windows
+          name: WantedFrame-0.3.0-preview.3-Windows
           path: |
-            release/WantedFrame-0.3.0-preview.2-Setup.exe
-            release/WantedFrame-0.3.0-preview.2-Setup.exe.blockmap
+            release/WantedFrame-0.3.0-preview.3-Setup.exe
+            release/WantedFrame-0.3.0-preview.3-Setup.exe.blockmap
             release/latest.yml
             source-revision.txt
             build-info.json

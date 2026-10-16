@@ -4,11 +4,13 @@
   import { itemLabel } from "../lib/itemLabel.js";
   import ItemImage from "../components/ItemImage.svelte";
   import type { Resource } from "../types/inventory.js";
+  import EventResourcePanel from "../components/EventResourcePanel.svelte";
 
   export let resources: Resource[] = [];
 </script>
 
 <div class="resources-sub-panel">
+  <EventResourcePanel />
   <div class="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3">
     {#if resources.length === 0}
       <div class="empty-state col-span-full">

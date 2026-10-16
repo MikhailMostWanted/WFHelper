@@ -14,8 +14,26 @@ import { getPersonalProfile, getInventoryBindingFingerprint } from "./codexProfi
 import { computeMasteryProgress } from "./masteryHelper";
 import { waitForStartupData } from "./startupReadiness";
 import { app } from "electron";
+import { trackResourceSnapshot } from "./resourceTracker";
 
 let pending: Promise<AccountBridgeDocument> | null = null;
+export async function currentResourceTracking() {
+  await waitForStartupData();
+  const data = ctx.currentInventoryData;
+  const source = getInventorySource();
+  if (!data || source === "none") return null;
+  const report = trackResourceSnapshot(data, {
+    source,
+    capturedAt: getLoadedInventoryModifiedAt(),
+    bindingId: getInventoryBindingFingerprint(getLoadedInventoryHash()) ?? "manual",
+  });
+  for (const row of report.rows) {
+    const item = lookupItem(row.type);
+    row.name ??= item?.name ?? null;
+    row.nameRu ??= nameInLocale(item?.nameKey, "ru");
+  }
+  return report;
+}
 /** Read only the chosen in-memory inventory and already cached, same-account profile. */
 export function currentAccountBridge(): Promise<AccountBridgeDocument> {
   if (pending) return pending;
@@ -67,6 +85,7 @@ async function build(): Promise<AccountBridgeDocument> {
   );
   const doc = buildAccountBridge(raw, snapshot, {
     bindingId,
+    resources: (await currentResourceTracking()) ?? undefined,
     gameItems,
     gameNameRu: (key) => nameInLocale(key, "ru"),
     mastery,

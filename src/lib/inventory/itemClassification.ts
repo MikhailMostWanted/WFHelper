@@ -10,6 +10,7 @@ import {
 } from "../../../config/shared/gearCollections.js";
 import type { EquipmentCollection } from "../../../config/shared/gearCollections.js";
 import type { InventoryGroup, ItemDbEntry, RawInventoryEntry } from "../../types/inventory.js";
+import { eventResourceInfo, isEventResource } from "../../../config/shared/eventResources.js";
 
 export interface ResolvedItem extends ItemDbEntry {
   name: string;
@@ -79,6 +80,10 @@ export function resolveItem(
     };
   }
   if (!internalName) return { name: "Unknown", imageUrl: null };
+
+  const event = eventResourceInfo(internalName);
+  if (event)
+    return { name: event.name, imageUrl: null, category: "Resource" };
 
   return { name: fallbackNameFromUniqueName(internalName), imageUrl: null, category: "Unknown" };
 }
@@ -238,6 +243,7 @@ export function isResourceItem(
   dbEntry: ItemDbEntry = {},
   resolved?: ResolvedItem,
 ): boolean {
+  if (isEventResource(internalName)) return true;
   if (isAuxiliaryInventoryItem(internalName, dbEntry, resolved)) return false;
   if (isAyatanLikeItem(internalName, dbEntry, resolved)) return false;
   if (isRelicLikeItem(internalName, dbEntry, resolved)) return false;

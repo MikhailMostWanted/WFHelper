@@ -284,6 +284,10 @@ export interface AccountBridgeActionResult {
 }
 
 export interface IpcInvokeMap {
+  getResourceTracking: {
+    args: [];
+    return: import("../../config/shared/resourceBalances").ResourceTrackingReport | null;
+  };
   getAccountBridgeStatus: { args: []; return: AccountBridgeStatus };
   accountBridgeAction: {
     args: [action: AccountBridgeAction, automatic?: boolean];

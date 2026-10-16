@@ -1,5 +1,6 @@
 import { unwrapInventoryPayload, hasInventoryShape } from "../config/shared/inventoryPayload";
 import { asRecord } from "../config/shared/objectValidation";
+import { eventResourceInfo } from "../config/shared/eventResources";
 
 const STACKS = [
   "MiscItems",
@@ -215,7 +216,7 @@ export function buildAccountSnapshot(payload: unknown, options: SnapshotOptions)
         if (Array.isArray(refs))
           output.fieldCoverage.omittedValues += Math.max(0, refs.length - 32);
       }
-      const label = options.lookup?.(itemType);
+      const label = options.lookup?.(itemType) ?? eventResourceInfo(itemType);
       const mapRoll = (v: unknown) =>
         list(v)
           .slice(0, 8)

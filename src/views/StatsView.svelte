@@ -48,6 +48,7 @@
   import StatsTradePanel from "../components/stats/StatsTradePanel.svelte";
   import HeaderTabs from "../components/HeaderTabs.svelte";
   import PersonalStatsPanel from "../components/stats/PersonalStatsPanel.svelte";
+  import EventResourcePanel from "../components/EventResourcePanel.svelte";
   import { persistedString } from "../lib/persistence.js";
   import StatResourcePicker from "../components/stats/StatResourcePicker.svelte";
   import { buildStatIconMap } from "../lib/assetUrls.js";
@@ -787,6 +788,7 @@
 
           <LayoutGrid view="stats" only={STATS_MAIN_SECTIONS} gapClass="gap-4" let:sectionId>
             {#if sectionId === "stats.summary"}
+              <EventResourcePanel />
               {#if !session?.hasData}
                 <p class="m-0 text-sm text-text-muted">{$tr("stats.noData")}</p>
               {:else}

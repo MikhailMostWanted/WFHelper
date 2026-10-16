@@ -6,6 +6,7 @@ import type {
   RecipeIngredient,
   Resource,
 } from "../../types/inventory.js";
+import { isEventResource } from "../../../config/shared/eventResources.js";
 import {
   MODULAR_PART_PATH,
   PET_PART_PATH,
@@ -261,6 +262,13 @@ export function parseResources(
   const resources = (data.MiscItems || [])
     .map((item) => {
       const internalName = item.ItemType || "";
+      if (
+        isEventResource(internalName) &&
+        (typeof item.ItemCount !== "number" ||
+          !Number.isSafeInteger(item.ItemCount) ||
+          item.ItemCount < 0)
+      )
+        return null;
       const resolved = resolveItem(internalName, itemDb);
       const dbEntry = itemDb[internalName] || {};
       if (!isResourceItem(internalName, dbEntry, resolved)) return null;

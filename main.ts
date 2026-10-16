@@ -99,6 +99,7 @@ import ctx from "./ipc/context";
 import * as inventoryIpc from "./ipc/inventoryIpc";
 import * as accountSnapshotIpc from "./ipc/accountSnapshotIpc";
 import { saveAccountSnapshot } from "./services/accountSnapshotStore";
+import { currentResourceTracking } from "./services/accountBridgeRuntime";
 import { userDataPath } from "./services/userDataPath";
 import { nameInLocale } from "./services/gameLocale";
 import * as wfmIpc from "./ipc/wfmIpc";
@@ -491,6 +492,9 @@ function initTrackersAndSettings(profileStage: ProfileStage): void {
         // An import/account switch while startup was pending invalidates this input.
         if (ctx.currentInventoryData !== data || inventoryIpc.getInventorySource() !== source)
           return;
+        void currentResourceTracking().catch(() =>
+          log.warn("[ResourceTracking] Snapshot unavailable"),
+        );
         return saveAccountSnapshot(userDataPath("account-snapshot.json"), data, {
           source,
           inventoryUpdatedAt,

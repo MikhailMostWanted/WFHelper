@@ -3,6 +3,11 @@ import schemaJson from "../integrations/wantedframe_mcp/schema.json";
 import { unwrapInventoryPayload } from "../config/shared/inventoryPayload";
 import { asRecord } from "../config/shared/objectValidation";
 import type { AccountSnapshot } from "./accountSnapshot";
+import {
+  observeResources,
+  resourceBalanceReport,
+  type ResourceTrackingReport,
+} from "../config/shared/resourceBalances";
 
 type Json = null | string | number | boolean | Json[] | { [key: string]: Json };
 type Schema = {
@@ -46,6 +51,7 @@ export interface AccountBridgeDocument {
 }
 interface BridgeInputs {
   bindingId: string;
+  resources?: ResourceTrackingReport;
   gameItems?: Readonly<Record<string, unknown>>;
   gameNameRu?: (nameKey: string | null | undefined) => string | null;
   mastery?: { items: unknown[]; stats: { profileMastery: unknown } };
@@ -159,6 +165,19 @@ export function buildAccountBridge(
   };
   const stamp = snapshot.inventoryUpdatedAt;
   add("account", [snapshot.account], "inventory", stamp);
+  const resources =
+    input.resources ??
+    resourceBalanceReport({
+      version: 1,
+      previous: null,
+      current: observeResources(inv, {
+        bindingId: input.bindingId,
+        source: snapshot.source,
+        capturedAt: stamp,
+      }),
+    });
+  add("resources.balances", resources.rows, "inventory-balances", stamp);
+  if (resources.coverage === "partial") sections[sections.length - 1].status = "partial";
   add("loadouts", asRecord(inv.LoadOutPresets) ? snapshot.loadouts : undefined, "inventory", stamp);
   for (const coverage of snapshot.coverage) {
     const id = "inventory." + coverage.section;
