@@ -82,8 +82,7 @@ export function resolveItem(
   if (!internalName) return { name: "Unknown", imageUrl: null };
 
   const event = eventResourceInfo(internalName);
-  if (event)
-    return { name: event.name, imageUrl: null, category: "Resource" };
+  if (event) return { name: event.name, imageUrl: null, category: "Resource" };
 
   return { name: fallbackNameFromUniqueName(internalName), imageUrl: null, category: "Unknown" };
 }
