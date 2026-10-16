@@ -14,7 +14,7 @@ export interface ResourceHistory {
   previous: ResourceObservation | null;
   current: ResourceObservation;
 }
-export interface ResourceBalance {
+interface ResourceBalance {
   type: string;
   count: number | null;
   previousCount: number | null;
