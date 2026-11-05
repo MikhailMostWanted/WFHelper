@@ -1,0 +1,22 @@
+{
+  "description": "Synthetic, selected fields from existing tests/bridge/build_fixture.cjs output; documentation illustration, not an importable full snapshot or real account",
+  "sourceRevision": "3032361635d5f8a525a2f4c7544c031b412377e9",
+  "fixture": "tests/bridge/build_fixture.cjs",
+  "fullSectionCount": 53,
+  "account": {
+    "masteryRank": 14,
+    "masteryXp": null,
+    "credits": 12000,
+    "platinum": 0,
+    "endo": 50
+  },
+  "missingSection": {
+    "id": "inventory.LongGuns",
+    "status": "missing"
+  },
+  "zipEntries": [
+    "account.json",
+    "README_CHATGPT.md"
+  ],
+  "sentinelAuthorizationFieldsExcluded": true
+}
