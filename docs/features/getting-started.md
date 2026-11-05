@@ -12,9 +12,9 @@ screenshotCaption: The setup wizard. You can change these choices later in Setti
 
 ## Install and open WantedFrame
 
-1. Download WantedFrame from [GitHub Releases](https://github.com/MikhailMostWanted/WantedFrame/releases).
+1. Download WantedFrame from [GitHub Releases](https://github.com/MikhailMostWanted/WFHelper/releases/tag/v0.3.0-preview.3).
 2. On Windows, download the release's `WantedFrame-<version>-Setup.exe` and run it. The installer is unsigned, so Windows SmartScreen may show a warning. Check that the file came from the project's release page before choosing **More info**, then **Run anyway**.
-3. On Linux, download the `.AppImage`, mark it executable in your file manager's Properties, and open it. See [Linux setup](#linux-setup) below for screen capture and Steam settings.
+3. This fork currently publishes Windows preview installers only. No Linux AppImage is available in its published releases. The [Linux setup](#linux-setup) notes below describe source-based Linux use; they are not a download promise.
 4. Choose your language, app size, and theme in the setup wizard, then select **Next**.
 
 You do not need a WantedFrame account. A warframe.market sign-in is only needed for account features such as managing your listings.
@@ -70,9 +70,9 @@ Overlays work on X11, XWayland and native Wayland. On native Wayland they use th
 - **Login token not found:** restart Warframe and try again. If the error persists, include the exact message when asking for help.
 - **JSON rejected:** choose an inventory export, rather than a stats or trade-history export.
 - **Items or quantities look old:** check the selected source and allow for the helper cooldown. Imported files need a newer export to reflect later changes.
-- **Overlay cannot read a reward:** confirm the game's English interface, check screen-share permission on Linux, and follow any OCR hint shown by the app. If a scan-debug bundle was created, **Settings > General > Open scan-debug folder** opens it.
+- **Overlay cannot read a reward:** check the configured OCR language and its availability on your system, check screen-share permission on Linux, and follow any OCR hint shown by the app. If a scan-debug bundle was created, **Settings > General > Open scan-debug folder** opens it.
 
-Report persistent problems through [GitHub Issues](https://github.com/MikhailMostWanted/WantedFrame/issues) or [Discord](https://discord.gg/7Gm3UvUSww). Include your app version, operating system, inventory source, and exact error. Check logs and screenshots for personal information before sharing them.
+GitHub Issues are disabled in this fork as of 2026-11-05. For code proposals, use the [repository pull requests](https://github.com/MikhailMostWanted/WFHelper/pulls). No fork-owned support website or Discord is announced here. Include the app version, operating system, inventory source, and exact error when discussing a change. Check logs and screenshots for personal information before sharing them.
 
 ## Next: explore your inventory
 

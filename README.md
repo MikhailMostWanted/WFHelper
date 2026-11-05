@@ -1,151 +1,158 @@
-# WantedFrame
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/readme/hero-mobile.svg">
+  <img src="docs/readme/hero-wide.svg" alt="WFHelper — личная версия компаньона Warframe. Инвентарь, реликвии и план следующего шага." width="1280">
+</picture>
 
-Unofficial Warframe companion app for Windows and Linux. Reads your
-inventory, prices it with live warframe.market data, scans relic rewards on
-screen and tracks your arbitration runs straight from EE.log.
+# WFHelper · личная версия
 
-**[WantedFrame Releases](https://github.com/MikhailMostWanted/WantedFrame/releases)**: download the current Windows build and release notes.
+Компаньон Warframe для тех, кто хочет видеть, **что уже есть, что стоит оставить и чего не хватает для следующей сборки**. Инвентарь, реликвии, Кузница, мастерство и рыночные данные собраны в одном desktop-клиенте. Русский интерфейс и локальный снимок помогают разобраться в аккаунте без ручного переписывания таблиц.
 
-![WantedFrame inventory with live warframe.market prices](.github/screenshots/inventory.png)
+**[Скачать Windows preview 0.3.0-preview.3](https://github.com/MikhailMostWanted/WFHelper/releases/tag/v0.3.0-preview.3)** · [Что проверено](#verification) · [Сборка из исходников](#build)
 
-<sub>Shown in the midnight-blue theme. 10 themes are built in, or build your own.</sub>
+Сейчас собственный установщик исторически называется **WantedFrame**. Окончательное новое имя не утверждено. Репозиторий остаётся публичным форком [WFHelper/WFHelper](https://github.com/WFHelper/WFHelper); самостоятельные доработки находятся в `feat/wantedframe-next`. Их происхождение сохранено, отделение от сети форков ещё не выполнено.
 
-## Features
+[Возможности](#features) · [Моя версия](#own-version) · [Установка](#install) · [Сценарии](#journeys) · [Данные](#snapshot) · [Проверки](#verification) · [Происхождение](#origin)
 
-In the app:
+<a id="features"></a>
 
-- **Inventory** - full account inventory with platinum prices, order books and
-  an equipment tab for weapons and frames
-- **Relics** - browse owned relics with contents, drop sources and rewards
-- **Foundry** - crafting requirements with full component trees
-- **Mastery** - what you have not mastered yet, and what you could build
-- **Rivens** - your rivens with market comparison and a riven finder
-- **Market** - manage your warframe.market orders in-app (sign-in optional)
-- **Arbitrations** - automatic per-run analysis from EE.log: kills, drones,
-  rotations and vitus luck vs. the expected drop model, plus the schedule with
-  Windows notifications for favorited nodes
-- **World** - cycles, fissures, invasions, bounties and circuit rotations
-- **Stats** - daily platinum/credits/endo tracking and trade history
-- **Wiki** - item drop locations and relic reward tables
-- **Themes** - preset looks or build your own
+## От инвентаря к следующему действию
 
-In-game overlays (Warframe in Borderless mode):
+| Задача | Что есть в клиенте |
+| --- | --- |
+| Разобрать накопленное | Инвентарь по категориям, количества, экземпляры снаряжения, фильтры и оценка торгуемых предметов. |
+| Выбрать реликвию | Принадлежащие реликвии, состав наград, источники и экранный планировщик. |
+| Подготовить сборку | Кузница с деревьями компонентов и мастерство с ещё не освоенным снаряжением. |
+| Сравнить мод Разлома | Сохранённые моды и разбор характеристик; native OCR требует проверки на целевой Windows-системе. |
+| Свериться с рынком | Цены и заявки warframe.market; личные заявки требуют отдельного входа и явного действия пользователя. |
+| Следить за событиями | Мировые циклы, разломы, вторжения и арбитражи; разбор арбитражей использует `EE.log`. |
 
-- **Relic rewards** - prices every reward when your squad's relics crack
-- **Relic planner** - ranks your owned relics on the relic selection screen
-- **Riven scanner** - reads rolls and compares old vs. new stats while rerolling
-- **Arbitration summary** - your run stats the moment the mission ends
+Рыночная оценка — ориентир по доступным ценам. Она не гарантирует продажу и не доказывает наличие предмета: владение определяется выбранным снимком инвентаря.
 
-Notifications: in-game whispers, warframe.market DMs and arbitration windows can
-raise Windows notifications while you play.
+<a id="own-version"></a>
 
-> **Relic reward OCR supports English and Russian item names.** Riven OCR remains
-> more dependent on English game text. WantedFrame's display language is separate
-> and can be changed in Settings.
+## Что добавлено в этой версии
 
-## Install
+Собственная preview-ветка развивает существующий клиент, сохраняя его инвентарь, рыночную сессию и пользовательские данные.
 
-Download the latest `WantedFrame-<version>-Setup.exe` from
-[Releases](https://github.com/MikhailMostWanted/WantedFrame/releases) and run it.
+- **Русский UI и названия предметов.** Язык приложения выбирается отдельно от языка игры. В коде есть русский разбор наград реликвий и характеристик модов Разлома.
+- **Подготовка справочника без ожидания пустого результата.** Окно создаётся до тяжёлой загрузки каталога; ранние запросы ждут готовности данных.
+- **Ограниченная очередь OCR.** Таймаут ожидания не считается остановкой уже выполняющегося native-кода; после русского таймаута не запускается дополнительная английская попытка.
+- **Компактные пассивные оверлеи.** Подробности открываются действием пользователя; редактор сохраняет координаты.
+- **Локальный снимок и покрытие данных.** Количества, экземпляры, конфигурации, известные ранги, ссылки на моды и исторический XP разделены по смыслу. В настройках есть экспорт JSON; в исходниках — проверяемая JSON/ZIP-проекция.
 
-Windows SmartScreen may warn on first run because the installer is not
-code-signed: click "More info", then "Run anyway".
+Это preview. Скорость и точность native OCR зависят от Windows, языковых компонентов и реальных кадров. Результат CI с ONNX-фикстурами не заменяет такую проверку. Подробности: [WantedFrame Next](docs/WANTEDFRAME_NEXT.md).
 
-### Linux
+<a id="install"></a>
 
-Download `WantedFrame-<version>.AppImage` from
-[Releases](https://github.com/MikhailMostWanted/WantedFrame/releases), make it executable
-and run it:
+## Установка
 
-```
-chmod +x WantedFrame-*.AppImage
-./WantedFrame-*.AppImage
+### Windows
+
+Откройте [собственный релиз v0.3.0-preview.3](https://github.com/MikhailMostWanted/WFHelper/releases/tag/v0.3.0-preview.3) и выберите `WantedFrame-0.3.0-preview.3-Setup.exe` — около 243,5 МБ. Рядом опубликованы `.sha256`, `SOURCE_REVISION.txt` и `build-info.json`.
+
+Перед переходом со старой сборки сохраните копию пользовательского профиля. Preview не следует считать автоматическим обновлением стабильного выпуска. Этот проход не меняет `com.wfhelper.app`, формат профиля, рыночную авторизацию или существующие сессии.
+
+При проверке скачанного файла в PowerShell:
+
+```powershell
+Get-FileHash .\WantedFrame-0.3.0-preview.3-Setup.exe -Algorithm SHA256
 ```
 
-In a file manager instead: right-click the file, open Properties, then
-Permissions, tick "Allow executing as program" and double-click it.
+Сравните результат с `.sha256` из **того же релиза**. [Происхождение сборки и процесс выпуска](docs/RELEASE_PROCESS.md) объясняют связь версии, исходников и артефактов.
 
-Good to know:
+### Linux и macOS
 
-- **Warframe runs through Steam (Proton).** WantedFrame finds the game's log
-  inside the Proton prefix on its own, including Flatpak and Snap Steam
-  installs.
-- **Inventory comes straight from the running game.** Nothing extra to
-  download on Linux.
-- **Wayland picks its own backend.** The app puts itself on XWayland so the overlays
-  can sit on top of the game. Compositors without a real XWayland (niri) show
-  no window at all, so WantedFrame notices, restarts on native Wayland and
-  remembers it. Settings lets you pick the backend by hand. Wayland gives no
-  app a way to force itself above another, so overlays are best-effort there.
-- **SteamOS is untested.** Desktop mode may work like any other distro. Game
-  mode is not supported: gamescope only displays the game it launched, so
-  forcing the app into it can freeze the session.
-- **Screen capture asks once per session.** The first overlay scan opens your
-  desktop's screen-share dialog. Pick the monitor Warframe runs on.
-- **Instant overlays need one launch option.** Add `PROTON_LOG=1 %command%` to
-  Warframe's launch options (in Steam: right-click Warframe, Properties,
-  Launch Options) and restart the game. The setup wizard shows the same string
-  with a copy button. Without it the overlays still fire, just a few seconds
-  later.
+Linux поддерживается исходным кодом и отдельными CI-проверками запуска. На 5 ноября 2026 года в **собственных опубликованных релизах этого репозитория нет AppImage**. Инструкцию скачать отсутствующий файл здесь не приводим; сборка Linux требует своего подтверждённого артефакта и проверки системы/Wayland.
 
-### Inventory data
+Готовая собственная сборка macOS не опубликована. Локальная проверка формата данных на Mac не является приёмкой desktop-клиента для macOS.
 
-The game client offers no local inventory API, so the first-run wizard offers
-three sources:
+<a id="journeys"></a>
 
-- **warframe-api-helper** (recommended) - downloads
-  [Sainan/warframe-api-helper](https://github.com/Sainan/warframe-api-helper)
-  and loads its `inventory.json` snapshots while you play
-- **JSON import** - open an existing `inventory.json` export
-- **AlecaFrame import** - decrypts AlecaFrame's local `lastData.dat` cache
+## Три полезных сценария
 
-## Privacy
+**Разобрать инвентарь.** Выберите источник в мастере первого запуска: helper/готовый `inventory.json` либо импорт локального кеша AlecaFrame. Для чтения уже подготовленного JSON не нужен вход в warframe.market. Проверьте дату снимка, затем используйте категории и фильтры. Импорт отражает выбранный файл, а не непрерывный поток данных из игры.
 
-Inventory snapshots, captured arbitration logs and stats stay on your PC. The
-app talks to its own caching backend for warframe.market prices and icons, the
-public game-data sources listed below, and GitHub for updates. No crash
-reporting or telemetry is built into the app. Backend requests produce route,
-status, timing and item-slug observability records in Cloudflare/Grafana, plus
-an anonymous daily active-user count.
-Overlay windows also request the Rajdhani and Barlow fonts from Google Fonts.
-Update checks are manual.
+**Подготовить следующий предмет.** Найдите снаряжение в Кузнице и просмотрите компоненты; сопоставьте их с текущим владением и целями мастерства. Исторически освоенное снаряжение может уже отсутствовать в инвентаре — эти два факта хранятся отдельно.
 
-## Building from source
+**Понять, какие данные действительно получены.** Откройте покрытие локального снимка и экспортируйте данные. Изучите доступные количества, экземпляры и конфигурации; отсутствие поля сохраняется явно. Автоматический полный игровой калькулятор и проверенная серверная синхронизация в этом результате не заявлены.
 
-Requires Node 22+ and pnpm 11 (via corepack).
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/readme/flow-mobile.svg">
+  <img src="docs/readme/flow-wide.svg" alt="Источник инвентаря проходит локальную проекцию и становится данными интерфейса и экспорта; рыночные цены приходят отдельно." width="1280">
+</picture>
 
-```
-corepack enable
+<a id="snapshot"></a>
+
+## Снимок не должен придумывать ответ
+
+В существующем синтетическом тесте **53 раздела** проходят настоящую TypeScript-проекцию и упаковку ZIP. Пример ниже построен из её результата: это иллюстрация контракта, **не скриншот приложения и не игровой аккаунт**.
+
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/readme/fixture-mobile.svg">
+  <img src="docs/readme/fixture-wide.svg" alt="Синтетические данные: ранг 14, кредиты 12000, платина 0, неизвестный XP null и отсутствующий раздел missing. Ноль отличается от отсутствия данных." width="1280">
+</picture>
+
+[Посмотреть выбранные поля fixture](docs/readme/fixture-proof.json) · [Как проверены иллюстрации](docs/readme/README.md)
+
+- `0` означает известный нулевой остаток, `null` — отсутствие достоверного значения.
+- Изменение остатка ресурса может включать траты. Это не подтверждённая добыча за миссию.
+- Исторический XP не означает, что предмет сейчас принадлежит игроку.
+- `rawValue` в fingerprint мода — исходное кодирование броска, а не готовый процент характеристики.
+- Время получения инвентаря отличается от времени экспорта. Недостающий раздел не достраивается из догадок.
+
+<a id="verification"></a>
+
+## Проверки и реальные границы
+
+| Проверка | Результат и предел |
+| --- | --- |
+| Локальный контракт на Node 22.22.2 / TypeScript 5.9.3 | Существующий `tests/bridge/build_fixture.cjs`: 53 раздела, JSON round-trip, UTF-8/кириллица, ZIP с `account.json` и `README_CHATGPT.md`. Поля авторизации из synthetic sentinels исключены. |
+| CI точного исходника `30323616…` | [CI](https://github.com/MikhailMostWanted/WFHelper/actions/runs/38898563033), [Next preview](https://github.com/MikhailMostWanted/WFHelper/actions/runs/38898562926) и [Secret Scan](https://github.com/MikhailMostWanted/WFHelper/actions/runs/38898562722) завершены успешно. Это исторические проверки выбранного исходника. |
+| Windows-сборка preview | Версия, `SOURCE_REVISION` и `build-info` релиза ссылаются на `3032361635d5f8a525a2f4c7544c031b412377e9`. Установщик в этом проходе не запускался. |
+| Windows native OCR, игра и оверлеи | На рабочем компьютере владельца не проверялись. Экранный захват, перехват клавиш и реальный аккаунт для этой документации не запускались. |
+| Linux / macOS | Новый AppImage, Linux desktop и macOS GUI в этом проходе не собирались и не принимались. |
+
+Локальный JSON/ZIP-тест проверяет преобразование данных. Он не проверяет Warframe, актуальные рыночные цены, авторизацию, торговые операции или внешний сервис синхронизации.
+
+<a id="build"></a>
+
+## Сборка и вклад в проект
+
+Требуются **Node.js 22.12+ и pnpm 11.1.2**, указанный в `packageManager`. Актуальную собственную реализацию следует брать из preview-ветки:
+
+```sh
+git clone https://github.com/MikhailMostWanted/WFHelper.git
+cd WFHelper
+git checkout feat/wantedframe-next
 pnpm install --frozen-lockfile
-pnpm run dev        # dev loop
-pnpm run dist:win   # build the NSIS installer
+pnpm run build
 ```
 
-## Credits
+`pnpm run build` компилирует main/preload и renderer. `pnpm run dev` запускает desktop-клиент и его службы; для проверки документации он не требуется. Упаковка поддерживаемых целей: `pnpm run dist:win` на Windows и `pnpm run dist:linux` с Linux/Wayland build-зависимостями. Наличие команды не доказывает готовность опубликованного файла.
 
-- [warframe.market](https://warframe.market) - prices and order data
-- Digital Extremes' Public Export - item data and images
-- [WFCD](https://github.com/WFCD) community projects - item database
-  ([warframe-items](https://github.com/WFCD/warframe-items)), drop tables
-  ([drops.warframestat.us](https://drops.warframestat.us)) and world-state API
-- [browse.wf](https://browse.wf) - supplemental item icons
-- [sves' arbi analyzer](https://svesk.github.io/arbi/) - the arbitration
-  stats model this app's analyzer is ported from
-- [Sainan/warframe-api-helper](https://github.com/Sainan/warframe-api-helper) -
-  inventory snapshot tool
-- AlecaFrame - `lastData.dat` import compatibility
+Для отдельной проверки проекции без Electron установите TypeScript 5.9.3 в свой тестовый каталог и запустите существующий `tests/bridge/build_fixture.cjs`, передав `TYPESCRIPT_PATH` и отдельную папку результата. Не используйте реальные пользовательские экспорты как публичный demo. [Точный рецепт и список проверок](docs/readme/README.md).
 
-## Support
+Изменения этой витрины предлагаются в `feat/wantedframe-next`. Слияние накопленных runtime-доработок в `main`, выпуск, переименование и отделение форка — отдельные действия. [Статус и процедура отделения](docs/FORK_STATUS.md).
 
-WantedFrame is maintained in this fork. Use the repository Issues page for bugs
-and feature requests.
+## Данные и внешние подключения
 
-## Disclaimer
+Снимки инвентаря, статистика и разборы логов хранятся локально. Для цен и иконок клиент обращается к backend WFHelper и внешним источникам; управляющие рыночные действия требуют отдельной сессии. Существующий README upstream описывает маршрутные метрики backend и анонимный суточный счётчик; отсутствие crash-телеметрии не означает отсутствие сетевых запросов. Некоторые оверлеи запрашивают шрифты Google Fonts.
 
-Unofficial fan project, not affiliated with or endorsed by Digital
-Extremes. "Warframe" and related assets are property of Digital Extremes
-Ltd.
+Helper и импорт AlecaFrame — внешние источники со своими ограничениями. Связанные экспериментальные интеграции в дереве исходников не превращают desktop-клиент в персональное подключение WantedFrame и не меняют его API или авторизацию.
 
-## License
+<a id="origin"></a>
 
-[MIT](LICENSE)
+## Происхождение и благодарности
+
+Эта версия основана на [WFHelper/WFHelper](https://github.com/WFHelper/WFHelper). Общий предок собственной и текущей upstream-истории — `2e0d9552e9360fac4b86c37cc26593aedc4714a9`. Сохранены Git-история и исходное [MIT-уведомление](LICENSE). Все изменения форка нельзя приписывать одному автору: в истории есть upstream-коммиты, собственные доработки и автоматизация.
+
+- [warframe.market](https://warframe.market) — рыночные данные и заявки.
+- Digital Extremes Public Export — игровые данные и изображения; [WFCD](https://github.com/WFCD) — общественные справочники, drop tables и world-state.
+- [browse.wf](https://browse.wf) — дополнительные иконки.
+- [sves' arbi analyzer](https://svesk.github.io/arbi/) — происхождение модели анализа арбитражей.
+- [Sainan/warframe-api-helper](https://github.com/Sainan/warframe-api-helper) и AlecaFrame — совместимые источники инвентаря.
+- Onest — [SIL Open Font License](assets/OFL-Onest.txt). Игровые ресурсы, модели и сторонние компоненты сохраняют собственные условия; MIT репозитория не меняет их права.
+
+Неофициальный фанатский проект, не аффилированный с Digital Extremes. Warframe и связанные игровые ресурсы принадлежат Digital Extremes. Новые схемы этой витрины — оригинальные SVG без игровых кадров и чужих логотипов.
+
+На 5 ноября 2026 года GitHub Issues в этом репозитории выключены. Для предложений по коду используйте PR в соответствующую ветку; отдельный официальный сайт или канал поддержки этой версии здесь не объявлен.
