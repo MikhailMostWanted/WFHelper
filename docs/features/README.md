@@ -1,9 +1,9 @@
 # Feature guides
 
-The Markdown files in this folder are the source of the guides on
-https://wfhelper.com/docs/. The site is generated from them by a private build
-that also holds the screenshots, so nothing here needs the site checkout: write
-the guide, keep it valid against the rules below, and
+These guides retain the upstream wfhelper.com documentation format. This fork
+does not own or publish that website, and a guide update here does not deploy it.
+The upstream private generator also holds screenshots. Preserve format and
+anchors for compatibility, and
 `pnpm run test -- tests/main/docsGuides.test.ts` checks the same rules the
 generator enforces. This README is not published.
 
@@ -14,7 +14,7 @@ against the app, use the exact UI labels, and keep heading anchors that other
 guides link to. Only finished guides are published; do not add placeholder
 pages. Mark a beta feature as beta in the text.
 
-The in-app help buttons open `/docs/getting-started` and `/docs/inventory`
+The inherited in-app help buttons open `/docs/getting-started` and `/docs/inventory`
 (`src/components/DocsLink.svelte`), so those two files keep their names.
 
 ## File format

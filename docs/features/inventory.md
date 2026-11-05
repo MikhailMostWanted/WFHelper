@@ -79,4 +79,4 @@ Listings are created after review and confirmation. Complete the trade with the 
 - **A set appears alongside its parts:** this is a grouped view. The value estimate avoids counting the set twice.
 - **A quantity has not changed after a trade:** see [inventory refresh and imports](/docs/getting-started#choose-an-inventory-source).
 
-For setup and capture problems, return to [Getting started](/docs/getting-started#if-setup-gets-stuck). For an inventory mismatch that persists, report the app version, source type, item name, and expected quantity through [GitHub Issues](https://github.com/WantedFrame/wfhelper/issues).
+For setup and capture problems, return to [Getting started](/docs/getting-started#if-setup-gets-stuck). For an inventory mismatch that persists, include the app version, source type, item name, and expected quantity in a [code proposal](https://github.com/MikhailMostWanted/WFHelper/pulls). Issues are disabled in this fork; no separate support channel is promised.
