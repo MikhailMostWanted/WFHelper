@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,6 +11,14 @@ const executable = process.argv[2];
 if (!executable || !fs.existsSync(executable)) {
   throw new Error("usage: packaged-smoke.mjs <packaged executable or AppImage>");
 }
+const sourceNoticeSha256 = {
+  wfhelper: createHash("sha256")
+    .update(fs.readFileSync(new URL("../LICENSE", import.meta.url)))
+    .digest("hex"),
+  onest: createHash("sha256")
+    .update(fs.readFileSync(new URL("../assets/OFL-Onest.txt", import.meta.url)))
+    .digest("hex"),
+};
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "wfhelper-package-"));
 const output = path.resolve("test-results", `packaged-${Date.now()}`);
 fs.mkdirSync(output, { recursive: true });
@@ -50,7 +59,14 @@ try {
     .stderr?.on("data", (chunk) => fs.appendFileSync(path.join(output, "stderr.log"), chunk));
   runtime = await app.evaluate(async ({ app: desktop }) => {
     const require = process.mainModule.require.bind(process.mainModule);
+    const { createHash } = require("node:crypto");
+    const { readFileSync } = require("node:fs");
     const path = require("node:path");
+    const noticeSha256 = (file) => createHash("sha256").update(readFileSync(file)).digest("hex");
+    const notices = {
+      wfhelper: noticeSha256(path.join(process.resourcesPath, "LICENSE.WFHelper.txt")),
+      onest: noticeSha256(path.join(desktop.getAppPath(), "assets", "OFL-Onest.txt")),
+    };
     const sharp = require("sharp");
     const ort = require("onnxruntime-node");
     const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: "white" } })
@@ -69,9 +85,11 @@ try {
       version: desktop.getVersion(),
       imageBytes: image.length,
       models,
+      notices,
     };
   });
   assert.equal(runtime.packaged, true, "the smoke must launch a packaged app");
+  assert.deepEqual(runtime.notices, sourceNoticeSha256, "packaged notices must match source bytes");
   assert.ok(runtime.imageBytes > 0);
   const deadline = Date.now() + 90_000;
   let page;
@@ -107,5 +125,5 @@ try {
 if (!passed) process.exitCode = 1;
 else
   console.log(
-    `Packaged runtime passed: ${runtime.version}; sharp and both ONNX models loaded; clean exit. Evidence: ${output}`,
+    `Packaged runtime passed: ${runtime.version}; license notices verified; sharp and both ONNX models loaded; clean exit. Evidence: ${output}`,
   );

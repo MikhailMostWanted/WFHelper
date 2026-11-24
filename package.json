@@ -183,6 +183,10 @@
     ],
     "extraResources": [
       {
+        "from": "LICENSE",
+        "to": "LICENSE.WFHelper.txt"
+      },
+      {
         "from": "scripts/warframe-watcher.ps1",
         "to": "scripts/warframe-watcher.ps1"
       },
