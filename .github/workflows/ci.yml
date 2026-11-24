@@ -131,12 +131,12 @@ jobs:
           pnpm run test:main
           pnpm run build
 
-      - name: Build unpacked Windows app
+      - name: Build unpacked Windows app and verify license notices
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: pnpm exec electron-builder --win --x64 --dir --publish never
 
-      - name: Verify Windows package and license notices
+      - name: Smoke test packaged Windows app
         run: pnpm run test:packaged release/win-unpacked/WantedFrame.exe
 
       - name: Preserve Windows package evidence

@@ -17,7 +17,7 @@
 
 ## Лицензии поставки
 
-- В опубликованном `0.3.0-preview.3` есть уведомления Electron и Chromium. В `app.asar` присутствует исходный `assets/OFL-Onest.txt`. MIT-уведомление WFHelper в пакете отсутствует. В следующих сборках по текущей конфигурации оно копируется в `resources/LICENSE.WFHelper.txt`. Packaged smoke сверяет MIT и OFL с исходными файлами побайтно.
+- В опубликованном `0.3.0-preview.3` есть уведомления Electron и Chromium. В `app.asar` присутствует исходный `assets/OFL-Onest.txt`. MIT-уведомление WFHelper в пакете отсутствует. В следующих сборках по текущей конфигурации оно копируется в `resources/LICENSE.WFHelper.txt`. Проверка при упаковке сверяет MIT и OFL с исходными файлами побайтно.
 - `resources/riven-ocr/yolo/stat_line_detector.onnx` унаследован от WFHelper. В ONNX указана лицензия AGPL-3.0 и автор Ultralytics. Для выпуска нужно установить происхождение весов и обучающих материалов, обязательства по исходникам и условия распространения выбранной комплектации. Для конверсии `ch_PP-OCRv3_rec_infer.onnx` и словаря тоже нужна отдельная сверка источника. [Лицензирование моделей Ultralytics](https://www.ultralytics.com/license) · [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR).
 - Игровые названия, данные, графика и логотипы имеют собственные условия. Проверьте включённые в `assets/` изображения и демо-кадры по источнику. Digital Extremes допускает некоммерческое использование по Content Policy и требует письменного согласия на использование своих логотипов. [Warframe Content Policy](https://www.warframe.com/en/contentpolicy) · [Warframe EULA](https://www.warframe.com/en/eula).
 

@@ -36,6 +36,22 @@ exports.default = async function verifyPackagedRuntimeAssets(context) {
     throw new Error(`Packaged app.asar is missing runtime file(s): ${missingAsarFiles.join(", ")}`);
   }
 
+  const sourceRoot = path.resolve(__dirname, "..");
+  if (
+    !readFileSync(path.join(root, "LICENSE.WFHelper.txt")).equals(
+      readFileSync(path.join(sourceRoot, "LICENSE")),
+    )
+  ) {
+    throw new Error("Packaged WFHelper MIT notice differs from LICENSE");
+  }
+  const onestNotice = "assets/OFL-Onest.txt";
+  if (
+    !asar
+      .extractFile(appAsarPath, onestNotice)
+      .equals(readFileSync(path.join(sourceRoot, onestNotice)))
+  ) {
+    throw new Error("Packaged Onest OFL notice differs from assets/OFL-Onest.txt");
+  }
   verifySharpBinaries(root, context);
 };
 

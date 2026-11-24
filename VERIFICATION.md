@@ -16,7 +16,7 @@ npm. No live account is needed for the automated checks below.
 | Overlay lifecycle        | Build, `pnpm run test:overlay-stress`                                | Repeated native window show/hide and fixture triggers. Live capture needs separate tests.               |
 | Keyboard interception    | Build, `pnpm run test:keyhook --active-desktop`                      | Interactive opt-in. Decoy must own foreground focus before a key is sent.                               |
 | Linux startup            | Build, `xvfb-run -a pnpm run test:linux-boot`                        | X11 application boot; exit 2 means prerequisites missing, not a pass.                                   |
-| Packaged runtime         | `pnpm run test:packaged <executable-or-AppImage>`                    | Fresh profile, packaged UI, exact MIT/OFL notices, sharp and both ONNX models loading.                  |
+| Packaged runtime         | `pnpm run test:packaged <executable-or-AppImage>`                    | Fresh profile, packaged UI, sharp and both ONNX models loading. Does not install or update the app.     |
 | Worker                   | `pnpm run backend:typecheck`, `pnpm run backend:test`                | Cloudflare runtime tests. Deployed smoke is separate and uses the network.                              |
 
 `pnpm run test:e2e <spec>` builds first. `test:e2e:built` reuses the existing
@@ -97,9 +97,10 @@ full inventory exports or the real profile as routine diagnostics.
 
 ## Release checks
 
-Windows CI runs packaged smoke on an unpacked x64 build. Release workflows run
-the same check before asset upload on Windows and Linux. It verifies the shipped
-MIT/OFL notices byte for byte, model/library loading and first-run rendering.
+The packaging hook verifies the shipped MIT/OFL notices byte for byte. Windows
+CI then runs packaged smoke on an unpacked x64 build. The release workflows run
+the same smoke test before asset upload on Windows and Linux. It covers
+model/library loading and first-run rendering.
 Use a disposable VM/Sandbox and synthetic previous-release state to test
 installation, updates, migration and rollback separately.
 `scripts/installer-acceptance/README.md` describes the prepared Windows Sandbox
