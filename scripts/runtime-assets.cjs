@@ -8,8 +8,14 @@ module.exports = {
     "riven-ocr/paddle/ch_dict.txt",
   ],
   // Shipped only in a packaged build, so the repo check skips them.
-  packagedResources: ["scripts/ocr-server.ps1", "scripts/ocr.ps1", "scripts/warframe-watcher.ps1"],
+  packagedResources: [
+    "LICENSE.WFHelper.txt",
+    "scripts/ocr-server.ps1",
+    "scripts/ocr.ps1",
+    "scripts/warframe-watcher.ps1",
+  ],
   asarFiles: [
+    "assets/OFL-Onest.txt",
     "node_modules/debug/src/common.js",
     "node_modules/ms/index.js",
     "node_modules/ms/package.json",

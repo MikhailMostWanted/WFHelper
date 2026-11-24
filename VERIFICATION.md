@@ -97,10 +97,12 @@ full inventory exports or the real profile as routine diagnostics.
 
 ## Release checks
 
-Packaged smoke runs before release asset upload on Windows and Linux. It checks
-model/library loading and first-run rendering. Installation, updates, migration
-and rollback need separate tests. Use a disposable VM/Sandbox for installer
-upgrades with synthetic previous-release state.
+The packaging hook verifies the shipped MIT/OFL notices byte for byte. Windows
+CI then runs packaged smoke on an unpacked x64 build. The release workflows run
+the same smoke test before asset upload on Windows and Linux. It covers
+model/library loading and first-run rendering.
+Use a disposable VM/Sandbox and synthetic previous-release state to test
+installation, updates, migration and rollback separately.
 `scripts/installer-acceptance/README.md` describes the prepared Windows Sandbox
 runner for two supplied installers, saved-state checks and diagnostic files.
 
