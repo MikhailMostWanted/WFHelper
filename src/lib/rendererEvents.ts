@@ -9,7 +9,7 @@ import { statusText } from "../stores/app.js";
 import { pendingArbiRunId, subscribeArbiRunSaved } from "../stores/arbiRuns.js";
 import { subscribePtRunSaved } from "../stores/ptRuns.js";
 import { currentView } from "../stores/app.js";
-import { inventoryData, inventoryModifiedAt, itemDb, parsedItems } from "../stores/data.js";
+import { inventoryData, inventoryStatus, itemDb, parsedItems } from "../stores/data.js";
 import { masteryData } from "../stores/mastery.js";
 import { relicOwnedCounts } from "../stores/relics.js";
 import { applyClosedWfmListing } from "../stores/market.js";
@@ -18,19 +18,10 @@ import { detectedWarframeUiScale, overlaySettings } from "../stores/overlaySetti
 import { addToast } from "../stores/toasts.js";
 import { applyUpdateState } from "../stores/updates.js";
 
-async function refreshInventoryModifiedAt(): Promise<void> {
-  try {
-    const status = await invoke("getInventoryStatus");
-    inventoryModifiedAt.set(status?.modifiedAt ?? null);
-  } catch {
-    // A missing status must not claim the loaded file is fresh.
-    inventoryModifiedAt.set(null);
-  }
-}
-
 /** Main-process events that outlive whichever view happens to be mounted.
  * App.svelte only calls this and disposes it; none of it is layout. */
 export function initRendererEvents(): () => void {
+  let canSeedInventoryStatus = true;
   const unsubscribes = [
     overlaySettings.subscribe((settings) => {
       updateNotificationSoundSettings(
@@ -47,15 +38,11 @@ export function initRendererEvents(): () => void {
         inventoryData.set(null);
         masteryData.set(null);
         relicOwnedCounts.set({});
-        inventoryModifiedAt.set(null);
         statusText.set(null);
         return;
       }
       if (data && !(data as { error?: unknown }).error) {
         await onInventoryLoaded(data);
-        // Main only pushes a status on watcher errors and source switches, so the
-        // mtime behind this payload has to be pulled.
-        await refreshInventoryModifiedAt();
         if (!get(inventoryData)) return;
         // SetupView routes itself during the wizard; navigating here would tear it down
         statusText.set({
@@ -66,7 +53,8 @@ export function initRendererEvents(): () => void {
     }),
 
     on("inventory-status-updated", (status) => {
-      inventoryModifiedAt.set(status.modifiedAt ?? null);
+      canSeedInventoryStatus = false;
+      inventoryStatus.set(status);
       if (status.source === "none") {
         statusText.set(null);
         return;
@@ -123,8 +111,15 @@ export function initRendererEvents(): () => void {
     }),
   ];
 
-  // The startup inventory load can predate these subscriptions, so seed the mtime.
-  void refreshInventoryModifiedAt();
+  // A status pushed during startup takes precedence over the initial response.
+  void invoke("getInventoryStatus").then(
+    (status) => {
+      if (canSeedInventoryStatus) inventoryStatus.set(status);
+    },
+    () => {
+      if (canSeedInventoryStatus) inventoryStatus.set(null);
+    },
+  );
   void loadNotificationHistory();
 
   // Main raises each hint once: XWayland failed here, or there is no X server.
@@ -148,6 +143,7 @@ export function initRendererEvents(): () => void {
   });
 
   return () => {
+    canSeedInventoryStatus = false;
     for (const unsubscribe of unsubscribes) unsubscribe();
   };
 }

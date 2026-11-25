@@ -74,6 +74,7 @@ let _watchRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
 interface InventoryReadError {
   kind: "parse" | "read" | "watch";
+  code?: "access-denied" | "missing";
   message: string;
   path: string;
   at: number;
@@ -99,6 +100,23 @@ function inventoryErrorKind(err: unknown): "parse" | "read" {
   return typeof code === "string" && FS_ERROR_CODES.has(code) ? "read" : "parse";
 }
 let _lastReadError: InventoryReadError | null = null;
+
+function recordInventoryError(
+  kind: InventoryReadError["kind"],
+  err: unknown,
+  filePath: string,
+): void {
+  const errno = (err as NodeJS.ErrnoException | null)?.code;
+  const code =
+    errno === "EACCES" || errno === "EPERM"
+      ? "access-denied"
+      : errno === "ENOENT"
+        ? "missing"
+        : undefined;
+  const message = normalizeErrorMessage(err);
+  log.warn(`Inventory ${kind} failed:`, message);
+  _lastReadError = { kind, code, message, path: filePath, at: Date.now() };
+}
 
 const _inventoryStatePath = userDataPath("inventory-reload-state.json");
 
@@ -189,7 +207,7 @@ function getInventoryStatus(): {
 } {
   return {
     path: ctx.currentInventoryPath,
-    found: ctx.currentInventoryPath !== null,
+    found: _loadedInventoryHash !== null && _lastReadError === null,
     source: _trustedInventorySource,
     modifiedAt: getLoadedInventoryModifiedAt(),
     lastError: _lastReadError,
@@ -197,9 +215,7 @@ function getInventoryStatus(): {
 }
 
 function notifyInventoryStatus(): void {
-  const window = ctx.mainWindow;
-  if (!window || window.isDestroyed()) return;
-  window.webContents.send(INVENTORY_STATUS_UPDATED, getInventoryStatus());
+  broadcastToRenderers(INVENTORY_STATUS_UPDATED, getInventoryStatus());
 }
 
 function newestExistingInventoryPath(paths: string[]): string | null {
@@ -316,9 +332,7 @@ function readInventorySnapshot(filePath: string): InventoryFileSnapshot | null {
       modifiedAt: stats.mtimeMs,
     };
   } catch (err) {
-    const message = normalizeErrorMessage(err);
-    log.error(`Failed to read inventory at ${filePath}:`, message);
-    _lastReadError = { kind: "read", message, path: filePath, at: Date.now() };
+    recordInventoryError("read", err, filePath);
     return null;
   }
 }
@@ -344,7 +358,10 @@ function readInventory(filePath: string, source: JsonInventorySource = "helper")
     const contentUnchanged = hash === _lastInventoryHash;
 
     // Startup reads must populate the UI even when the persisted hash matches.
-    data = parseInventoryRaw(snapshot.raw);
+    data =
+      hash === _loadedInventoryHash && ctx.currentInventoryData
+        ? ctx.currentInventoryData
+        : parseInventoryRaw(snapshot.raw);
     ctx.currentInventoryData = data as Record<string, unknown> | null;
     _loadedInventoryHash = hash;
     _loadedInventoryModifiedAt = snapshot.modifiedAt;
@@ -360,10 +377,7 @@ function readInventory(filePath: string, source: JsonInventorySource = "helper")
     _persistState();
     return data;
   } catch (err) {
-    const message = normalizeErrorMessage(err);
-    const kind = inventoryErrorKind(err);
-    log.error(`Failed to ${kind} inventory at ${filePath}:`, message);
-    _lastReadError = { kind, message, path: filePath, at: Date.now() };
+    recordInventoryError(inventoryErrorKind(err), err, filePath);
     return null;
   }
 }
@@ -386,10 +400,7 @@ function readAlecaFrameInventory(filePath: string): unknown {
     _notifyListenersOncePerProcessHash(hash, data);
     return data;
   } catch (err) {
-    const message = normalizeErrorMessage(err);
-    const kind = inventoryErrorKind(err);
-    log.error(`Failed to ${kind} AlecaFrame inventory at ${filePath}:`, message);
-    _lastReadError = { kind, message, path: filePath, at: Date.now() };
+    recordInventoryError(inventoryErrorKind(err), err, filePath);
     return null;
   }
 }
@@ -405,54 +416,26 @@ function watchInventoryFile(
 
   const watcher = chokidar.watch(filePath, {
     persistent: true,
+    ignoreInitial: true,
     awaitWriteFinish: { stabilityThreshold: INVENTORY_WATCH_STABILITY_MS },
   });
   ctx.watcher = watcher;
 
-  watcher.on("change", () => {
+  const reload = (): void => {
     if (generation !== _watchGeneration) return;
-    if (source === "aleca") {
-      const previousHash = _lastInventoryHash;
-      const data = readAlecaFrameInventory(filePath);
-      if (!data || _lastInventoryHash === previousHash) return;
+    const previousHash = _loadedInventoryHash;
+    const data =
+      source === "aleca" ? readAlecaFrameInventory(filePath) : readInventory(filePath, source);
+    if (data && _loadedInventoryHash !== previousHash) {
       broadcastToRenderers(INVENTORY_UPDATED, data);
-      return;
     }
-    const snapshot = readInventorySnapshot(filePath);
-    if (snapshot == null) return;
-
-    const hash = crypto.createHash("sha256").update(snapshot.raw).digest("hex");
-    if (hash === _lastInventoryHash) {
-      _loadedInventoryModifiedAt = snapshot.modifiedAt;
-      log.info("Inventory file touched but content unchanged, skipping reload.");
-      return;
-    }
-
-    try {
-      const data = parseInventoryRaw(snapshot.raw);
-      _lastInventoryHash = hash;
-      _persistState();
-      log.info("Inventory file changed, reloading...");
-      ctx.currentInventoryData = data as Record<string, unknown> | null;
-      _loadedInventoryHash = hash;
-      _loadedInventoryModifiedAt = snapshot.modifiedAt;
-      _lastReadError = null;
-      rememberInventoryPath(filePath, source);
-      _notifyListenersOncePerProcessHash(hash, data);
-      if (data) broadcastToRenderers(INVENTORY_UPDATED, data);
-    } catch (err) {
-      const message = normalizeErrorMessage(err);
-      const kind = inventoryErrorKind(err);
-      log.error(`Failed to ${kind} inventory:`, message);
-      _lastReadError = { kind, message, path: filePath, at: Date.now() };
-    }
-  });
+    notifyInventoryStatus();
+  };
+  watcher.on("add", reload).on("change", reload).on("unlink", reload);
 
   watcher.on("error", (error) => {
     if (generation !== _watchGeneration) return;
-    const message = normalizeErrorMessage(error);
-    log.error(`Inventory watcher failed for ${filePath}:`, message);
-    _lastReadError = { kind: "watch", message, path: filePath, at: Date.now() };
+    recordInventoryError("watch", error, filePath);
     notifyInventoryStatus();
 
     _watchGeneration += 1;
@@ -468,9 +451,7 @@ function watchInventoryFile(
   });
 
   watcher.on("ready", () => {
-    if (generation !== _watchGeneration || _lastReadError?.kind !== "watch") return;
-    _lastReadError = null;
-    notifyInventoryStatus();
+    if (_lastReadError?.kind === "watch") reload();
   });
 }
 
@@ -489,34 +470,14 @@ function getLoadedInventoryModifiedAt(): number | null {
 
 function loadInitialInventory(): { path: string; data: unknown } | null {
   if (_trustedInventorySource === "none") return null;
-  if (_trustedInventorySource === "aleca" && _trustedInventoryPath) {
-    const alecaPath = newestExistingInventoryPath([_trustedInventoryPath]);
-    if (alecaPath) {
-      watchInventoryFile(alecaPath, "aleca");
-      const data = readAlecaFrameInventory(alecaPath);
-      if (data) {
-        return { path: alecaPath, data };
-      }
-      return null;
-    }
-  }
-
-  // A manually imported file wins over helper output: the user picked it, and
-  // nothing refreshes it but them.
-  if (_trustedInventorySource === "manual" && _trustedInventoryPath) {
-    const manualPath = newestExistingInventoryPath([_trustedInventoryPath]);
-    if (manualPath) {
-      ctx.currentInventoryPath = manualPath;
-      watchInventoryFile(manualPath, "manual");
-      const data = readInventory(manualPath, "manual");
-      return data ? { path: manualPath, data } : null;
-    }
-    // Demoted, not just bypassed: leaving the pick on "manual" would keep auto
-    // sync switched off for a file that no longer exists, so nothing refreshes.
-    log.warn("Manually selected inventory file is gone, falling back to the helper.");
-    _trustedInventorySource = "helper";
-    _trustedInventoryPath = null;
-    _persistState();
+  if (_trustedInventorySource === "manual" || _trustedInventorySource === "aleca") {
+    const filePath = _trustedInventoryPath;
+    if (!filePath) return null;
+    const source = _trustedInventorySource;
+    watchInventoryFile(filePath, source);
+    const data =
+      source === "aleca" ? readAlecaFrameInventory(filePath) : readInventory(filePath, source);
+    return data ? { path: filePath, data } : null;
   }
 
   const filePath = findInventoryFile();
@@ -545,15 +506,21 @@ function getInventorySource(): InventorySource {
  *  re-arms the watcher without a restart. */
 function reattachHelperInventory(): void {
   const filePath = findInventoryFile();
+  ctx.currentInventoryData = null;
+  _loadedInventoryHash = null;
+  _lastListenerInventoryHash = null;
+  _loadedInventoryModifiedAt = null;
+  _lastReadError = null;
   if (!filePath) {
     stopInventoryWatcher();
     ctx.currentInventoryPath = null;
     _activeInventorySource = "helper";
+    broadcastToRenderers(INVENTORY_UPDATED, null);
     return;
   }
   watchInventoryFile(filePath, "helper");
   const data = readInventory(filePath, "helper");
-  if (data) broadcastToRenderers(INVENTORY_UPDATED, data);
+  broadcastToRenderers(INVENTORY_UPDATED, data);
 }
 
 /** Records the user's explicit pick and re-applies the auto-sync gate.
@@ -582,6 +549,7 @@ function setInventorySource(source: InventorySource): InventorySource {
     ctx.currentInventoryData = null;
     _activeInventorySource = "none";
     _loadedInventoryHash = null;
+    _lastListenerInventoryHash = null;
     _loadedInventoryModifiedAt = null;
     _lastReadError = null;
     broadcastToRenderers(INVENTORY_UPDATED, null);
@@ -593,7 +561,9 @@ function setInventorySource(source: InventorySource): InventorySource {
 
 function register(): void {
   handleAuthorized(INVENTORY_GET, assertMainRendererSender, async () => {
-    return readCurrentInventory();
+    const data = readCurrentInventory();
+    notifyInventoryStatus();
+    return data;
   });
 
   handleAuthorized(
@@ -628,9 +598,10 @@ function register(): void {
       ctx.currentInventoryPath = filePath;
       watchInventoryFile(filePath, source);
       if (previousSource !== _trustedInventorySource) inventorySync.apply(`source ${source}`);
-      return data;
+      broadcastToRenderers(INVENTORY_UPDATED, data);
     }
-    return null;
+    notifyInventoryStatus();
+    return data;
   });
 
   handleAuthorized(INVENTORY_OPEN_ALECA_FRAME_FILE, assertMainRendererSender, async () => {
@@ -659,7 +630,9 @@ function register(): void {
     if (data) {
       watchInventoryFile(filePath, "aleca");
       if (previousSource !== _trustedInventorySource) inventorySync.apply("source aleca");
+      broadcastToRenderers(INVENTORY_UPDATED, data);
     }
+    notifyInventoryStatus();
     return data;
   });
 
@@ -677,6 +650,7 @@ export {
   readInventory,
   getInventorySource,
   getInventoryStatus,
+  notifyInventoryStatus,
   setInventorySource,
   getLoadedInventoryModifiedAt,
 };

@@ -7,6 +7,7 @@ import { _electron as electron } from "@playwright/test";
 import { closeNativeElectron } from "./native-electron.cjs";
 
 const executable = process.argv[2];
+const reviewBuild = process.argv.includes("--review");
 if (!executable || !fs.existsSync(executable)) {
   throw new Error("usage: packaged-smoke.mjs <packaged executable or AppImage>");
 }
@@ -48,16 +49,18 @@ try {
   app
     .process()
     .stderr?.on("data", (chunk) => fs.appendFileSync(path.join(output, "stderr.log"), chunk));
-  runtime = await app.evaluate(async ({ app: desktop }) => {
+  runtime = await app.evaluate(async ({ app: desktop }, review) => {
     const require = process.mainModule.require.bind(process.mainModule);
     const path = require("node:path");
     const sharp = require("sharp");
-    const ort = require("onnxruntime-node");
     const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: "white" } })
       .png()
       .toBuffer();
-    const models = ["yolo/stat_line_detector.onnx", "paddle/ch_PP-OCRv3_rec_infer.onnx"];
+    const models = review
+      ? []
+      : ["yolo/stat_line_detector.onnx", "paddle/ch_PP-OCRv3_rec_infer.onnx"];
     for (const model of models) {
+      const ort = require("onnxruntime-node");
       const session = await ort.InferenceSession.create(
         path.join(process.resourcesPath, "riven-ocr", model),
         { executionProviders: ["cpu"] },
@@ -69,10 +72,14 @@ try {
       version: desktop.getVersion(),
       imageBytes: image.length,
       models,
+      review: require("node:fs").existsSync(
+        path.join(process.resourcesPath, "desktop-review.json"),
+      ),
     };
-  });
+  }, reviewBuild);
   assert.equal(runtime.packaged, true, "the smoke must launch a packaged app");
   assert.ok(runtime.imageBytes > 0);
+  assert.equal(runtime.review, reviewBuild);
   const deadline = Date.now() + 90_000;
   let page;
   while (!page && Date.now() < deadline) {
@@ -82,6 +89,18 @@ try {
   assert.ok(page, "packaged main renderer did not open");
   await page.locator("#app").waitFor({ state: "visible", timeout: 30_000 });
   await page.locator("#content.setup-active").waitFor({ state: "visible", timeout: 30_000 });
+  if (reviewBuild) {
+    const session = await page.evaluate(() => window.api.wfmGetSession());
+    assert.equal(session.loggedIn, false);
+    const signIn = await page.evaluate(() =>
+      window.api.wfmSignIn({ email: "preview@example.invalid", password: "fixture" }),
+    );
+    assert.equal(signIn.loggedIn, false);
+    assert.match(signIn.error, /disabled/);
+    await page.evaluate(() => window.api.setInventorySource("helper"));
+    const result = await page.evaluate(() => window.api.downloadHelper());
+    assert.equal(result.ok, false);
+  }
   await page.screenshot({ path: path.join(output, "packaged-setup.png") });
   assert.deepEqual(errors, [], "packaged renderer errors");
   fs.writeFileSync(path.join(output, "runtime.json"), JSON.stringify(runtime, null, 2));
@@ -107,5 +126,5 @@ try {
 if (!passed) process.exitCode = 1;
 else
   console.log(
-    `Packaged runtime passed: ${runtime.version}; sharp and both ONNX models loaded; clean exit. Evidence: ${output}`,
+    `Packaged runtime passed: ${runtime.version}; ${reviewBuild ? "review profile" : "both ONNX models"} and sharp verified; clean exit. Evidence: ${output}`,
   );

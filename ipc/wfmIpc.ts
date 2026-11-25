@@ -3,6 +3,7 @@ import { isObject } from "./ipcValidators";
 import { toNonEmptyString } from "../config/shared/stringValidation";
 import type { WfmStatus } from "../config/shared/wfm";
 import { isWfmSlug } from "../config/shared/wfm";
+import { DESKTOP_REVIEW } from "../config/runtime/desktopReview";
 import { SUBTYPE_REQUIRED_CODE, subtypeChoicesOf } from "../config/shared/wfmOrders";
 import {
   errorCode,
@@ -126,6 +127,7 @@ function register(): void {
   if (registerWfmFixtures()) return; // E2E-only stub replaced the whole surface
 
   handleAuthorized(WFM_SIGNIN, assertMainRendererSender, async (_event, payload) => {
+    if (DESKTOP_REVIEW) return { loggedIn: false, error: "Live market is disabled in this build." };
     const creds = parseCredentials(payload);
     if (!creds) {
       log.warn("[Security] wfm:signin blocked due to invalid payload shape");

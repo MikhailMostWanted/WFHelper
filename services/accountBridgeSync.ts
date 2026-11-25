@@ -2,6 +2,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import https from "node:https";
 import { safeStorage } from "electron";
+import { DESKTOP_REVIEW } from "../config/runtime/desktopReview";
 import { userDataPath } from "./userDataPath";
 import { writeFileAtomicSync } from "./atomicFile";
 import type { AccountBridgeDocument } from "./accountBridge";
@@ -102,7 +103,7 @@ function persist(next: Settings): void {
   settings = next;
 }
 export function bridgeSyncStatus(): BridgeSyncStatus {
-  const cfg = load();
+  const cfg = DESKTOP_REVIEW ? null : load();
   return {
     connected: !!cfg,
     server: cfg?.server ?? null,
@@ -115,6 +116,7 @@ export function bridgeSyncStatus(): BridgeSyncStatus {
 }
 /** Invoked only after the owner selects and confirms a local pairing file. */
 export function connectBridge(pair: Pairing): void {
+  if (DESKTOP_REVIEW) throw new Error("MCP pairing is disabled in this build.");
   generation++;
   abortActive?.();
   persist({
@@ -129,6 +131,7 @@ export function connectBridge(pair: Pairing): void {
   lastSentAt = null;
 }
 export function setAutomaticBridge(enabled: boolean): void {
+  if (DESKTOP_REVIEW) throw new Error("MCP syncing is disabled in this build.");
   const cfg = load();
   if (!cfg) throw new Error("Сначала подключи сервер");
   if (enabled && (!cfg.bindingId || cfg.bindingId === "manual"))
@@ -142,6 +145,7 @@ export function setAutomaticBridge(enabled: boolean): void {
   }
 }
 export async function disconnectBridge(): Promise<void> {
+  if (DESKTOP_REVIEW) throw new Error("MCP pairing is disabled in this build.");
   generation++;
   abortActive?.();
   settings = null;
@@ -152,6 +156,7 @@ export async function disconnectBridge(): Promise<void> {
 }
 /** Only the explicitly paired destination is contacted. Redirects never receive the token. */
 export function pushBridge(doc: AccountBridgeDocument): Promise<void> {
+  if (DESKTOP_REVIEW) return Promise.reject(new Error("MCP syncing is disabled in this build."));
   if (busy) return Promise.reject(new Error("Отправка уже выполняется"));
   const cfg = load();
   if (!cfg) return Promise.reject(new Error("Сервер не подключён"));

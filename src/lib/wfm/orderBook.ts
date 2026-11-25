@@ -24,7 +24,19 @@ export interface ItemOrderBook {
 type ItemOrderBookResult =
   | { status: "ok"; data: ItemOrderBook }
   | { status: "not_found"; slug: string }
-  | { status: "error"; slug: string };
+  | { status: "error"; slug: string; reason?: OrderBookErrorReason };
+
+type OrderBookErrorReason = "access-denied" | "rate-limited";
+export function orderBookErrorKey(reason?: OrderBookErrorReason) {
+  if (reason === "access-denied") return "orderbook.accessDenied";
+  if (reason === "rate-limited") return "orderbook.rateLimited";
+  return "common.failedToLoadListingsTryAgain";
+}
+
+type EndpointResult =
+  | { status: "ok"; orders: unknown[] }
+  | { status: "not_found" }
+  | { status: "error"; reason?: OrderBookErrorReason };
 
 const ORDERBOOK_TTL_MS = 45_000;
 const ORDERBOOK_NO_DATA_TTL_MS = 3 * 60 * 1000;
@@ -76,30 +88,25 @@ function isFresh(entry: CacheEntry): boolean {
   });
 }
 
-async function fetchRawOrdersFromEndpoint(
-  url: string,
-): Promise<{ data: unknown[] | null; transient: boolean }> {
+async function fetchRawOrdersFromEndpoint(url: string): Promise<EndpointResult> {
   bumpCounter("httpCalls");
 
-  let response: Response;
   try {
-    response = await fetchWithTimeout(url, DIRECT_ORDER_BOOK_FETCH_TIMEOUT_MS, {
+    const response = await fetchWithTimeout(url, DIRECT_ORDER_BOOK_FETCH_TIMEOUT_MS, {
       headers: WFM_HEADERS,
     });
+    if (response.status === 404) return { status: "not_found" };
+    if (response.status === 401 || response.status === 403) {
+      return { status: "error", reason: "access-denied" };
+    }
+    if (response.status === 429) return { status: "error", reason: "rate-limited" };
+    if (!response.ok) return { status: "error" };
+
+    const orders = extractWfmOrderList(await response.json());
+    return orders ? { status: "ok", orders } : { status: "error" };
   } catch {
-    return { data: null, transient: true };
+    return { status: "error" };
   }
-
-  if (response.status === 429 || response.status >= 500) {
-    return { data: null, transient: true };
-  }
-  if (!response.ok) return { data: null, transient: false };
-
-  const jsonPayload = await response.json();
-  const rawOrders = extractWfmOrderList(jsonPayload);
-  if (!rawOrders) return { data: null, transient: false };
-
-  return { data: rawOrders, transient: false };
 }
 
 async function fetchDirectOrderBook(
@@ -107,73 +114,42 @@ async function fetchDirectOrderBook(
   rank: number | null,
   subtype: string | null,
 ): Promise<ItemOrderBookResult> {
-  const v2Attempt = await fetchRawOrdersFromEndpoint(
+  let result = await fetchRawOrdersFromEndpoint(
     `https://api.warframe.market/v2/orders/item/${slug}`,
   );
-  if (v2Attempt.data) {
-    bumpCounter("resultOk");
-    // A 200 with no orders is what an "empty listing" report looks like; keep the trace.
-    if (v2Attempt.data.length === 0) log.warn(`[OrderBook] v2 returned no orders for ${slug}`);
-    return {
-      status: "ok",
-      data: {
-        slug,
-        // Renderer keeps the FULL book - the browse tab pages through it; the
-        // default 500 cap is for the worker's KV-bound prewarm path only.
-        sell: normalizeWfmOrderBookSide(
-          v2Attempt.data,
-          "sell",
-          rank,
-          Number.MAX_SAFE_INTEGER,
-          subtype,
-        ),
-        buy: normalizeWfmOrderBookSide(
-          v2Attempt.data,
-          "buy",
-          rank,
-          Number.MAX_SAFE_INTEGER,
-          subtype,
-        ),
-        timestamp: Date.now(),
-      },
-    };
+  if (result.status === "not_found") {
+    bumpCounter("v1FallbackCalls");
+    result = await fetchRawOrdersFromEndpoint(
+      `https://api.warframe.market/v1/items/${slug}/orders`,
+    );
   }
-  if (v2Attempt.transient) {
+  if (result.status === "not_found") {
+    bumpCounter("resultNoData");
+    return { status: "not_found", slug };
+  }
+  if (result.status === "error") {
     bumpCounter("resultError");
-    return { status: "error", slug };
+    return { ...result, slug };
   }
 
-  bumpCounter("v1FallbackCalls");
-  const v1Attempt = await fetchRawOrdersFromEndpoint(
-    `https://api.warframe.market/v1/items/${slug}/orders`,
-  );
-  if (v1Attempt.data) {
-    bumpCounter("resultOk");
-    return {
-      status: "ok",
-      data: {
-        slug,
-        sell: normalizeWfmOrderBookSide(
-          v1Attempt.data,
-          "sell",
-          rank,
-          Number.MAX_SAFE_INTEGER,
-          subtype,
-        ),
-        buy: normalizeWfmOrderBookSide(
-          v1Attempt.data,
-          "buy",
-          rank,
-          Number.MAX_SAFE_INTEGER,
-          subtype,
-        ),
-        timestamp: Date.now(),
-      },
-    };
-  }
-
-  bumpCounter(v1Attempt.transient ? "resultError" : "resultNoData");
-  return v1Attempt.transient ? { status: "error", slug } : { status: "not_found", slug };
+  bumpCounter("resultOk");
+  if (result.orders.length === 0) log.info(`[OrderBook] No orders returned for ${slug}`);
+  return {
+    status: "ok",
+    data: {
+      slug,
+      // The browse tab pages the full book locally.
+      sell: normalizeWfmOrderBookSide(
+        result.orders,
+        "sell",
+        rank,
+        Number.MAX_SAFE_INTEGER,
+        subtype,
+      ),
+      buy: normalizeWfmOrderBookSide(result.orders, "buy", rank, Number.MAX_SAFE_INTEGER, subtype),
+      timestamp: Date.now(),
+    },
+  };
 }
 
 export function resetOrderBookDebugCounters(): void {
@@ -276,7 +252,7 @@ export async function fetchItemOrderBookBySlug(
           return { status: "not_found", slug: normalizedSlug };
         }
 
-        return { status: "error", slug: normalizedSlug };
+        return result;
       },
       priority,
       requestOwner,

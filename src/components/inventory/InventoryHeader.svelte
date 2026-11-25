@@ -5,11 +5,13 @@
   import SharedFilterBar from "../SharedFilterBar.svelte";
   import DocsLink from "../DocsLink.svelte";
   import { tr } from "../../lib/i18n.js";
+  import { VIEW_LABEL_KEYS } from "../../lib/viewRegistry.js";
   import type { MessageKey } from "../../lib/i18n.js";
   import type { InventoryFilterTab } from "../../lib/inventoryMarket.js";
   import type { SharedSortKey } from "../../types/filters.js";
 
   export let totalCount = 0;
+  export let hasSnapshot = true;
   export let filters: Array<{ key: InventoryFilterTab; labelKey: MessageKey }> = [];
   export let activeFilter: InventoryFilterTab = "all_parts";
   export let showFilterPanel = false;
@@ -67,13 +69,14 @@
 <!-- The layout-edit button rides the title row; on its own row it leaves a band of dead space beside it. -->
 <div class="inventory-heading">
   <h2>
-    {$tr("inventory.title", { count: totalCount })}
+    {hasSnapshot ? $tr("inventory.title", { count: totalCount }) : $tr(VIEW_LABEL_KEYS.inventory)}
   </h2>
   <div class="ml-auto flex items-center gap-2">
     <DocsLink page="inventory" />
     <slot name="actions" />
   </div>
 </div>
+<slot name="source" />
 <div class="view-sticky-filters inventory-workspace" bind:this={stickyEl}>
   <!-- The tab row will not shrink below its own labels, so the controls take the
        next row whole once they no longer fit beside it. A px breakpoint measured

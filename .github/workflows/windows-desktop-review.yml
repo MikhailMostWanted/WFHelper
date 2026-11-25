@@ -1,0 +1,46 @@
+name: Windows desktop review
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/windows-desktop-review.yml"
+      - "build/installer.nsh"
+      - "scripts/build-desktop-review.mjs"
+      - "scripts/installer-acceptance/**"
+      - "scripts/packaged-smoke.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install-launch-uninstall:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build unsigned x64 review installer
+        shell: pwsh
+        run: pnpm run dist:win:review 0.3.1-preview.1 "$env:RUNNER_TEMP\desktop-review"
+      - name: Verify clean installation, launch and uninstall
+        shell: pwsh
+        run: |
+          $root = "$env:RUNNER_TEMP\desktop-review"
+          ./scripts/installer-acceptance/review-ci.ps1 -Installer "$root\source\release\WantedFrame-0.3.1-preview.1-Setup.exe" -Evidence "$root\install-result.json"
+      - name: Preserve acceptance summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-install-evidence
+          path: |
+            ${{ runner.temp }}/desktop-review/artifact.json
+            ${{ runner.temp }}/desktop-review/install-result.json
+          if-no-files-found: error
+          retention-days: 14

@@ -120,6 +120,7 @@ interface AppRuntimeInfo {
 
 interface InventoryReadError {
   kind: "parse" | "read" | "watch";
+  code?: "access-denied" | "missing";
   message: string;
   path: string;
   at: number;

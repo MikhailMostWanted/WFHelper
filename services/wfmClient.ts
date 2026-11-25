@@ -9,6 +9,7 @@ import {
 } from "./wfmScheduler";
 import { WfmApiError } from "./wfmTypes";
 import { normalizeErrorMessage } from "../config/shared/errors";
+import { DESKTOP_REVIEW } from "../config/runtime/desktopReview";
 
 const log = withScope("wfmClient");
 
@@ -363,6 +364,8 @@ async function _request(
   headers: Record<string, string>,
   body: string | null,
 ): Promise<WfmResponseLike> {
+  if (DESKTOP_REVIEW)
+    throw new WfmApiError("Live market is disabled in this build.", "WFM_DISABLED");
   const net = _nodeTransportLatched ? null : _chromiumNet();
   if (!_transportLogged) {
     _transportLogged = true;
@@ -666,6 +669,11 @@ function _coreRequest(
     priority,
   }: CoreRequestOptions = {},
 ): Promise<unknown> {
+  if (DESKTOP_REVIEW) {
+    return Promise.reject(
+      new WfmApiError("Live market is disabled in this build.", "WFM_DISABLED"),
+    );
+  }
   const url = baseUrl + path;
   const body = json !== undefined ? JSON.stringify(json) : null;
   const authScheme = baseUrl === BASE_URL_V2 ? "Bearer" : "JWT";
@@ -866,6 +874,11 @@ export function requestRaw(
   path: string,
   { json, headers: extraHeaders, headerAuth = false, priority }: WfmRequestOptions = {},
 ): Promise<WfmRawResponse> {
+  if (DESKTOP_REVIEW) {
+    return Promise.reject(
+      new WfmApiError("Live market is disabled in this build.", "WFM_DISABLED"),
+    );
+  }
   const url = BASE_URL + path;
   const body = json !== undefined ? JSON.stringify(json) : null;
   const replayable = _isReplayable(method);

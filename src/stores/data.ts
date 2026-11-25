@@ -5,14 +5,17 @@ import { parseInventory } from "../lib/inventory.js";
 import { parseFoundry } from "../lib/inventory/foundryResources.js";
 import { gameRefKey } from "../lib/marketNaming.js";
 import { hideFoundryClaims } from "./preferences.js";
-import type { WfmItemsLookup } from "../types/ipc.js";
+import type { IpcInvokeMap, WfmItemsLookup } from "../types/ipc.js";
 import type { FoundryData, ItemDbEntry, ParsedItem, RawInventoryData } from "../types/inventory.js";
 
 export const itemDb = writable<Record<string, ItemDbEntry>>({});
 export const wfmItems = writable<WfmItemsLookup>({});
 export const inventoryData = writable<RawInventoryData | null>(null);
+export const inventoryStatus = writable<
+  IpcInvokeMap["getInventoryStatus"]["return"] | null | undefined
+>(undefined);
 /** mtime of the file behind `inventoryData`; dates its undated point-in-time fields. */
-export const inventoryModifiedAt = writable<number | null>(null);
+export const inventoryModifiedAt = derived(inventoryStatus, (status) => status?.modifiedAt ?? null);
 
 /** What the account can actually use: blueprints handed to the foundry are gone
  *  from the in-game inventory but stay in Recipes until the build is claimed. */

@@ -10,6 +10,7 @@ import { markQuitting } from "./appLifecycle";
 import { withScope } from "./logger";
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { APP_UPDATE_STATUS } from "../config/shared/ipcChannels";
+import { DESKTOP_REVIEW } from "../config/runtime/desktopReview";
 
 const log = withScope("autoUpdater");
 
@@ -125,7 +126,7 @@ function applyFakeUpdateState(): boolean {
 }
 
 function shouldEnableAutoUpdater(): boolean {
-  if (process.env.WF_DISABLE_AUTO_UPDATE === "1") return false;
+  if (DESKTOP_REVIEW || process.env.WF_DISABLE_AUTO_UPDATE === "1") return false;
   if (!app.isPackaged) return false;
   const ymlPath = path.join(process.resourcesPath, "app-update.yml");
   return fs.existsSync(ymlPath);

@@ -2,10 +2,12 @@
   import { onMount } from "svelte";
 
   import { DAY_MS } from "../lib/format.js";
-  import { invoke, on, send } from "../lib/ipc.js";
+  import { invoke, send } from "../lib/ipc.js";
   import { locale, tr, type MessageKey } from "../lib/i18n.js";
   import { useInterval } from "../lib/timers.js";
   import { APP_LOGO_URL } from "../lib/assetUrls.js";
+  import { describeInventorySource } from "../lib/inventorySourceLabel.js";
+  import { inventoryStatus } from "../stores/data.js";
   import WfmStatusPill from "./market/WfmStatusPill.svelte";
   import { themeSettings } from "../stores/theme.js";
   import { DEFAULT_APP_NAME } from "../config/themeDefaults.js";
@@ -18,7 +20,6 @@
   $: appName = $themeSettings.branding.appName || DEFAULT_APP_NAME;
 
   let helperStatus: HelperStatus | null = null;
-  let withoutInventory = false;
 
   // Show just the clock time, plus the date once the data is over a day old.
   function formatHelperTime(ms: number | null, localeCode: string): string {
@@ -72,29 +73,28 @@
     return "bg-danger";
   }
 
-  $: statusMessage = withoutInventory
-    ? { key: "settings.inventorySourceNone" as const }
-    : helperStatusMessage(helperStatus, helperInventoryIsOld, $locale);
+  $: helperSelected = $inventoryStatus?.source === "helper";
+  $: sourceLabel = $inventoryStatus
+    ? describeInventorySource($inventoryStatus.source, $inventoryStatus.path).labelKey
+    : ("titlebar.status.unknown" as const);
+  $: statusMessage = $inventoryStatus?.lastError
+    ? { key: "inventory.source.unavailable" as const }
+    : helperSelected
+      ? helperStatusMessage(helperStatus, helperInventoryIsOld, $locale)
+      : { key: sourceLabel };
   $: helperStatusText = $tr(statusMessage.key, statusMessage.params);
   $: helperTooltipText = $tr(
-    withoutInventory ? "setup.source.none.desc" : helperTooltipKey(helperStatus),
+    helperSelected && !$inventoryStatus?.lastError
+      ? helperTooltipKey(helperStatus)
+      : statusMessage.key,
   );
-  $: helperDotClass = withoutInventory
-    ? "bg-text-muted"
-    : computeHelperDotClass(helperStatus, helperInventoryIsOld);
-  $: helperDotPulse = !withoutInventory && (helperStatus?.running ?? false);
+  $: helperDotClass =
+    helperSelected && !$inventoryStatus?.lastError
+      ? computeHelperDotClass(helperStatus, helperInventoryIsOld)
+      : "bg-text-muted";
+  $: helperDotPulse = helperSelected && (helperStatus?.running ?? false);
 
   onMount(() => {
-    let sourceUpdated = false;
-    const unsubscribe = on("inventory-status-updated", (status) => {
-      sourceUpdated = true;
-      withoutInventory = status.source === "none";
-    });
-    void invoke("getInventoryStatus")
-      .then((status) => {
-        if (!sourceUpdated) withoutInventory = status.source === "none";
-      })
-      .catch(() => {});
     const refreshHelperStatus = (): void => {
       invoke("getHelperStatus")
         .then((status) => {
@@ -103,11 +103,7 @@
         .catch(() => {});
     };
 
-    const stop = useInterval(refreshHelperStatus, HELPER_STATUS_POLL_MS, { immediate: true });
-    return () => {
-      unsubscribe();
-      stop();
-    };
+    return useInterval(refreshHelperStatus, HELPER_STATUS_POLL_MS, { immediate: true });
   });
 </script>
 

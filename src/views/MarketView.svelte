@@ -811,6 +811,18 @@
         <MarketAlertsView />
       {/if}
     </LayoutGrid>
+  {:else if !$marketSession.loggedIn && import.meta.env.VITE_WF_DESKTOP_REVIEW === "1"}
+    <HeaderTabs
+      options={orderTypeTabs}
+      activeKey={$marketViewState.typeTab}
+      onSelect={handleTypeTabSelect}
+    />
+    <div class="market-signin-workspace">
+      <div class="market-signin-card" role="status" data-market-review-status>
+        <h2 class="m-0 font-display text-2xl font-bold">{$tr("market.wfmTitle")}</h2>
+        <p class="mt-2 text-text-secondary">{$tr("market.reviewUnavailable")}</p>
+      </div>
+    </div>
   {:else if !$marketSession.loggedIn}
     <div class="market-desk-navigation">
       <HeaderTabs
