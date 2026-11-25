@@ -400,7 +400,7 @@ describe("fetchItemOrderBookBySlug", () => {
       const url =
         typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       if (url === "https://api.warframe.market/v2/orders/item/primed_flow") {
-        return new Response("", { status: 403 });
+        return new Response("", { status: 404 });
       }
       if (url === "https://api.warframe.market/v1/items/primed_flow/orders") {
         return jsonResponse(200, {
@@ -426,5 +426,32 @@ describe("fetchItemOrderBookBySlug", () => {
 
     expect(result.status).toBe("ok");
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    [401, "access-denied"],
+    [403, "access-denied"],
+    [429, "rate-limited"],
+  ])(
+    "keeps HTTP %i distinct from no listings and does not switch endpoints",
+    async (status, reason) => {
+      const fetchMock = vi.fn(async () => new Response(null, { status }));
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+      await expect(fetchItemOrderBookBySlug("primed_flow")).resolves.toEqual({
+        status: "error",
+        slug: "primed_flow",
+        reason,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("settles malformed successful responses as unavailable rather than empty", async () => {
+    globalThis.fetch = vi.fn(async () => new Response("<html>", { status: 200 }));
+    await expect(fetchItemOrderBookBySlug("primed_flow")).resolves.toEqual({
+      status: "error",
+      slug: "primed_flow",
+    });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 });

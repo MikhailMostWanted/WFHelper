@@ -25,7 +25,8 @@
 
   let step: Step = "configure";
   const isLinux = getPlatform() === "linux";
-  let inventorySource: InventorySource = "helper";
+  const desktopReview = import.meta.env.VITE_WF_DESKTOP_REVIEW === "1";
+  let inventorySource: InventorySource = desktopReview ? "manual" : "helper";
   let progress: HelperDownloadProgress | null = null;
   let errorMessage = "";
   let helperStatus: HelperInventoryStatus = "checking";
@@ -415,7 +416,7 @@
               {$tr("setup.inventory.desc")}
             </p>
 
-            {#if helperStatus === "not_found" && runnerStatus?.exeFound}
+            {#if !desktopReview && helperStatus === "not_found" && runnerStatus?.exeFound}
               <div class="mb-3 rounded-lg border border-warning bg-warning/10 px-3 py-3">
                 <span
                   class="mb-1 inline-block rounded bg-warning px-2 py-0.5 font-display text-xs font-bold tracking-widest text-text-on-accent"
@@ -460,38 +461,44 @@
             {/if}
 
             <div class="grid gap-2">
-              <button
-                type="button"
-                class={sourceButtonClass("helper", inventorySource)}
-                aria-pressed={inventorySource === "helper"}
-                on:click={() => (inventorySource = "helper")}
-              >
-                <div class="flex items-center justify-between gap-3">
-                  <!-- Windows shows the executable's real name on GitHub Releases, never
+              {#if !desktopReview}
+                <button
+                  type="button"
+                  class={sourceButtonClass("helper", inventorySource)}
+                  aria-pressed={inventorySource === "helper"}
+                  on:click={() => (inventorySource = "helper")}
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <!-- Windows shows the executable's real name on GitHub Releases, never
                        localised; Linux has no executable, it reads the running game. -->
-                  <span class="font-display text-sm font-semibold"
-                    >{isLinux ? $tr("setup.source.helper.linuxTitle") : "warframe-api-helper"}</span
-                  >
-                  <span
-                    class="rounded bg-success/15 px-2 py-0.5 font-display text-xs font-bold tracking-widest text-success"
-                    >{$tr("common.recommended")}</span
-                  >
-                </div>
-                <div class="mt-1 text-xs leading-snug">
-                  {$tr(isLinux ? "setup.source.helper.linuxDesc" : "setup.source.helper.desc")}
-                </div>
-                <div class="mt-2 text-xs text-text-muted">
-                  {#if helperStatus === "checking"}
-                    {$tr("setup.source.helper.checking")}
-                  {:else if helperStatus === "found"}
-                    {$tr("setup.source.helper.found", { path: helperPath ?? "" })}
-                  {:else if runnerStatus?.exeFound}
-                    {$tr(isLinux ? "setup.source.helper.linuxReady" : "setup.source.helper.ready")}
-                  {:else}
-                    {$tr("setup.source.helper.notInstalled")}
-                  {/if}
-                </div>
-              </button>
+                    <span class="font-display text-sm font-semibold"
+                      >{isLinux
+                        ? $tr("setup.source.helper.linuxTitle")
+                        : "warframe-api-helper"}</span
+                    >
+                    <span
+                      class="rounded bg-success/15 px-2 py-0.5 font-display text-xs font-bold tracking-widest text-success"
+                      >{$tr("common.recommended")}</span
+                    >
+                  </div>
+                  <div class="mt-1 text-xs leading-snug">
+                    {$tr(isLinux ? "setup.source.helper.linuxDesc" : "setup.source.helper.desc")}
+                  </div>
+                  <div class="mt-2 text-xs text-text-muted">
+                    {#if helperStatus === "checking"}
+                      {$tr("setup.source.helper.checking")}
+                    {:else if helperStatus === "found"}
+                      {$tr("setup.source.helper.found", { path: helperPath ?? "" })}
+                    {:else if runnerStatus?.exeFound}
+                      {$tr(
+                        isLinux ? "setup.source.helper.linuxReady" : "setup.source.helper.ready",
+                      )}
+                    {:else}
+                      {$tr("setup.source.helper.notInstalled")}
+                    {/if}
+                  </div>
+                </button>
+              {/if}
 
               <button
                 type="button"

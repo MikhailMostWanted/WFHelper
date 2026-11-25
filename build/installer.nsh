@@ -27,14 +27,21 @@ Var HelperAutoInstall
 Var HelperAutoInstallCheckbox
 
 !macro customInit
+!ifdef WF_DESKTOP_REVIEW
+  StrCpy $HelperAutoInstall "0"
+!else
   StrCpy $HelperAutoInstall "1"
+!endif
 !macroend
 
 !macro customWelcomePage
   !insertmacro MUI_PAGE_WELCOME
+!ifndef WF_DESKTOP_REVIEW
   Page custom HelperOptionsPage HelperOptionsLeave
+!endif
 !macroend
 
+!ifndef WF_DESKTOP_REVIEW
 Function HelperOptionsPage
   nsDialogs::Create 1018
   Pop $0
@@ -66,6 +73,7 @@ Function HelperOptionsLeave
     StrCpy $HelperAutoInstall "0"
   ${EndIf}
 FunctionEnd
+!endif
 
 !macro customInstall
   ; Remove the legacy WFHelper watcher so an upgrade cannot leave two launchers.
@@ -73,10 +81,16 @@ FunctionEnd
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "WFHelperWarframeWatcher"
 
   ; Silent auto-update skips the options page - keep the user's original choice.
+!ifdef WF_DESKTOP_REVIEW
+  ${If} ${FileExists} "$APPDATA\WantedFrame\setup-preferences.json"
+    Goto helperPrefsDone
+  ${EndIf}
+!else
   ${If} ${Silent}
   ${AndIf} ${FileExists} "$APPDATA\WantedFrame\setup-preferences.json"
     Goto helperPrefsDone
   ${EndIf}
+!endif
   CreateDirectory "$APPDATA\WantedFrame"
   FileOpen $0 "$APPDATA\WantedFrame\setup-preferences.json" w
   ${If} $HelperAutoInstall == "1"

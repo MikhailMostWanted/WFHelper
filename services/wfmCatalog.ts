@@ -5,6 +5,7 @@ import { BACKEND_URL } from "../config/shared/backendConfig";
 import { normalizeErrorMessage } from "../config/shared/errors";
 import { withAbortTimeout } from "../config/shared/fetchWithTimeout";
 import { formatWfmAssetUrl, titleFromSlug } from "../config/shared/wfm";
+import { DESKTOP_REVIEW } from "../config/runtime/desktopReview";
 
 const log = withScope("wfmCatalog");
 
@@ -92,6 +93,7 @@ async function _fetchBackendCatalog(): Promise<unknown[]> {
 }
 
 async function _load(): Promise<void> {
+  if (DESKTOP_REVIEW) return;
   if (_loaded) return;
   if (_loading) return _loading;
   if (Date.now() - _lastFailureAt < LOAD_FAILURE_COOLDOWN_MS) {

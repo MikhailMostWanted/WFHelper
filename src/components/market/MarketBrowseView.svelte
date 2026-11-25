@@ -20,6 +20,7 @@
   import {
     clearOrderBookCache,
     fetchItemOrderBookBySlug,
+    orderBookErrorKey,
     type ItemOrderBook,
     type OrderBookEntry,
   } from "../../lib/wfm/orderBook.js";
@@ -279,12 +280,7 @@
     noData = false;
     loading = true;
 
-    let result = await fetchItemOrderBookBySlug(slug, { rank, subtype: requestedSubtype });
-    if (token !== requestToken) return;
-    if (result.status === "error") {
-      clearOrderBookCache(slug, rank, requestedSubtype);
-      result = await fetchItemOrderBookBySlug(slug, { rank, subtype: requestedSubtype });
-    }
+    const result = await fetchItemOrderBookBySlug(slug, { rank, subtype: requestedSubtype });
     if (token !== requestToken) return;
 
     loading = false;
@@ -297,7 +293,7 @@
     }
     setAgeTick(false);
     if (result.status === "not_found") noData = true;
-    else errorKey = "common.failedToLoadListingsTryAgain";
+    else errorKey = orderBookErrorKey(result.reason);
   }
 
   function refresh(): void {
@@ -325,6 +321,7 @@
   }
 
   onDestroy(() => {
+    requestToken += 1;
     if (autoRefreshTimer) clearTimeout(autoRefreshTimer);
     if (feedbackTimer) clearTimeout(feedbackTimer);
     if (copiedTimer) clearTimeout(copiedTimer);
@@ -701,7 +698,13 @@
       </div>
       <div>
         <h3>{$translate("browse.tabOrders")}</h3>
-        <p>{$translate("browse.emptyHint")}</p>
+        <p>
+          {$translate(
+            import.meta.env.VITE_WF_DESKTOP_REVIEW === "1"
+              ? "market.reviewUnavailable"
+              : "browse.emptyHint",
+          )}
+        </p>
       </div>
     </div>
   {:else}
@@ -719,11 +722,15 @@
           {catalogLabel(selected, $itemDb)}
         </h3>
         <div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-text-secondary">
-          <span class={owned.total > 0 ? "font-semibold text-success" : ""}
-            >{$translate("browse.owned", { count: owned.total })}{owned.ranks.length > 0
-              ? ` (${owned.ranks.map((entry) => `${entry.count}x R${entry.rank}`).join(", ")})`
-              : ""}</span
-          >
+          {#if owned.total > 0}
+            <span class="font-semibold text-success">
+              {$translate("browse.owned", { count: owned.total })}{owned.ranks.length > 0
+                ? ` (${owned.ranks.map((entry) => `${entry.count}x R${entry.rank}`).join(", ")})`
+                : ""}
+            </span>
+          {:else}
+            <span>{$translate("browse.ownershipUnknown")}</span>
+          {/if}
           {#if tradingTax != null}
             <span class="inline-flex items-center gap-1"
               >{$translate("browse.tradingTax")}

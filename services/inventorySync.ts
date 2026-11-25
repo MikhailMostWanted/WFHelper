@@ -1,5 +1,6 @@
 import { withScope } from "./logger";
 import type { InventorySource } from "../config/shared/inventorySource";
+import { DESKTOP_REVIEW } from "../config/runtime/desktopReview";
 
 const log = withScope("inventorySync");
 
@@ -36,6 +37,7 @@ export function init(deps: InventorySyncDeps): void {
 }
 
 function skipReason(): string | null {
+  if (DESKTOP_REVIEW) return "review build uses inventory files";
   if (!_deps) return "inventory sync is not initialized";
   return autoSyncSkipReason(_deps.getSource(), _deps.isAutoSyncEnabled());
 }

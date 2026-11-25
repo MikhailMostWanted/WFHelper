@@ -16,6 +16,7 @@
   import {
     clearOrderBookCache,
     fetchItemOrderBookBySlug,
+    orderBookErrorKey,
     type ItemOrderBook,
     type OrderBookEntry,
   } from "../../lib/wfm/orderBook.js";
@@ -62,7 +63,7 @@
   let currentSubtype: string | null = null;
   let orderBook: ItemOrderBook | null = null;
   let loading = false;
-  let errorMessage = "";
+  let errorKey: MessageKey | null = null;
   let feedbackMessage = "";
   let noData = false;
   let requestToken = 0;
@@ -162,6 +163,7 @@
   }
 
   onDestroy(() => {
+    requestToken += 1;
     if (autoRefreshTimer) clearTimeout(autoRefreshTimer);
     if (feedbackTimer) clearTimeout(feedbackTimer);
     stopAgeTick?.();
@@ -198,7 +200,7 @@
     const token = ++requestToken;
 
     orderBook = null;
-    errorMessage = "";
+    errorKey = null;
     noData = false;
 
     if (!slugToLoad) {
@@ -209,17 +211,10 @@
 
     loading = true;
 
-    let result = await fetchItemOrderBookBySlug(slugToLoad, {
+    const result = await fetchItemOrderBookBySlug(slugToLoad, {
       rank: rankToLoad,
       subtype: subtypeToLoad,
     });
-    if (result.status === "error") {
-      clearOrderBookCache(slugToLoad, rankToLoad, subtypeToLoad);
-      result = await fetchItemOrderBookBySlug(slugToLoad, {
-        rank: rankToLoad,
-        subtype: subtypeToLoad,
-      });
-    }
     if (token !== requestToken) return;
 
     loading = false;
@@ -238,7 +233,7 @@
     }
     setAgeTick(false);
     resetAutoRefresh(slugToLoad, rankToLoad);
-    errorMessage = $tr("common.failedToLoadListingsTryAgain");
+    errorKey = orderBookErrorKey(result.reason);
   }
 
   function setFeedback(message: string): void {
@@ -506,7 +501,7 @@
             x{item.amount} · {item.categoryLabel}{#if requestRank != null}
               {$tr("orderbook.viewingRank", { rank: requestRank })}{/if}
           </span>
-          {#if orderBook && !loading && !errorMessage && !noData}
+          {#if orderBook && !loading && !errorKey && !noData}
             <span class="shrink-0 text-text-muted"
               >{formatUpdatedLabel($tr, orderBook.timestamp ?? null, nowTimestamp)}</span
             >
@@ -527,11 +522,12 @@
       >
         {$tr("common.loadingListings")}
       </div>
-    {:else if errorMessage}
+    {:else if errorKey}
       <div
         class="rounded-lg border border-dashed border-danger/40 bg-bg-soft px-2 py-2 text-xs text-danger"
+        role="alert"
       >
-        {errorMessage}
+        {$tr(errorKey)}
       </div>
     {:else if noData || !orderBook}
       <div

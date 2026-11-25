@@ -50,6 +50,7 @@ if (DISPLAY_BACKEND === "x11") {
 import { getLogFilePath, withScope } from "./services/logger";
 import { resolveWarframeUiScale } from "./services/eeLogPath";
 import { MAIN_WINDOW_CSP, PERMISSIONS_POLICY } from "./config/runtime/security";
+import { DESKTOP_REVIEW } from "./config/runtime/desktopReview";
 import { OVERLAY_LAYOUT_KINDS } from "./config/shared/overlayLayout";
 import { overlayPreviewFilePaths, overlayPreviewUrl } from "./services/overlayPreview";
 import * as windowSecurity from "./services/windowSecurity";
@@ -88,6 +89,7 @@ import { shouldUseRussianRewardOcr } from "./services/rewardRussianOcr";
 import * as autoUpdater from "./services/autoUpdater";
 import * as rivenBestAttributes from "./services/rivenBestAttributes";
 import * as warframeStatus from "./services/warframeStatus";
+import { BACKEND_URL } from "./config/shared/backendConfig";
 import {
   configureWarframeLifecycle,
   startWarframeLifecycle,
@@ -363,6 +365,22 @@ function createWindow(): void {
     );
   }
 
+  if (DESKTOP_REVIEW) {
+    const backend = BACKEND_URL ? new URL(BACKEND_URL).hostname : null;
+    ctx.mainWindow.webContents.session.webRequest.onBeforeRequest(
+      { urls: ["http://*/*", "https://*/*"] },
+      ({ url, resourceType }, callback) => {
+        const host = new URL(url).hostname;
+        callback({
+          cancel:
+            host === backend ||
+            host === "warframe.market" ||
+            host.endsWith(".warframe.market") ||
+            resourceType === "image",
+        });
+      },
+    );
+  }
   ctx.mainWindow.webContents.session.webRequest.onHeadersReceived(
     (
       details: { responseHeaders?: Record<string, string[]>; url: string; resourceType: string },
@@ -461,9 +479,11 @@ function initTrackersAndSettings(profileStage: ProfileStage): void {
   overlayIpc.loadOverlaySettings();
   profileStage("overlay-settings:load", settingsStart);
   startWarframeLifecycle(() => app.quit());
-  void configureWarframeLifecycle(ctx.overlaySettings.warframeLifecycleEnabled === true).catch(
-    (error: unknown) => log.warn("[WarframeLifecycle] startup failed:", error),
-  );
+  if (!DESKTOP_REVIEW) {
+    void configureWarframeLifecycle(ctx.overlaySettings.warframeLifecycleEnabled === true).catch(
+      (error: unknown) => log.warn("[WarframeLifecycle] startup failed:", error),
+    );
+  }
 
   const statsLoadStart = Date.now();
   statsTracker.loadHistory();
@@ -545,6 +565,7 @@ function registerIpcHandlers(profileStage: ProfileStage): void {
     log.info("First inventory load detected at:", discovered);
     const data = inventoryIpc.readInventory(discovered);
     if (data) popoutIpc.broadcastToRenderers(INVENTORY_UPDATED, data);
+    inventoryIpc.notifyInventoryStatus();
   };
 
   inventorySync.init({
@@ -566,13 +587,13 @@ function registerIpcHandlers(profileStage: ProfileStage): void {
     inventoryLastModified: inventoryIpc.getLoadedInventoryModifiedAt(),
   }));
   handleAuthorized(HELPER_RUN_NOW, assertMainRendererSender, async () => {
-    if (inventoryIpc.getInventorySource() === "none") return { ok: false };
+    if (DESKTOP_REVIEW || inventoryIpc.getInventorySource() === "none") return { ok: false };
     const ok = await apiHelperRunner.runOnce();
     attachInventoryAfterHelperRun(ok);
     return { ok };
   });
   handleAuthorized(HELPER_DOWNLOAD, assertMainRendererSender, async () => {
-    if (inventoryIpc.getInventorySource() === "none") return { ok: false };
+    if (DESKTOP_REVIEW || inventoryIpc.getInventorySource() === "none") return { ok: false };
     const ok = await apiHelperRunner.downloadHelper((progress) => {
       if (ctx.mainWindow) {
         ctx.mainWindow.webContents.send(HELPER_DOWNLOAD_PROGRESS, progress);
@@ -778,14 +799,16 @@ void app.whenReady().then(async () => {
   }
 
   const sessionRestoreStart = Date.now();
-  void wfmSession
-    .restoreSession()
-    .then(() => {
-      wfmIpc.startListenerIfLoggedIn();
-    })
-    .catch((err: Error) => {
-      log.warn("[WFMSession] restore failed:", err.message);
-    });
+  if (!DESKTOP_REVIEW) {
+    void wfmSession
+      .restoreSession()
+      .then(() => {
+        wfmIpc.startListenerIfLoggedIn();
+      })
+      .catch((err: Error) => {
+        log.warn("[WFMSession] restore failed:", err.message);
+      });
+  }
   profileStage("wfm-session:restore-dispatch", sessionRestoreStart);
 
   const updaterStart = Date.now();

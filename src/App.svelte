@@ -184,7 +184,14 @@
         statusText.set(null);
         return;
       }
-      if (inventoryStatus?.found || helperStatus?.inventoryLastModified) return;
+      if (
+        inventoryStatus?.source === "manual" ||
+        inventoryStatus?.source === "aleca" ||
+        inventoryStatus?.found ||
+        inventoryStatus?.lastError ||
+        helperStatus?.inventoryLastModified
+      )
+        return;
 
       currentView.set("setup");
       statusText.set({ key: "app.inventorySetupRequired" });

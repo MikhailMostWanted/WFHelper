@@ -18,6 +18,7 @@
     "dist": "pnpm run verify:onnx-models && pnpm run build && electron-builder",
     "dist:linux": "pnpm run verify:onnx-models && pnpm run build && node scripts/build-layer-shell.mjs --require && electron-builder --linux AppImage",
     "build:layer-shell": "node scripts/build-layer-shell.mjs",
+    "dist:win:review": "node scripts/build-desktop-review.mjs",
     "dist:win": "pnpm run verify:onnx-models && pnpm run build && electron-builder --win nsis",
     "check": "svelte-check --tsconfig tsconfig.json",
     "typecheck": "pnpm run typecheck:renderer && pnpm run typecheck:main && pnpm run typecheck:tests && pnpm run typecheck:e2e",

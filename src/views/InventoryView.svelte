@@ -48,6 +48,7 @@
   import EditLayoutBar from "../components/layout/EditLayoutBar.svelte";
   import LayoutGrid from "../components/layout/LayoutGrid.svelte";
   import { parsedItems, wfmItems, inventoryData, itemDb } from "../stores/data.js";
+  import InventorySourceStatus from "../components/inventory/InventorySourceStatus.svelte";
   import { masteryData } from "../stores/mastery.js";
   import { marketOrders } from "../stores/market.js";
   import { ensureMarketOrdersLoaded } from "../lib/marketOrdersSync.js";
@@ -729,7 +730,7 @@
 
   // The header stack is conditional; an absent block must not leave an empty slot.
   $: availableHeaderSections = [
-    ...(marketTab ? ["inventory.valueStrip"] : []),
+    ...($inventoryData && marketTab ? ["inventory.valueStrip"] : []),
     ...($inventorySelectionMode && marketTab ? ["inventory.selectionBar"] : []),
     ...(showFilterPanel && marketTab ? ["inventory.filters"] : []),
   ];
@@ -738,6 +739,7 @@
 <section class="view active inventory-collection">
   <InventoryHeader
     totalCount={filteredTotalCount}
+    hasSnapshot={Boolean($inventoryData)}
     filters={FILTERS}
     activeFilter={filter}
     {showFilterPanel}
@@ -748,12 +750,13 @@
     filtersEnabled={marketTab}
     basicFiltersEnabled={filter !== "pets"}
     selectionMode={$inventorySelectionMode}
-    selectionEnabled={marketTab}
+    selectionEnabled={marketTab && Boolean($inventoryData)}
     onToggleSelectionMode={handleToggleSelectionMode}
     on:filter={handleFilterSelect}
     on:toggle={handleToggleFilterPanel}
   >
     <EditLayoutBar view="inventory" slot="actions" />
+    <InventorySourceStatus slot="source" />
     <LayoutGrid
       view="inventory"
       only={INVENTORY_HEADER_SECTIONS}
@@ -816,7 +819,7 @@
   {/if}
 
   <LayoutGrid view="inventory" only={INVENTORY_GRID_SECTIONS} gapClass="gap-0" let:sectionId>
-    {#if sectionId === "inventory.grid"}
+    {#if sectionId === "inventory.grid" && $inventoryData}
       {#if filter === "pets" && petGenetics}
         <PetsInventory genetics={petGenetics} database={$itemDb} />
       {:else if filter === "resources"}

@@ -167,6 +167,8 @@
   "orderbook.bestWts": "Лучший WTS",
   "orderbook.closeListings": "Закрыть объявления на рынке",
   "orderbook.noActiveListings": "Активные объявления не найдены.",
+  "orderbook.accessDenied": "Warframe.market отказал в доступе к объявлениям.",
+  "orderbook.rateLimited": "Warframe.market ограничил частоту запросов. Попробуйте позже.",
   "orderbook.noBuyOrders": "Нет ордеров на покупку",
   "orderbook.noSellOrders": "Нет ордеров на продажу",
   "orderbook.offlineHidden": "Не в сети и скрыто фильтром: {count}",

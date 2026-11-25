@@ -3,7 +3,6 @@ const path = require("node:path");
 const asar = require("@electron/asar");
 const runtimeAssets = require("./runtime-assets.cjs");
 
-const requiredResources = [...runtimeAssets.onnxAssets, ...runtimeAssets.packagedResources];
 const requiredAsarFiles = runtimeAssets.asarFiles;
 
 function resourcesRoot(context) {
@@ -12,6 +11,14 @@ function resourcesRoot(context) {
 
 exports.default = async function verifyPackagedRuntimeAssets(context) {
   const root = resourcesRoot(context);
+  const sourceRoot = path.resolve(__dirname, "..");
+  const reviewMarker = "desktop-review.json";
+  const reviewSource = path.join(sourceRoot, "resources", reviewMarker);
+  const review = existsSync(reviewSource);
+  const requiredResources = [
+    ...runtimeAssets.packagedResources,
+    ...(review ? [reviewMarker] : runtimeAssets.onnxAssets),
+  ];
   const missing = requiredResources.filter(
     (relativePath) => !existsSync(path.join(root, relativePath)),
   );
@@ -36,7 +43,17 @@ exports.default = async function verifyPackagedRuntimeAssets(context) {
     throw new Error(`Packaged app.asar is missing runtime file(s): ${missingAsarFiles.join(", ")}`);
   }
 
-  const sourceRoot = path.resolve(__dirname, "..");
+  if (review) {
+    if (!readFileSync(path.join(root, reviewMarker)).equals(readFileSync(reviewSource))) {
+      throw new Error("Packaged review manifest differs from its source");
+    }
+    if (
+      existsSync(path.join(root, "riven-ocr")) ||
+      [...packagedFiles].some((file) => file.endsWith(".onnx"))
+    ) {
+      throw new Error("Desktop review must exclude the Riven model files");
+    }
+  }
   if (
     !readFileSync(path.join(root, "LICENSE.WFHelper.txt")).equals(
       readFileSync(path.join(sourceRoot, "LICENSE")),
@@ -51,6 +68,15 @@ exports.default = async function verifyPackagedRuntimeAssets(context) {
       .equals(readFileSync(path.join(sourceRoot, onestNotice)))
   ) {
     throw new Error("Packaged Onest OFL notice differs from assets/OFL-Onest.txt");
+  }
+  const unboundedNotice = "assets/OFL-Unbounded.txt";
+  if (
+    existsSync(path.join(sourceRoot, unboundedNotice)) &&
+    !asar
+      .extractFile(appAsarPath, unboundedNotice)
+      .equals(readFileSync(path.join(sourceRoot, unboundedNotice)))
+  ) {
+    throw new Error("Packaged Unbounded OFL notice differs from its source");
   }
   verifySharpBinaries(root, context);
 };
