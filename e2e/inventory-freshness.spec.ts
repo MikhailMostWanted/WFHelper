@@ -24,6 +24,17 @@ test("an unreadable update keeps the previous file and recovers on the next vali
     await expect(status).toHaveAttribute("data-state", "old");
     const oldTimestamp = await status.locator("time").getAttribute("datetime");
 
+    if (process.platform !== "win32" && process.getuid?.() !== 0) {
+      await fs.chmod(file, 0o000);
+      try {
+        await harness.page.evaluate(() => window.api.getInventory());
+        await expect(status).toHaveAttribute("data-state", "denied");
+        await expect(status.locator("time")).toHaveAttribute("datetime", oldTimestamp!);
+      } finally {
+        await fs.chmod(file, 0o600);
+      }
+    }
+
     await fs.writeFile(file, "{");
     await expect(status).toHaveAttribute("data-state", "invalid");
     await expect(status).toContainText("Showing the last readable file");

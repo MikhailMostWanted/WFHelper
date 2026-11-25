@@ -39,9 +39,19 @@
   $: source = $inventoryStatus
     ? describeInventorySource($inventoryStatus.source, $inventoryStatus.path)
     : null;
-  $: modifiedAt = $inventoryStatus?.modifiedAt;
-  $: fileTime = modifiedAt && modifiedAt <= now && modifiedAt > 0 ? new Date(modifiedAt) : null;
-  $: statusKey = stateKey($inventoryStatus, Boolean($inventoryData), fileTime, now);
+  function readableTime(modifiedAt: number | null | undefined, currentTime: number): Date | null {
+    if (modifiedAt != null && modifiedAt > 0 && Math.floor(modifiedAt) <= currentTime) {
+      return new Date(modifiedAt);
+    }
+    return null;
+  }
+  $: fileTime = readableTime($inventoryStatus?.modifiedAt, Math.max(now, Date.now()));
+  $: statusKey = stateKey(
+    $inventoryStatus,
+    Boolean($inventoryData),
+    fileTime,
+    Math.max(now, Date.now()),
+  );
 
   function chooseSource(): void {
     settingsTabRequest.set("general");
