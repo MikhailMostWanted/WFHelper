@@ -24,7 +24,9 @@
 
 !ifndef BUILD_UNINSTALLER
 Var HelperAutoInstall
+!ifndef WF_DESKTOP_REVIEW
 Var HelperAutoInstallCheckbox
+!endif
 
 !macro customInit
 !ifdef WF_DESKTOP_REVIEW
