@@ -133,7 +133,7 @@ async function fetchDirectOrderBook(
   }
 
   bumpCounter("resultOk");
-  if (result.orders.length === 0) log.debug(`[OrderBook] No orders returned for ${slug}`);
+  if (result.orders.length === 0) log.info(`[OrderBook] No orders returned for ${slug}`);
   return {
     status: "ok",
     data: {

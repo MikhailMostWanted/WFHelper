@@ -59,7 +59,11 @@
   }
 </script>
 
-<div class="source-status" data-inventory-source-status data-state={statusKey.split(".").at(-1)}>
+<div
+  class="source-status"
+  data-inventory-source-status
+  data-state={statusKey.slice("inventory.source.".length)}
+>
   <div role="status">
     <strong>{$tr(statusKey)}</strong>
     <div class="source-details">
