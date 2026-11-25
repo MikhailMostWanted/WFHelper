@@ -216,8 +216,10 @@ function run(...args) {
 run("install", "--frozen-lockfile");
 run("run", "build");
 if (target !== "renderer") {
-  const args = ["exec", "electron-builder", "--win", "--x64", "--publish", "never"];
-  args.push(target === "dir" ? "--dir" : "nsis");
+  const args = ["exec", "electron-builder", "--win"];
+  if (target === "nsis") args.push("nsis");
+  else args.push("--dir");
+  args.push("--x64", "--publish", "never");
   run(...args);
 }
 const setup = path.join(stage, "release", `WantedFrame-${version}-Setup.exe`);
